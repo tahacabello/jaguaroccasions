@@ -6,7 +6,7 @@ import { Search, ShoppingBag, User, Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "@/context/CartContext";
 import { CartDrawer } from "@/components/layout/CartDrawer";
-import { getSupabaseSettings } from "@/lib/supabase";
+import { getSupabaseSettings, supabase } from "@/lib/supabase";
 
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -15,6 +15,19 @@ export function Header() {
   const [announcementText, setAnnouncementText] = useState("توصيل لجميع أنحاء ليبيا 🎓");
 
   const { cartCount } = useCart();
+
+  const [userLoggedIn, setUserLoggedIn] = useState(false);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUserLoggedIn(!!user);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserLoggedIn(!!session?.user);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Load dynamic settings from Supabase
   useEffect(() => {
@@ -53,7 +66,7 @@ export function Header() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             <span className="text-2xl font-black tracking-tighter bg-gradient-to-r from-primary-light to-primary-dark bg-clip-text text-transparent">
-              JAGUAR
+              جاغوار
             </span>
             <span className="text-lg font-bold text-foreground">
               Occasions
@@ -81,7 +94,7 @@ export function Header() {
             <button className="p-2 text-foreground/80 hover:text-primary transition-colors rounded-full hover:bg-surface-hover">
               <Search className="w-5 h-5" />
             </button>
-            <Link href="/auth/login" className="p-2 text-foreground/80 hover:text-primary transition-colors rounded-full hover:bg-surface-hover">
+            <Link href={userLoggedIn ? "/account" : "/auth/login"} className="p-2 text-foreground/80 hover:text-primary transition-colors rounded-full hover:bg-surface-hover">
               <User className="w-5 h-5" />
             </Link>
             <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-foreground/80 hover:text-primary transition-colors rounded-full hover:bg-surface-hover">
@@ -116,7 +129,7 @@ export function Header() {
           >
             <div className="flex items-center justify-between p-6 border-b border-border">
               <span className="text-2xl font-black bg-gradient-to-r from-primary-light to-primary-dark bg-clip-text text-transparent">
-                JAGUAR
+                جاغوار Occasions
               </span>
               <button 
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -134,9 +147,9 @@ export function Header() {
             </nav>
             
             <div className="mt-auto p-6 border-t border-border">
-              <Link href="/auth/login" onClick={() => setIsMobileMenuOpen(false)} className="btn-premium w-full flex justify-center items-center gap-2">
+              <Link href={userLoggedIn ? "/account" : "/auth/login"} onClick={() => setIsMobileMenuOpen(false)} className="btn-premium w-full flex justify-center items-center gap-2">
                 <User className="w-5 h-5" />
-                تسجيل الدخول
+                {userLoggedIn ? "حسابي الفاخر" : "تسجيل الدخول"}
               </Link>
             </div>
           </motion.div>

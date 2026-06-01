@@ -25,9 +25,12 @@ export function Footer() {
           
           {/* Brand Col */}
           <div className="space-y-6">
-            <Link href="/" className="inline-block">
+            <Link href="/" className="inline-block flex items-center gap-2">
               <span className="text-3xl font-black tracking-tighter bg-gradient-to-r from-primary-light to-primary-dark bg-clip-text text-transparent">
-                JAGUAR
+                جاغوار
+              </span>
+              <span className="text-xl font-bold text-foreground">
+                Occasions
               </span>
             </Link>
             <p className="text-foreground/70 leading-relaxed text-sm">

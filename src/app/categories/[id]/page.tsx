@@ -1,12 +1,18 @@
 import CategoryProductsClient from "./CategoryProductsClient";
+import { getSupabaseCategories } from "@/lib/supabase";
 
 export async function generateStaticParams() {
-  return [
-    { id: "gowns" },
-    { id: "caps" },
-    { id: "sashes" },
-    { id: "pins" }
-  ];
+  try {
+    const cats = await getSupabaseCategories();
+    return cats.map((c: any) => ({ id: c.id }));
+  } catch (err) {
+    return [
+      { id: "gowns" },
+      { id: "caps" },
+      { id: "sashes" },
+      { id: "pins" }
+    ];
+  }
 }
 
 interface PageProps {

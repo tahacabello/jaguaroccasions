@@ -7,28 +7,36 @@ import Link from "next/link";
 import Image from "next/image";
 import { ShoppingBag, Heart, Filter, ChevronRight } from "lucide-react";
 import { useCart } from "@/context/CartContext";
-import { getSupabaseProducts } from "@/lib/supabase";
-
-// Mock categories map
-const categoriesMap: Record<string, { name: string; desc: string }> = {
-  gowns: { name: "كابات التخرج", desc: "تشكيلة فاخرة من الكابات الكويتية والكلاسيكية المصممة بعناية فائقة" },
-  caps: { name: "قبعات التخرج", desc: "قبعات مخمل وستان تناسب جميع الأذواق ومصممة بأعلى جودة" },
-  sashes: { name: "شالات التخرج", desc: "شالات مطرزة بدقة عالية ومخصصة بالاسم والألوان المفضلة لديك" },
-  pins: { name: "بروشات التخرج", desc: "بروشات معدنية ومطلية بالذهب بتصاميم مميزة تعبر عن إنجازك" },
-};
+import { getSupabaseProducts, getSupabaseCategories } from "@/lib/supabase";
 
 export default function CategoryProductsClient({ params }: { params: { id: string } }) {
   const { addToCart } = useCart();
-  const category = categoriesMap[params.id];
+  const [category, setCategory] = useState<any>({ name: "جاري التحميل...", desc: "" });
   const [products, setProducts] = useState<any[]>([]);
+  const [isValidCategory, setIsValidCategory] = useState(true);
 
   useEffect(() => {
+    // Fetch categories and resolve current
+    getSupabaseCategories().then(cats => {
+      const found = cats.find((c: any) => c.id === params.id);
+      if (found) {
+        setCategory(found);
+        setIsValidCategory(true);
+      } else {
+        setIsValidCategory(false);
+      }
+    }).catch(err => {
+      console.error(err);
+      setIsValidCategory(false);
+    });
+
+    // Fetch products in category
     getSupabaseProducts().then(dbProducts => {
       setProducts(dbProducts.filter(p => p.categoryId === params.id));
     }).catch(err => console.error("Error loading category products in CPC:", err));
   }, [params.id]);
 
-  if (!category) {
+  if (!isValidCategory) {
     return (
       <>
         <title>القسم غير موجود | جاغوار</title>

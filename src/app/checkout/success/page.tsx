@@ -4,9 +4,10 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { CheckCircle, MapPin, Phone, CreditCard, ChevronRight, ShoppingBag } from "lucide-react";
+import { CheckCircle, MapPin, Phone, CreditCard, ChevronRight, ShoppingBag, MessageCircle, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { getSupabaseSettings } from "@/lib/supabase";
 
 interface OrderItem {
   id: string;
@@ -21,12 +22,13 @@ interface SimulatedOrder {
   id: string;
   guest_name: string;
   guest_phone: string;
+  guest_backup_phone?: string;
   guest_city: string;
-  guest_address: string;
+  guest_street: string;
+  guest_address_detail?: string;
   status: string;
   payment_method: string;
   total_amount: number;
-  shipping_fee: number;
   tracking_number: string;
   created_at: string;
   items: OrderItem[];
@@ -37,8 +39,12 @@ function SuccessContent() {
   const orderId = searchParams.get("id");
   const [order, setOrder] = useState<SimulatedOrder | null>(null);
   const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    // Load dynamic settings to get WhatsApp number
+    getSupabaseSettings().then(setSettings).catch(err => console.error("Error getting settings on success page:", err));
+
     if (!orderId) {
       setLoading(false);
       return;
@@ -70,17 +76,16 @@ function SuccessContent() {
     guest_name: "خريج جاغوار الفاخر",
     guest_phone: "0912345678",
     guest_city: "طرابلس",
-    guest_address: "حي الأندلس، بجانب مقهى زرياب",
-    status: "pending",
+    guest_street: "حي الأندلس، بجانب مقهى زرياب",
+    status: "new_order",
     payment_method: "cash_on_delivery",
     total_amount: 95,
-    shipping_fee: 10,
     tracking_number: "JG-849302",
     created_at: new Date().toISOString(),
     items: [
       {
         id: "1",
-        name: "كاب كويتي فاخر",
+        name: "كيبان كويتي فاخر",
         price: 85,
         image: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=400&auto=format&fit=crop",
         quantity: 1,
@@ -97,12 +102,40 @@ function SuccessContent() {
     mobicash: "موبي كاش (MobiCash)",
   };
 
+  // Generate WhatsApp confirmation link with pre-filled message detailing order
+  const getWhatsAppLink = () => {
+    const rawNumber = settings.whatsapp_number || "+218921234567";
+    // Remove plus and spaces for url
+    const cleanNumber = rawNumber.replace(/\+/g, "").replace(/\s/g, "");
+    
+    const itemsList = currentOrder.items
+      ? currentOrder.items.map(item => `- ${item.name} (${item.mode === "rent" ? "إيجار" : "شراء"}) [الكمية: ${item.quantity}]`).join("\n")
+      : "";
+
+    const message = `السلام عليكم ورحمة الله،
+أود تأكيد طلبي رقم (${currentOrder.tracking_number}) من متجر جاغوار للمناسبات.
+
+تفاصيل الطلب:
+- اسم الزبون: ${currentOrder.guest_name}
+- رقم الهاتف: ${currentOrder.guest_phone}
+${currentOrder.guest_backup_phone ? `- هاتف احتياطي: ${currentOrder.guest_backup_phone}\n` : ""}- المدينة: ${currentOrder.guest_city}
+- الشارع والعنوان: ${currentOrder.guest_street} ${currentOrder.guest_address_detail || ""}
+
+المنتجات المحجوزة:
+${itemsList}
+
+إجمالي القيمة: ${currentOrder.total_amount} د.ل
+طريقة الدفع: ${paymentLabels[currentOrder.payment_method] || currentOrder.payment_method}`;
+
+    return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`;
+  };
+
   return (
     <main className="min-h-screen bg-background pt-16 pb-24 text-right">
       <div className="container mx-auto px-4 lg:px-8 max-w-4xl">
         
         {/* Header Celebratory Section */}
-        <div className="text-center mb-16 space-y-4">
+        <div className="text-center mb-10 space-y-4">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-green-500/10 text-green-400 rounded-full border border-green-500/20 mb-4 animate-bounce">
             <CheckCircle className="w-12 h-12" />
           </div>
@@ -112,6 +145,35 @@ function SuccessContent() {
           <p className="text-foreground/60 text-lg max-w-md mx-auto">
             شكراً لاختيارك "جاغوار". يسعدنا أن نكون جزءاً من فرحة تخرجك المميزة!
           </p>
+        </div>
+
+        {/* WhatsApp Urgent Action Notice */}
+        <div className="glass p-8 rounded-3xl border-2 border-green-500/30 bg-green-950/10 mb-8 space-y-6 text-center">
+          <div className="flex justify-center">
+            <div className="p-3 bg-green-500/20 rounded-full text-green-400">
+              <MessageCircle className="w-8 h-8 animate-pulse" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black text-green-400">تأكيد الطلب عبر الواتساب</h2>
+            <p className="text-sm font-semibold text-foreground/80 leading-relaxed max-w-xl mx-auto">
+              “لتأكيد وإتمام طلبك 100%، يرجى التواصل معنا عبر الواتساب.”
+            </p>
+            <p className="text-xs text-foreground/60 leading-relaxed">
+              قم بالنقر على الزر الأخضر أدناه لفتح محادثة واتساب مجهزة تلقائياً بكامل بيانات فاتورتك لتأكيد حجز منتجاتك فورياً.
+            </p>
+          </div>
+          <div className="flex justify-center">
+            <a
+              href={getWhatsAppLink()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-3 px-8 py-4 bg-green-500 hover:bg-green-600 text-black font-black rounded-xl text-lg transition-all duration-300 hover:scale-105 shadow-[0_0_30px_rgba(34,197,94,0.35)]"
+            >
+              <MessageCircle className="w-6 h-6" />
+              تأكيد حجز الطلبية الآن عبر الواتساب
+            </a>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
@@ -125,38 +187,38 @@ function SuccessContent() {
               
               <div className="relative pl-4 space-y-8 before:absolute before:right-3.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-border">
                 
-                {/* Step 1 */}
+                {/* Step 1 - active */}
                 <div className="relative pr-8 flex items-start gap-4">
                   <div className="absolute right-0 top-1 w-7 h-7 rounded-full bg-primary border-4 border-background flex items-center justify-center z-10">
                     <div className="w-2.5 h-2.5 bg-black rounded-full" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm text-primary-light">تم استلام طلبك الفاخر</h4>
+                    <h4 className="font-bold text-sm text-primary-light">طلب جديد (بانتظار التأكيد)</h4>
                     <p className="text-xs text-foreground/60 mt-1">
-                      طلبك قيد المراجعة الآن وسيتواصل معك موظف المبيعات قريباً
+                      تم تسجيل طلبك بنجاح، يرجى نقر زر الواتساب أعلاه لتأكيد طلبك وتجنب إلغائه تلقائياً.
                     </p>
                   </div>
                 </div>
 
-                {/* Step 2 */}
+                {/* Step 2 - inactive */}
                 <div className="relative pr-8 flex items-start gap-4 opacity-50">
                   <div className="absolute right-0 top-1 w-7 h-7 rounded-full bg-border border-4 border-background flex items-center justify-center z-10">
                     <div className="w-2 h-2 bg-foreground/30 rounded-full" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm">جاري التجهيز والتعبئة</h4>
-                    <p className="text-xs text-foreground/60 mt-1">تجهيز مستلزمات تخرجك وتطريز الأسماء المطلوبة</p>
+                    <h4 className="font-bold text-sm">جاري التجهيز والتطريز</h4>
+                    <p className="text-xs text-foreground/60 mt-1">تجهيز مستلزمات تخرجك وتطريز الأسماء وكتابة التفاصيل بدقة</p>
                   </div>
                 </div>
 
-                {/* Step 3 */}
+                {/* Step 3 - inactive */}
                 <div className="relative pr-8 flex items-start gap-4 opacity-50">
                   <div className="absolute right-0 top-1 w-7 h-7 rounded-full bg-border border-4 border-background flex items-center justify-center z-10">
                     <div className="w-2 h-2 bg-foreground/30 rounded-full" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm">خارج للتوصيل</h4>
-                    <p className="text-xs text-foreground/60 mt-1">تم تسليم الشحنة لشركة التوصيل للتواصل معك</p>
+                    <h4 className="font-bold text-sm">جاهز للتسليم / التوصيل</h4>
+                    <p className="text-xs text-foreground/60 mt-1">طلبك جاهز للتسليم في فروعنا أو للشحن مباشرة</p>
                   </div>
                 </div>
 
@@ -165,7 +227,7 @@ function SuccessContent() {
 
             {/* Items List */}
             <div className="glass p-6 rounded-3xl border border-border space-y-4">
-              <h3 className="text-lg font-bold border-b border-border pb-3">محتويات الشحنة</h3>
+              <h3 className="text-lg font-bold border-b border-border pb-3">محتويات الطلبية</h3>
               <div className="space-y-4">
                 {currentOrder.items?.map((item) => (
                   <div key={`${item.id}-${item.mode}`} className="flex gap-4 items-center">
@@ -201,11 +263,11 @@ function SuccessContent() {
             
             {/* Order Metadata */}
             <div className="glass p-6 rounded-3xl border border-border space-y-4">
-              <h3 className="text-lg font-bold border-b border-border pb-3">تفاصيل الفاتورة</h3>
+              <h3 className="text-lg font-bold border-b border-border pb-3">ملخص الفاتورة</h3>
 
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-foreground/60">رقم التتبع للطلب:</span>
+                  <span className="text-foreground/60">رقم تتبع الطلب:</span>
                   <span className="font-black text-primary-light tracking-wide">{currentOrder.tracking_number}</span>
                 </div>
 
@@ -220,24 +282,25 @@ function SuccessContent() {
                   </span>
                 </div>
 
-                <div className="flex justify-between">
-                  <span className="text-foreground/60">المجموع النهائي:</span>
-                  <span className="font-black text-primary-light">{currentOrder.total_amount} د.ل</span>
+                <div className="flex justify-between items-center border-t border-border pt-3">
+                  <span className="text-foreground/60">إجمالي قيمة الطلب:</span>
+                  <span className="font-black text-lg text-primary-light">{currentOrder.total_amount} د.ل</span>
                 </div>
               </div>
             </div>
 
             {/* Delivery Details */}
             <div className="glass p-6 rounded-3xl border border-border space-y-4">
-              <h3 className="text-lg font-bold border-b border-border pb-3">بيانات التوصيل والدفع</h3>
+              <h3 className="text-lg font-bold border-b border-border pb-3">بيانات التوصيل والعنوان</h3>
 
               <div className="space-y-4 text-sm font-semibold">
                 <div className="flex gap-3 items-start">
                   <MapPin className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="text-foreground/65 text-xs">عنوان التوصيل:</h4>
+                    <h4 className="text-foreground/65 text-xs">العنوان بالتفصيل:</h4>
                     <p className="text-foreground mt-1">
-                      {currentOrder.guest_city} · {currentOrder.guest_address}
+                      {currentOrder.guest_city} · {currentOrder.guest_street}
+                      {currentOrder.guest_address_detail ? ` · ${currentOrder.guest_address_detail}` : ""}
                     </p>
                   </div>
                 </div>
@@ -245,9 +308,10 @@ function SuccessContent() {
                 <div className="flex gap-3 items-start">
                   <Phone className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="text-foreground/65 text-xs">رقم التواصل:</h4>
+                    <h4 className="text-foreground/65 text-xs">هواتف التواصل:</h4>
                     <p className="text-foreground mt-1" dir="ltr">
                       {currentOrder.guest_phone}
+                      {currentOrder.guest_backup_phone ? ` / ${currentOrder.guest_backup_phone}` : ""}
                     </p>
                   </div>
                 </div>

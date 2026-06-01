@@ -1,11 +1,11 @@
 import type { NextConfig } from "next";
 
-const isGithubActions = process.env.GITHUB_ACTIONS === "true";
+const isProd = process.env.NODE_ENV === "production";
 
 const nextConfig: NextConfig = {
   output: "export",
-  basePath: isGithubActions ? "/jaguar-occasions" : "",
-  assetPrefix: isGithubActions ? "/jaguar-occasions" : "",
+  basePath: isProd ? "/jaguaroccasions" : "",
+  assetPrefix: isProd ? "/jaguaroccasions" : "",
   images: {
     unoptimized: true,
   },

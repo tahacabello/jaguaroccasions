@@ -4,23 +4,10 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { useCart } from "@/context/CartContext";
-import { supabase } from "@/lib/supabase";
-import { ShoppingBag, CreditCard, Truck, ShieldCheck, Ticket, Check } from "lucide-react";
+import { supabase, addSupabaseOrder } from "@/lib/supabase";
+import { ShoppingBag, CreditCard, ShieldCheck, Ticket, Check, MapPin, Phone, Info } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-
-// Dynamic shipping fees per city in Libya
-const shippingFees: Record<string, number> = {
-  tripoli: 10,
-  benghazi: 25,
-  misrata: 15,
-  khoms: 15,
-  zawiya: 12,
-  sebha: 35,
-  garian: 15,
-  tobruk: 30,
-  other: 25,
-};
 
 const cityNames: Record<string, string> = {
   tripoli: "طرابلس",
@@ -31,6 +18,8 @@ const cityNames: Record<string, string> = {
   sebha: "سبها",
   garian: "غريان",
   tobruk: "طبرق",
+  zleten: "زليتن",
+  msallata: "مسلاتة",
   other: "مدينة أخرى",
 };
 
@@ -41,10 +30,16 @@ export default function CheckoutPage() {
   // Form State
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [backupPhone, setBackupPhone] = useState("");
   const [city, setCity] = useState("tripoli");
-  const [address, setAddress] = useState("");
+  const [street, setStreet] = useState("");
+  const [addressDetail, setAddressDetail] = useState("");
+  const [notes, setNotes] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cash_on_delivery" | "sadad" | "mobicash">("cash_on_delivery");
   
+  // Auth state
+  const [customerId, setCustomerId] = useState<string | null>(null);
+
   // Coupon Engine State
   const [couponCode, setCouponCode] = useState("");
   const [discountPercent, setDiscountPercent] = useState(0);
@@ -54,10 +49,36 @@ export default function CheckoutPage() {
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Calculations
-  const shippingFee = shippingFees[city] || 15;
+  // Calculations (completely removed shipping fees)
   const discountAmount = Math.round(cartTotal * (discountPercent / 100));
-  const finalTotal = cartTotal + shippingFee - discountAmount;
+  const finalTotal = cartTotal - discountAmount;
+
+  // Prefill authenticated customer details
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setCustomerId(user.id);
+        // Query their profile shipping details
+        supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single()
+          .then(({ data: profile, error }) => {
+            if (profile && !error) {
+              setName(profile.name || "");
+              setPhone(profile.phone || "");
+              setBackupPhone(profile.backup_phone || "");
+              // Find matching city key or set to tripoli
+              const cityKey = Object.keys(cityNames).find(key => cityNames[key] === profile.city) || "tripoli";
+              setCity(cityKey);
+              setStreet(profile.street || "");
+              setAddressDetail(profile.additional_address || "");
+            }
+          });
+      }
+    });
+  }, []);
 
   // Protect page: redirect to products if cart is empty (unless submitting)
   useEffect(() => {
@@ -98,80 +119,64 @@ export default function CheckoutPage() {
   // Submit Order
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !phone || !address) {
-      alert("الرجاء ملء جميع الحقول المطلوبة لضمان دقة التوصيل");
+    if (!name || !phone || !street) {
+      alert("الرجاء ملء جميع الحقول المطلوبة للتوصيل");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
+      const trackingNumber = `JG-${Math.floor(100000 + Math.random() * 900000)}`;
+      
       // 1. Prepare Order Payload
-      const orderData = {
+      const orderPayload = {
+        customer_id: customerId,
         guest_name: name,
         guest_phone: phone,
-        guest_city: cityNames[city],
-        guest_address: address,
-        status: "pending",
+        guest_backup_phone: backupPhone,
+        guest_city: cityNames[city] || city,
+        guest_street: street,
+        guest_address_detail: addressDetail,
+        customer_notes: notes,
+        status: "new_order",
         payment_method: paymentMethod,
         total_amount: finalTotal,
-        shipping_fee: shippingFee,
-        tracking_number: `JG-${Math.floor(100000 + Math.random() * 900000)}`,
+        tracking_number: trackingNumber,
       };
 
-      let orderId = "";
+      // 2. Insert into Supabase
+      const result = await addSupabaseOrder(orderPayload, cartItems);
 
-      // 2. Insert into Supabase (with elegant local fallback for preview)
-      const isPlaceholder = supabase.auth.constructor.name === "Object" || !process.env.NEXT_PUBLIC_SUPABASE_URL;
-      
-      if (isPlaceholder) {
-        // Simulation for testing/preview if Supabase url is placeholder
-        console.log("Supabase in placeholder mode. Simulating order creation locally...", orderData);
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        orderId = Math.random().toString(36).substring(2, 15);
-        
-        // Save order to mock localStorage for success page retrieval
-        const simulatedOrder = {
-          id: orderId,
-          ...orderData,
-          items: cartItems,
-          created_at: new Date().toISOString(),
-        };
-        localStorage.setItem(`simulated_order_${orderId}`, JSON.stringify(simulatedOrder));
-      } else {
-        // Real Supabase Insertion
-        const { data: order, error: orderError } = await supabase
-          .from("orders")
-          .insert(orderData)
-          .select()
-          .single();
-
-        if (orderError) throw orderError;
-        orderId = order.id;
-
-        // Insert Order Items
-        const orderItemsData = cartItems.map((item) => ({
-          order_id: orderId,
-          product_id: item.id,
-          product_name: item.name,
-          quantity: item.quantity,
-          price_at_purchase: item.price,
-          item_mode: item.mode,
-        }));
-
-        const { error: itemsError } = await supabase
-          .from("order_items")
-          .insert(orderItemsData);
-
-        if (itemsError) throw itemsError;
+      if (!result.success) {
+        throw new Error(result.error || "خطأ أثناء إضافة الطلبية");
       }
 
-      // 3. Clear Cart & Redirect to Success Page
+      const dbOrderId = result.data.id;
+
+      // 3. Save order to localStorage for success page retrieval (crucial for guest views & instant page reload)
+      const cachedOrder = {
+        id: dbOrderId,
+        ...orderPayload,
+        items: cartItems.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          image: item.image,
+          quantity: item.quantity,
+          mode: item.mode
+        })),
+        created_at: new Date().toISOString(),
+      };
+      
+      localStorage.setItem(`simulated_order_${dbOrderId}`, JSON.stringify(cachedOrder));
+
+      // 4. Clear Cart & Redirect to Success Page
       clearCart();
-      router.push(`/checkout/success?id=${orderId}`);
-    } catch (error) {
+      router.push(`/checkout/success?id=${dbOrderId}`);
+    } catch (error: any) {
       console.error("Order submission failed:", error);
-      alert("حدث خطأ أثناء إتمام الطلب. يرجى المحاولة مرة أخرى.");
+      alert(`حدث خطأ أثناء إتمام الطلب: ${error?.message || "يرجى المحاولة مرة أخرى."}`);
       setIsSubmitting(false);
     }
   };
@@ -179,10 +184,20 @@ export default function CheckoutPage() {
   return (
     <>
       <Header />
-      <main className="min-h-screen bg-background pt-12 pb-24">
+      <main className="min-h-screen bg-background pt-12 pb-24 text-right">
         <div className="container mx-auto px-4 lg:px-8 max-w-6xl">
           
-          <h1 className="text-3xl md:text-5xl font-black mb-12 text-right">إتمام الطلب الفاخر</h1>
+          <h1 className="text-3xl md:text-5xl font-black mb-12 text-right bg-gradient-to-r from-primary-light to-primary-dark bg-clip-text text-transparent">
+            إتمام الطلب الفاخر
+          </h1>
+
+          {/* WhatsApp confirmation prompt */}
+          <div className="mb-8 p-4 rounded-2xl bg-primary/10 border border-primary/20 flex items-center gap-3 text-primary-light">
+            <Info className="w-5 h-5 shrink-0" />
+            <p className="text-sm font-bold leading-relaxed">
+              💡 **ملاحظة هامة:** لتأكيد وإتمام طلبك 100%، يرجى التواصل معنا عبر الواتساب فور الانتهاء من ملء البيانات وتقديم الطلب.
+            </p>
+          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
             
@@ -191,7 +206,7 @@ export default function CheckoutPage() {
               
               {/* Form panel */}
               <form onSubmit={handlePlaceOrder} className="glass p-8 rounded-3xl border border-border space-y-6">
-                <h2 className="text-2xl font-bold border-b border-border pb-4 mb-6">تفاصيل الشحن والتوصيل</h2>
+                <h2 className="text-2xl font-bold border-b border-border pb-4 mb-6">تفاصيل عنوان الشحن والتوصيل</h2>
 
                 {/* Name */}
                 <div className="space-y-2">
@@ -201,15 +216,15 @@ export default function CheckoutPage() {
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="مثال: أحمد عبد الله الوداني"
+                    placeholder="مثال: أحمد عبد الله الفرجاني"
                     className="w-full px-4 py-3 rounded-xl border border-border bg-surface hover:border-primary-light/35 focus:border-primary focus:outline-none transition-colors font-semibold"
                   />
                 </div>
 
-                {/* Phone & City Row */}
+                {/* Phone & Backup Phone */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="block text-sm font-bold text-foreground/80">رقم الهاتف *</label>
+                    <label className="block text-sm font-bold text-foreground/80">رقم الهاتف الأساسي *</label>
                     <input
                       type="tel"
                       required
@@ -222,41 +237,73 @@ export default function CheckoutPage() {
                   </div>
 
                   <div className="space-y-2">
+                    <label className="block text-sm font-bold text-foreground/80">رقم الهاتف الاحتياطي</label>
+                    <input
+                      type="tel"
+                      value={backupPhone}
+                      onChange={(e) => setBackupPhone(e.target.value)}
+                      placeholder="مثال: 092XXXXXXX"
+                      className="w-full px-4 py-3 rounded-xl border border-border bg-surface hover:border-primary-light/35 focus:border-primary focus:outline-none transition-colors font-semibold text-left"
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+
+                {/* City & Street */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
                     <label className="block text-sm font-bold text-foreground/80">المدينة *</label>
                     <select
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
                       className="w-full px-4 py-3 rounded-xl border border-border bg-surface hover:border-primary-light/35 focus:border-primary focus:outline-none transition-colors font-bold"
                     >
-                      <option value="tripoli">طرابلس (10 د.ل)</option>
-                      <option value="benghazi">بنغازي (25 د.ل)</option>
-                      <option value="misrata">مصراتة (15 د.ل)</option>
-                      <option value="khoms">الخمس (15 د.ل)</option>
-                      <option value="zawiya">الزاوية (12 د.ل)</option>
-                      <option value="sebha">سبها (35 د.ل)</option>
-                      <option value="garian">غريان (15 د.ل)</option>
-                      <option value="tobruk">طبرق (30 د.ل)</option>
-                      <option value="other">مدينة أخرى (25 د.ل)</option>
+                      {Object.entries(cityNames).map(([key, name]) => (
+                        <option key={key} value={key}>{name}</option>
+                      ))}
                     </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-sm font-bold text-foreground/80">الشارع بالتفصيل *</label>
+                    <input
+                      type="text"
+                      required
+                      value={street}
+                      onChange={(e) => setStreet(e.target.value)}
+                      placeholder="مثال: شارع النصر، خلف فندق تيبستي"
+                      className="w-full px-4 py-3 rounded-xl border border-border bg-surface hover:border-primary-light/35 focus:border-primary focus:outline-none transition-colors font-semibold"
+                    />
                   </div>
                 </div>
 
                 {/* Address Details */}
                 <div className="space-y-2">
-                  <label className="block text-sm font-bold text-foreground/80">العنوان بالتفصيل *</label>
+                  <label className="block text-sm font-bold text-foreground/80">تفاصيل إضافية للعنوان</label>
+                  <input
+                    type="text"
+                    value={addressDetail}
+                    onChange={(e) => setAddressDetail(e.target.value)}
+                    placeholder="مثال: بجانب مقهى السلام، عمارة رقم 4، الطابق الثالث"
+                    className="w-full px-4 py-3 rounded-xl border border-border bg-surface hover:border-primary-light/35 focus:border-primary focus:outline-none transition-colors font-semibold"
+                  />
+                </div>
+
+                {/* Notes */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-foreground/80">ملاحظات الزبون (مثل مقاس التطريز، الكتابة المخصصة)</label>
                   <textarea
-                    required
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
                     rows={3}
-                    placeholder="اسم الحي، الشارع، علامة مميزة بجانب المنزل..."
+                    placeholder="اكتب أي ملاحظات إضافية ترغب بإطلاعنا عليها..."
                     className="w-full px-4 py-3 rounded-xl border border-border bg-surface hover:border-primary-light/35 focus:border-primary focus:outline-none transition-colors font-semibold"
                   />
                 </div>
 
                 {/* Payment Method selection */}
                 <div className="space-y-4 pt-4 border-t border-border">
-                  <h3 className="text-lg font-bold text-foreground">طريقة الدفع</h3>
+                  <h3 className="text-lg font-bold text-foreground">طريقة الدفع المختارة</h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
@@ -312,7 +359,7 @@ export default function CheckoutPage() {
                     ) : (
                       <>
                         <Check className="w-5 h-5" />
-                        تأكيد الطلب الفاخر
+                        تأكيد الطلب وحجز المنتجات
                       </>
                     )}
                   </button>
@@ -320,26 +367,19 @@ export default function CheckoutPage() {
               </form>
 
               {/* Guarantees panel */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 rounded-2xl glass border border-border flex items-center gap-3">
-                  <Truck className="w-8 h-8 text-primary shrink-0" />
-                  <div>
-                    <h4 className="font-bold text-sm">توصيل سريع وموثوق</h4>
-                    <p className="text-xs text-foreground/60">لباب بيتك في أسرع وقت</p>
-                  </div>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-4 rounded-2xl glass border border-border flex items-center gap-3">
                   <ShieldCheck className="w-8 h-8 text-primary shrink-0" />
                   <div>
-                    <h4 className="font-bold text-sm">معاينة الطلب قبل الدفع</h4>
-                    <p className="text-xs text-foreground/60">افحص خاماتك وتأكد منها</p>
+                    <h4 className="font-bold text-sm">مراجعة ومعاينة الطلب</h4>
+                    <p className="text-xs text-foreground/60">افحص خاماتك بالكامل عند الاستلام والتسليم</p>
                   </div>
                 </div>
                 <div className="p-4 rounded-2xl glass border border-border flex items-center gap-3">
                   <CreditCard className="w-8 h-8 text-primary shrink-0" />
                   <div>
-                    <h4 className="font-bold text-sm">طرق دفع آمنة 100%</h4>
-                    <p className="text-xs text-foreground/60">كاش أو عبر الموبايل المصرفي</p>
+                    <h4 className="font-bold text-sm">طرق دفع آمنة وسهلة</h4>
+                    <p className="text-xs text-foreground/60">ادفع كاش عند الاستلام أو بتحويل مصرفي مباشر</p>
                   </div>
                 </div>
               </div>
@@ -350,7 +390,7 @@ export default function CheckoutPage() {
             <div className="lg:col-span-5 space-y-6">
               
               <div className="glass p-6 rounded-3xl border border-border space-y-6 sticky top-24">
-                <h2 className="text-xl font-bold border-b border-border pb-4 mb-4">ملخص الطلب</h2>
+                <h2 className="text-xl font-bold border-b border-border pb-4 mb-4">ملخص الطلب الفاخر</h2>
 
                 {/* Items list */}
                 <div className="max-h-[300px] overflow-y-auto space-y-4 pr-1">
@@ -403,7 +443,7 @@ export default function CheckoutPage() {
                   {couponSuccess && <p className="text-xs text-green-400 font-bold mt-1">{couponSuccess}</p>}
                 </form>
 
-                {/* Price Breakdown */}
+                {/* Price Breakdown (strictly removed shipping costs) */}
                 <div className="pt-6 border-t border-border space-y-3 font-semibold text-sm">
                   <div className="flex justify-between text-foreground/85">
                     <span>المجموع الفرعي:</span>
@@ -417,11 +457,6 @@ export default function CheckoutPage() {
                     </div>
                   )}
 
-                  <div className="flex justify-between text-foreground/85">
-                    <span>رسوم التوصيل ({cityNames[city]}):</span>
-                    <span>{shippingFee} د.ل</span>
-                  </div>
-
                   <div className="flex justify-between items-center text-lg border-t border-border pt-4 font-black">
                     <span className="text-foreground">المجموع الإجمالي:</span>
                     <span className="text-2xl text-primary-light">{finalTotal} د.ل</span>
@@ -430,7 +465,7 @@ export default function CheckoutPage() {
 
                 {/* Tips */}
                 <div className="bg-primary/5 rounded-2xl p-4 border border-primary/20 text-xs leading-relaxed text-primary-light/90">
-                  💡 **ملاحظة تهمك:** كوبون **GRAD2026** يعطيك خصم 10% بمناسبة موسم تخرج 2026! جربه الآن لتوفر على طلبك.
+                  💡 **كوبونات تهمك:** استخدم الكوبون **GRAD2026** للحصول على خصم 10% أو **JAGUAR** للحصول على خصم 15% بمناسبة الموسم الجديد!
                 </div>
 
               </div>

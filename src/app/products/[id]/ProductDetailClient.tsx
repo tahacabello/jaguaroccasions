@@ -7,7 +7,7 @@ import Image from "next/image";
 import { ShoppingCart, Heart, ShieldCheck, Truck, ChevronRight, Plus, Minus, Check, X } from "lucide-react";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
-import { getSupabaseProducts } from "@/lib/supabase";
+import { getSupabaseProducts, resolveAssetPath } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Mock products database for details fetching
@@ -28,16 +28,16 @@ const productsDb: Record<string, {
     priceSale: 85,
     priceRent: 40,
     description: "كاب تخرج بتصميم كويتي أصيل، مصنوع من أجود أنواع المخمل الفاخر. يتميز بتفاصيل ذهبية دقيقة وحياكة يدوية متقنة تضمن لك إطلالة استثنائية في يوم تخرجك. متوفر للبيع والإيجار.",
-    image: "/products/gallery/graduation_photo_01.jpg",
+    image: resolveAssetPath("/products/gallery/graduation_photo_01.jpg"),
     images: [
-      "/products/gallery/graduation_photo_01.jpg",
-      "/products/gallery/graduation_photo_02.jpg",
-      "/products/gallery/graduation_photo_03.jpg",
-      "/products/gallery/graduation_photo_04.jpg",
-      "/products/gallery/graduation_photo_05.jpg",
-      "/products/gallery/graduation_photo_06.jpg",
-      "/products/gallery/graduation_photo_07.jpg",
-      "/products/gallery/graduation_photo_08.jpg",
+      resolveAssetPath("/products/gallery/graduation_photo_01.jpg"),
+      resolveAssetPath("/products/gallery/graduation_photo_02.jpg"),
+      resolveAssetPath("/products/gallery/graduation_photo_03.jpg"),
+      resolveAssetPath("/products/gallery/graduation_photo_04.jpg"),
+      resolveAssetPath("/products/gallery/graduation_photo_05.jpg"),
+      resolveAssetPath("/products/gallery/graduation_photo_06.jpg"),
+      resolveAssetPath("/products/gallery/graduation_photo_07.jpg"),
+      resolveAssetPath("/products/gallery/graduation_photo_08.jpg"),
     ],
     status: "متوفر",
     category: "كابات التخرج",
@@ -109,7 +109,8 @@ export default function ProductDetailClient({ params }: { params: { id: string }
   const { addToCart } = useCart();
 
   // Gallery state
-  const productImages = product.images && product.images.length > 0 ? product.images : [product.image];
+  const productImages = (product.images && product.images.length > 0 ? product.images : [product.image])
+    .map((img: string) => resolveAssetPath(img));
   const [activeImage, setActiveImage] = useState(productImages[0]);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
@@ -126,7 +127,8 @@ export default function ProductDetailClient({ params }: { params: { id: string }
           }
         }
         setProduct(dbProduct);
-        setActiveImage(dbProduct.images ? dbProduct.images[0] : dbProduct.image);
+        const imagesList = dbProduct.images && dbProduct.images.length > 0 ? dbProduct.images : [dbProduct.image];
+        setActiveImage(resolveAssetPath(imagesList[0]));
       }
     }).catch(err => console.error("Error fetching product detail in PD:", err));
   }, [params.id]);

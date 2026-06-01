@@ -1,21 +1,22 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
-
-const categories = [
-  { id: "gowns", name: "كابات التخرج", image: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=600&auto=format&fit=crop", count: "120+" },
-  { id: "caps", name: "قبعات التخرج", image: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=600&auto=format&fit=crop", count: "80+" },
-  { id: "sashes", name: "شالات التخرج", image: "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=600&auto=format&fit=crop", count: "200+" },
-  { id: "pins", name: "بروشات التخرج", image: "https://images.unsplash.com/photo-1627384113743-6bd5a479fffd?q=80&w=600&auto=format&fit=crop", count: "150+" },
-];
+import { getSupabaseCategories, defaultCategories } from "@/lib/supabase";
 
 export function FeaturedCategories() {
+  const [categoriesList, setCategoriesList] = useState<any[]>(defaultCategories);
+
+  useEffect(() => {
+    getSupabaseCategories().then(setCategoriesList).catch(err => console.error(err));
+  }, []);
+
   return (
     <section className="py-24 bg-surface relative overflow-hidden">
       <div className="container mx-auto px-4 lg:px-8">
-        <div className="flex justify-between items-end mb-12">
+        <div className="flex justify-between items-end mb-12 text-right">
           <div>
             <h2 className="text-3xl md:text-5xl font-black mb-4">الأقسام المميزة</h2>
             <p className="text-foreground/60 text-lg">اكتشف مجموعاتنا المصنفة بعناية</p>
@@ -26,7 +27,7 @@ export function FeaturedCategories() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {categories.map((cat, idx) => (
+          {categoriesList.map((cat, idx) => (
             <motion.div
               key={cat.id}
               initial={{ opacity: 0, y: 30 }}
@@ -47,9 +48,9 @@ export function FeaturedCategories() {
                 </div>
 
                 {/* Content */}
-                <div className="relative z-10 p-6 transform transition-transform duration-300 group-hover:-translate-y-2">
+                <div className="relative z-10 p-6 transform transition-transform duration-300 group-hover:-translate-y-2 text-right">
                   <h3 className="text-2xl font-bold text-white mb-1">{cat.name}</h3>
-                  <p className="text-primary-light font-medium">{cat.count} منتج</p>
+                  <p className="text-primary-light font-medium">{cat.count || "100+"} منتج</p>
                   
                   {/* Hover Line */}
                   <div className="h-1 w-0 bg-primary mt-4 transition-all duration-300 group-hover:w-12 rounded-full"></div>
