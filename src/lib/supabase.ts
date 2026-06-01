@@ -111,6 +111,58 @@ export const mockProducts = [
     categoryId: "gowns",
     code: "JG-008",
     sales: 15
+  },
+  {
+    id: "9",
+    name: "شال تخرج مطرز",
+    priceSale: 45,
+    priceRent: 20,
+    description: "شال تخرج مطرز بخيوط حريرية فاخرة. يمكنك طلب كتابة اسمك وسنة التخرج بألوان متعددة. نسيج ناعم ومقاوم للتجعد.",
+    image: "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=800&auto=format&fit=crop",
+    status: "متوفر",
+    category: "شالات التخرج",
+    categoryId: "sashes",
+    code: "JG-009",
+    sales: 42
+  },
+  {
+    id: "10",
+    name: "بروش مخصص",
+    priceSale: 25,
+    priceRent: 12,
+    description: "بروش تخرج معدني أنيق ومطلي بالذهب عيار 18 قيراط. يتم قصه بالليزر بالاسم أو الشعار الذي تفضله. هدية تذكارية رائعة.",
+    image: "https://images.unsplash.com/photo-1627384113743-6bd5a479fffd?q=80&w=800&auto=format&fit=crop",
+    status: "محجوز",
+    category: "بروشات التخرج",
+    categoryId: "pins",
+    code: "JG-010",
+    sales: 18
+  },
+  {
+    id: "11",
+    name: "روب تخرج أطفال",
+    priceSale: 60,
+    priceRent: 30,
+    description: "روب تخرج للأطفال بتصميم مريح وألوان زاهية تناسب حفلات تخرج الروضة والابتدائي. خامة خفيفة وباردة تناسب الصيف.",
+    image: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=800&auto=format&fit=crop",
+    status: "متوفر",
+    category: "كابات التخرج",
+    categoryId: "gowns",
+    code: "JG-011",
+    sales: 15
+  },
+  {
+    id: "12",
+    name: "قبعة تخرج مخمل",
+    priceSale: 95,
+    priceRent: 45,
+    description: "قبعة تخرج كلاسيكية مصنوعة من القطيفة الفاخرة مع شراشيب حريرية طويلة متدلية بلون ذهبي لامع.",
+    image: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=800&auto=format&fit=crop",
+    status: "غير متوفر",
+    category: "قبعات التخرج",
+    categoryId: "caps",
+    code: "JG-012",
+    sales: 5
   }
 ];
 
