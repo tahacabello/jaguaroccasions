@@ -49,9 +49,24 @@ export function DynamicSections() {
 
   if (loading) {
     return (
-      <div className="py-24 text-center">
-        <div className="inline-block w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-foreground/60 mt-4 font-bold text-sm">جاري تحميل أقسام الصفحة الرئيسية...</p>
+      <div className="py-20 bg-background text-right container mx-auto px-4 lg:px-8 space-y-16 animate-pulse">
+        {[1, 2].map((sec) => (
+          <div key={sec} className="space-y-8">
+            <div className="space-y-3">
+              <div className="h-8 bg-surface-hover/50 rounded w-1/4"></div>
+              <div className="h-4 bg-surface-hover/30 rounded w-1/2"></div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-96 w-full rounded-2xl bg-surface-hover/20 border border-border/30 flex flex-col justify-end p-5 space-y-4">
+                  <div className="h-40 w-full bg-surface-hover/40 rounded-xl mb-2"></div>
+                  <div className="h-6 bg-surface-hover/50 rounded w-3/4"></div>
+                  <div className="h-4 bg-surface-hover/30 rounded w-1/2"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     );
   }

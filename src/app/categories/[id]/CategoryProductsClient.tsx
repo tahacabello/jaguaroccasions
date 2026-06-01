@@ -17,49 +17,54 @@ import {
 
 export default function CategoryProductsClient({ params }: { params: { id: string } }) {
   const { addToCart } = useCart();
-  const [category, setCategory] = useState<any>({ name: "جاري التحميل...", desc: "" });
+  const [category, setCategory] = useState<any>({ name: "", desc: "" });
   const [subcategories, setSubcategories] = useState<any[]>([]);
   const [selectedSubcategory, setSelectedSubcategory] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [isValidCategory, setIsValidCategory] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch categories and resolve current
-    getSupabaseCategories().then(cats => {
-      const decodedParamId = decodeURIComponent(params.id);
-      const found = cats.find((c: any) => 
-        c.id === params.id || 
-        c.slug === params.id || 
-        c.slug === decodedParamId ||
-        c.name === params.id ||
-        c.name === decodedParamId
-      );
+    async function loadAll() {
+      try {
+        const decodedParamId = decodeURIComponent(params.id);
+        const cats = await getSupabaseCategories();
+        const found = cats.find((c: any) => 
+          c.id === params.id || 
+          c.slug === params.id || 
+          c.slug === decodedParamId ||
+          c.name === params.id ||
+          c.name === decodedParamId
+        );
 
-      if (found) {
-        setCategory(found);
-        setIsValidCategory(true);
+        if (found) {
+          setCategory(found);
+          setIsValidCategory(true);
 
-        // Fetch subcategories for this category
-        getSupabaseSubcategories(found.id).then(subs => {
-          const activeSubs = subs.filter(s => s.is_active);
+          // Fetch both subcategories and products in parallel
+          const [subs, dbProducts] = await Promise.all([
+            getSupabaseSubcategories(found.id),
+            getSupabaseProducts()
+          ]);
+
+          // Handle subcategories
+          const activeSubs = subs.filter((s: any) => s.is_active);
           setSubcategories(activeSubs);
 
-          // Check if there is a pre-selected subcategory in the URL
+          // Check pre-selected subcategory from URL
           if (typeof window !== "undefined") {
             const urlParams = new URLSearchParams(window.location.search);
             const subId = urlParams.get("sub");
             if (subId) {
-              const matchedSub = activeSubs.find(s => s.id === subId);
+              const matchedSub = activeSubs.find((s: any) => s.id === subId);
               if (matchedSub) {
                 setSelectedSubcategory(matchedSub);
               }
             }
           }
-        }).catch(err => console.error("Error loading subcategories:", err));
 
-        // Fetch products in category and filter them robustly
-        getSupabaseProducts().then(dbProducts => {
-          const filtered = dbProducts.filter(p => {
+          // Filter products in category robustly
+          const filtered = dbProducts.filter((p: any) => {
             if (!p.categoryId) return false;
 
             // 1. Direct UUID or ID match
@@ -80,16 +85,51 @@ export default function CategoryProductsClient({ params }: { params: { id: strin
 
             return false;
           });
+
           setProducts(filtered);
-        }).catch(err => console.error("Error loading products in CPC:", err));
-      } else {
+        } else {
+          setIsValidCategory(false);
+        }
+      } catch (err) {
+        console.error("Error loading category client details:", err);
         setIsValidCategory(false);
+      } finally {
+        setLoading(false);
       }
-    }).catch(err => {
-      console.error(err);
-      setIsValidCategory(false);
-    });
+    }
+    loadAll();
   }, [params.id]);
+
+  if (loading) {
+    return (
+      <>
+        <title>جاري التحميل... | جاغوار للمناسبات</title>
+        <Header />
+        <main className="min-h-screen bg-background pt-12 pb-24 text-right">
+          <div className="container mx-auto px-4 lg:px-8">
+            {/* Shimmer header */}
+            <div className="space-y-4 mb-12 animate-pulse">
+              <div className="h-4 bg-surface-hover/30 rounded w-1/4"></div>
+              <div className="h-10 bg-surface-hover/50 rounded w-1/3"></div>
+              <div className="h-4 bg-surface-hover/30 rounded w-1/2"></div>
+            </div>
+
+            {/* Shimmer grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-96 w-full rounded-2xl bg-surface-hover/20 animate-pulse border border-border/30 flex flex-col justify-end p-5 space-y-4">
+                  <div className="h-40 w-full bg-surface-hover/40 rounded-xl"></div>
+                  <div className="h-6 bg-surface-hover/50 rounded w-3/4"></div>
+                  <div className="h-4 bg-surface-hover/30 rounded w-1/2"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   if (!isValidCategory) {
     return (

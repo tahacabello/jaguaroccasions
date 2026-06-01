@@ -183,12 +183,10 @@ export async function getSupabaseCategories(): Promise<any[]> {
       .order('sort_order', { ascending: true });
 
     if (error) throw error;
-    if (!data || data.length === 0) return defaultCategories;
-
-    return data;
+    return data || [];
   } catch (err) {
-    console.warn("Failed to get categories from Supabase, using defaults:", err);
-    return defaultCategories;
+    console.warn("Failed to get categories from Supabase:", err);
+    return [];
   }
 }
 
@@ -435,7 +433,7 @@ export async function getSupabaseProducts(): Promise<any[]> {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    if (!data || data.length === 0) return mockProducts;
+    if (!data) return [];
 
     return data.map(item => ({
       id: item.id,
@@ -455,8 +453,8 @@ export async function getSupabaseProducts(): Promise<any[]> {
       sortOrder: item.sort_order || 0
     }));
   } catch (err) {
-    console.warn("Supabase products fetch failed, using mock fallbacks:", err);
-    return mockProducts;
+    console.warn("Supabase products fetch failed:", err);
+    return [];
   }
 }
 
