@@ -1,10 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const TOKEN = process.env.GITHUB_TOKEN || '';
+const TOKEN = process.env.GITHUB_TOKEN || '<YOUR_GITHUB_TOKEN>';
 const OWNER = 'tahacabello';
 const REPO = 'jaguar-occasions';
-const BASE_DIR = path.join(__dirname, 'jaguar-next');
+const BASE_DIR = __dirname;
 
 // List of old files to delete at the root of the repository
 const filesToDelete = [

@@ -15,7 +15,7 @@
 
 | Key | Value |
 |-----|-------|
-| **GitHub Token** | `REMOVED_FOR_SECURITY` |
+| **GitHub Token** | `<YOUR_GITHUB_TOKEN>` |
 | **GitHub Owner** | `tahacabello` |
 | **GitHub Repo** | `jaguar-occasions` |
 | **GitHub Pages URL** | `https://tahacabello.github.io/jaguar-occasions/` |

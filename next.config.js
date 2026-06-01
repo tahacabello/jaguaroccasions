@@ -4,6 +4,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  basePath: '/jaguar-occasions',
+  assetPrefix: '/jaguar-occasions/',
   trailingSlash: true,
 };
 
