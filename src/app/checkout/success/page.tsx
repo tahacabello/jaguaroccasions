@@ -73,7 +73,7 @@ function SuccessContent() {
   // If no order is found, display standard placeholder success message
   const demoOrder: SimulatedOrder = {
     id: "demo-id",
-    guest_name: "خريج جاغوار الفاخر",
+    guest_name: "خريج جاغوار",
     guest_phone: "0912345678",
     guest_city: "طرابلس",
     guest_street: "حي الأندلس، بجانب مقهى زرياب",
@@ -85,7 +85,7 @@ function SuccessContent() {
     items: [
       {
         id: "1",
-        name: "كيبان كويتي فاخر",
+        name: "كيبان كويتي",
         price: 85,
         image: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=400&auto=format&fit=crop",
         quantity: 1,

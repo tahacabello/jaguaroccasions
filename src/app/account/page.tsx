@@ -184,7 +184,7 @@ ${itemsList}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-border pb-8 mb-12">
             <div>
               <h1 className="text-3xl md:text-5xl font-black bg-gradient-to-r from-primary-light to-primary-dark bg-clip-text text-transparent">
-                حسابك الفاخر
+                حسابك
               </h1>
               <p className="text-foreground/60 text-sm mt-2">مرحباً بك، {profile?.name || "زبون جاغوار"}</p>
             </div>
@@ -250,7 +250,7 @@ ${itemsList}
                       <ShoppingBag className="w-16 h-16 text-foreground/30 mx-auto" />
                       <h3 className="text-xl font-bold">لا يوجد طلبيات مسجلة بعد</h3>
                       <p className="text-sm text-foreground/60 max-w-sm mx-auto">
-                        لم تقم بتسجيل أي طلبات شراء أو حجز كابات تخرج حتى الآن. تفضل بتصفح المتجر الفاخر وحجز طلبك!
+                        لم تقم بتسجيل أي طلبات شراء أو حجز كابات تخرج حتى الآن. تفضل بتصفح المتجر وحجز طلبك!
                       </p>
                       <Link href="/products" className="btn-premium inline-block px-8 py-3 text-sm">
                         تصفح المنتجات وحجز الآن

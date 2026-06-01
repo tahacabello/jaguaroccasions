@@ -4,7 +4,15 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://uxsixllbppablltuvtkj.supabase.co';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_Cf8BqtzedCI5qHgtt0gWRA_TihclIWq';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  global: {
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    },
+  },
+});
 
 // Helper to resolve local assets with the correct basePath for GitHub Pages
 export function resolveAssetPath(path: string | undefined | null): string {
@@ -32,10 +40,10 @@ export function resolveAssetPath(path: string | undefined | null): string {
 export const mockProducts = [
   {
     id: "1",
-    name: "كيبان كويتي فاخر",
+    name: "كاب كويتي",
     priceSale: 85,
     priceRent: 40,
-    description: "كيب تخرج بتصميم كويتي أصيل، مصنوع من أجود أنواع المخمل الفاخر. يتميز بتفاصيل ذهبية دقيقة وحياكة يدوية متقنة تضمن لك إطلالة استثنائية في يوم تخرجك. متوفر للبيع والإيجار.",
+    description: "كيب تخرج بتصميم كويتي أصيل، مصنوع من أجود أنواع المخمل. يتميز بتفاصيل ذهبية دقيقة وحياكة يدوية متقنة تضمن لك إطلالة استثنائية في يوم تخرجك. متوفر للبيع والإيجار.",
     image: resolveAssetPath("/products/gallery/graduation_photo_01.jpg"),
     images: [
       resolveAssetPath("/products/gallery/graduation_photo_01.jpg"),
@@ -55,7 +63,7 @@ export const mockProducts = [
     name: "شال تخرج مطرز",
     priceSale: 45,
     priceRent: 20,
-    description: "شال تخرج مطرز بخيوط حريرية فاخرة. يمكنك طلب كتابة اسمك وسنة التخرج بألوان متعددة. نسيج ناعم ومقاوم للتجعد.",
+    description: "شال تخرج مطرز بخيوط حريرية. يمكنك طلب كتابة اسمك وسنة التخرج بألوان متعددة. نسيج ناعم ومقاوم للتجعد.",
     image: "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=800&auto=format&fit=crop",
     images: [],
     status: "available",
@@ -87,7 +95,7 @@ export const mockProducts = [
     name: "قبعة تخرج مخمل كلاسيكية",
     priceSale: 95,
     priceRent: 45,
-    description: "قبعة تخرج كلاسيكية مصنوعة من القطيفة الفاخرة مع شراشيب حريرية طويلة متدلية بلون ذهبي لامع.",
+    description: "قبعة تخرج كلاسيكية مصنوعة من القطيفة مع شراشيب حريرية طويلة متدلية بلون ذهبي لامع.",
     image: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=800&auto=format&fit=crop",
     images: [],
     status: "available",
@@ -103,24 +111,37 @@ export const mockProducts = [
 // Resilient Mock Settings Database
 export const defaultSettings: Record<string, string> = {
   store_name: "جاغوار للمناسبات",
-  announcement_text: "تنسيق وتطريز فاخر لكافة مستلزمات التخرج 🎓",
+  announcement_text: "تنسيق وتطريز لكافة مستلزمات التخرج 🎓",
   hero_title: "لحظة تخرجك، بأرقى المعايير",
-  hero_subtitle: "اكتشف مجموعتنا الحصرية والراقية من كيبان التخرج، القبعات، والشالات المطرزة بالاسم. إيجار وبيع مع خدمة حجز متكاملة.",
+  hero_subtitle: "اكتشف مجموعاتنا الحصرية من كيبان التخرج، القبعات، والشالات المطرزة بالاسم. إيجار وبيع مع خدمة حجز متكاملة.",
   whatsapp_number: "+218921234567",
   contact_phone: "+218921234567",
   instagram_link: "https://instagram.com",
   tiktok_link: "https://tiktok.com",
   location: "طرابلس، ليبيا",
   about_text: "جاغوار للمناسبات هو خياركم الأول للتميز والظهور بأرقى إطلالة في حفلات تخرجكم.",
-  footer_text: "جميع الحقوق محفوظة © 2026 جاغوار للمناسبات"
+  footer_text: "جميع الحقوق محفوظة © 2026 جاغوار للمناسبات",
+  categories_title: "الأقسام المميزة",
+  categories_subtitle: "اكتشف مجموعاتنا المصنفة بعناية",
+  trending_title: "الأكثر طلباً",
+  trending_subtitle: "تصاميم حصرية تميز إطلالتك في يوم تخرجك",
+  hero_badge: "تشكيلة تخرج 2026 متوفرة الآن",
+  trust_badge_1_title: "ضمان الجودة",
+  trust_badge_1_desc: "أجود الخامات المستخدمة بضمان الاسترجاع",
+  trust_badge_2_title: "توصيل آمن",
+  trust_badge_2_desc: "شحن سريع لجميع المدن الليبية",
+  trust_badge_3_title: "دعم 24/7",
+  trust_badge_3_desc: "فريق مخصص للرد على استفساراتكم",
+  trust_badge_4_title: "تصاميم حصرية",
+  trust_badge_4_desc: "تشكيلات فريدة لتناسب جميع الأذواق"
 };
 
 // 4 main categories requested - clean from promotional adjectives
 export const defaultCategories = [
-  { id: "gowns", name: "كيبان تخرج", image: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=800&auto=format&fit=crop", desc: "تشكيلة كيبان كويتية وكلاسيكية فاخرة", is_active: true, sort_order: 0 },
-  { id: "sashes", name: "شيلان تخرج", image: "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=800&auto=format&fit=crop", desc: "شيلان مطرزة مخصصة بالأسماء", is_active: true, sort_order: 1 },
-  { id: "caps", name: "قبعات تخرج", image: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=800&auto=format&fit=crop", desc: "قبعات مخمل وستان تناسب جميع الأذواق", is_active: true, sort_order: 2 },
-  { id: "pins", name: "إكسسوارات التخرج", image: "https://images.unsplash.com/photo-1627384113743-6bd5a479fffd?q=80&w=800&auto=format&fit=crop", desc: "بروشات وإكسسوارات تخرج معدنية ومطلية بالذهب", is_active: true, sort_order: 3 },
+  { id: "gowns", name: "كيبان تخرج", image: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=800&auto=format&fit=crop", desc: "تشكيلة كيبان كويتية وكلاسيكية", is_active: true, sort_order: 0, slug: "gowns" },
+  { id: "sashes", name: "شيلان تخرج", image: "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=800&auto=format&fit=crop", desc: "شيلات مطرزة مخصصة بالأسماء", is_active: true, sort_order: 1, slug: "sashes" },
+  { id: "caps", name: "قبعات تخرج", image: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=800&auto=format&fit=crop", desc: "قبعات مخمل وستان تناسب جميع الأذواق", is_active: true, sort_order: 2, slug: "caps" },
+  { id: "pins", name: "إكسسوارات التخرج", image: "https://images.unsplash.com/photo-1627384113743-6bd5a479fffd?q=80&w=800&auto=format&fit=crop", desc: "بروشات وإكسسوارات تخرج معدنية ومطلية بالذهب", is_active: true, sort_order: 3, slug: "pins" },
 ];
 
 // =====================================================================
@@ -628,4 +649,43 @@ export async function updateSupabaseUserProfile(userId: string, profile: any): P
     console.error(`Failed to update profile for ${userId}:`, err);
     return false;
   }
+}
+
+// Resilient Image Helper with High-Quality Fallbacks for Categories
+export function getCategoryImage(cat: any): string {
+  if (!cat || !cat.image || cat.image.startsWith("blob:") || cat.image.startsWith("data:")) {
+    const slug = (cat?.slug || cat?.id || "").toLowerCase();
+    if (slug.includes("gown") || slug.includes("كيب") || slug.includes("كاب")) {
+      return "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=800&auto=format&fit=crop";
+    }
+    if (slug.includes("sash") || slug.includes("شال") || slug.includes("شيل")) {
+      return "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=800&auto=format&fit=crop";
+    }
+    if (slug.includes("cap") || slug.includes("قبع")) {
+      return "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=800&auto=format&fit=crop";
+    }
+    if (slug.includes("pin") || slug.includes("بروش") || slug.includes("إكسسوار")) {
+      return "https://images.unsplash.com/photo-1627384113743-6bd5a479fffd?q=80&w=800&auto=format&fit=crop";
+    }
+    return "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=800&auto=format&fit=crop";
+  }
+  return resolveAssetPath(cat.image);
+}
+
+// Resilient Image Helper with High-Quality Fallbacks for Products
+export function getProductImage(product: any): string {
+  if (!product || !product.image || product.image.startsWith("blob:") || product.image.startsWith("data:")) {
+    const code = (product?.code || product?.id || "").toLowerCase();
+    if (code.includes("gown") || code.includes("كيب") || code.includes("كاب")) {
+      return "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=800&auto=format&fit=crop";
+    }
+    if (code.includes("sash") || code.includes("شال") || code.includes("شيل")) {
+      return "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=800&auto=format&fit=crop";
+    }
+    if (code.includes("cap") || code.includes("قبع")) {
+      return "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=800&auto=format&fit=crop";
+    }
+    return "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=800&auto=format&fit=crop";
+  }
+  return resolveAssetPath(product.image);
 }

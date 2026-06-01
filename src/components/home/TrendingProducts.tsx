@@ -6,17 +6,24 @@ import Link from "next/link";
 import Image from "next/image";
 import { ShoppingBag, Heart } from "lucide-react";
 import { useCart } from "@/context/CartContext";
-import { getSupabaseProducts, mockProducts } from "@/lib/supabase";
+import { getSupabaseProducts, mockProducts, getSupabaseSettings } from "@/lib/supabase";
 
 export function TrendingProducts() {
   const { addToCart } = useCart();
   const [products, setProducts] = useState<any[]>(mockProducts.slice(0, 4));
+  const [trendingTitle, setTrendingTitle] = useState("الأكثر طلباً");
+  const [trendingSubtitle, setTrendingSubtitle] = useState("المنتجات المفضلة لدى خريجي 2026");
 
   useEffect(() => {
     getSupabaseProducts().then(dbProducts => {
       // Show first 4 products on the homepage carousel
       setProducts(dbProducts.slice(0, 4));
     }).catch(err => console.error("Error loading products in TrendingProducts:", err));
+
+    getSupabaseSettings().then(settings => {
+      if (settings.trending_title) setTrendingTitle(settings.trending_title);
+      if (settings.trending_subtitle) setTrendingSubtitle(settings.trending_subtitle);
+    }).catch(err => console.error(err));
   }, []);
 
   return (
@@ -24,8 +31,8 @@ export function TrendingProducts() {
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex justify-between items-end mb-12">
           <div>
-            <h2 className="text-3xl md:text-5xl font-black mb-4">الأكثر طلباً</h2>
-            <p className="text-foreground/60 text-lg">المنتجات المفضلة لدى خريجي 2026</p>
+            <h2 className="text-3xl md:text-5xl font-black mb-4">{trendingTitle}</h2>
+            <p className="text-foreground/60 text-lg">{trendingSubtitle}</p>
           </div>
           <Link href="/products" className="hidden sm:flex text-primary hover:text-primary-light font-bold items-center gap-2 transition-colors">
             عرض كل المنتجات

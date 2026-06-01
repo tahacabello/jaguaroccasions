@@ -205,37 +205,23 @@ export default function AdminDashboard() {
     }
   }, [isAuthenticated]);
 
-  // Handle Admin Sign In
+  // Handle Admin Sign In (Passcode `9999` only)
   const handleAdminSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
     setAuthLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (error) throw error;
-
-      // Verify that this user profile is an admin
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("is_admin")
-        .eq("id", data.user.id)
-        .single();
-
-      if (profile && !profileError && profile.is_admin) {
+      // Reverted to simple passcode '9999' check as requested by the user
+      if (password === "9999") {
         sessionStorage.setItem("jaguar_admin_auth", "true");
         setIsAuthenticated(true);
       } else {
-        await supabase.auth.signOut();
-        setAuthError("عذراً، هذا الحساب غير مسجل كمسؤول في النظام!");
+        setAuthError("رمز المرور غير صحيح! يرجى إدخال الرمز الصحيح للدخول.");
       }
     } catch (err: any) {
       console.error("Admin sign in failed:", err);
-      setAuthError(err?.message || "خطأ أثناء تسجيل الدخول. يرجى مراجعة البيانات.");
+      setAuthError("خطأ أثناء تسجيل الدخول. يرجى المحاولة مجدداً.");
     } finally {
       setAuthLoading(false);
     }
@@ -243,9 +229,9 @@ export default function AdminDashboard() {
 
   // Sign out admin
   const handleAdminSignOut = async () => {
-    await supabase.auth.signOut();
     sessionStorage.removeItem("jaguar_admin_auth");
     setIsAuthenticated(false);
+    setPassword("");
   };
 
   // Upload image handlers (Canvas compression + Supabase storage bucket)
@@ -562,27 +548,14 @@ export default function AdminDashboard() {
 
           <form onSubmit={handleAdminSignIn} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-foreground/80 mb-2">البريد الإلكتروني للإدارة</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@jaguar.ly"
-                className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
-                dir="ltr"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-foreground/80 mb-2">كلمة المرور</label>
+              <label className="block text-xs font-bold text-foreground/80 mb-2">رمز المرور الخاص بالإدارة</label>
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
+                placeholder="••••"
+                className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-center tracking-widest font-black"
                 dir="ltr"
               />
             </div>
@@ -596,7 +569,7 @@ export default function AdminDashboard() {
                 <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
               ) : (
                 <>
-                  تسجيل الدخول للوحة
+                  دخول للوحة التحكم
                   <ArrowRight className="w-4 h-4 rotate-180" />
                 </>
               )}
@@ -827,7 +800,41 @@ export default function AdminDashboard() {
 
               {/* Tab: Categories */}
               {activeTab === "categories" && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  {/* Category Section Header Editor */}
+                  <div className="glass rounded-3xl border border-border p-6 space-y-4">
+                    <h3 className="text-lg font-bold">تعديل عنوان ووصف قسم الأقسام المميزة بالرئيسية</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">العنوان الرئيسي للقسم (مثال: الأقسام المميزة)</label>
+                        <input
+                          type="text"
+                          value={settings.categories_title || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSettings(prev => ({ ...prev, categories_title: val }));
+                            updateSupabaseSetting("categories_title", val);
+                          }}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">الوصف الفرعي للقسم (مثال: اكتشف مجموعاتنا المصنفة بعناية)</label>
+                        <input
+                          type="text"
+                          value={settings.categories_subtitle || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSettings(prev => ({ ...prev, categories_subtitle: val }));
+                            updateSupabaseSetting("categories_subtitle", val);
+                          }}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   {/* Left panel: Categories List */}
                   <div className="glass rounded-3xl border border-border p-6 space-y-6">
                     <div className="flex justify-between items-center">
@@ -937,11 +944,45 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 </div>
+              </div>
               )}
 
               {/* Tab: Inventory (Products) */}
               {activeTab === "inventory" && (
                 <div className="space-y-6">
+                  {/* Products Section Header Editor */}
+                  <div className="glass rounded-3xl border border-border p-6 space-y-4">
+                    <h3 className="text-lg font-bold">تعديل عنوان ووصف قسم الأكثر طلباً بالرئيسية</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">العنوان الرئيسي للقسم (مثال: الأكثر طلباً)</label>
+                        <input
+                          type="text"
+                          value={settings.trending_title || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSettings(prev => ({ ...prev, trending_title: val }));
+                            updateSupabaseSetting("trending_title", val);
+                          }}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">الوصف الفرعي للقسم (مثال: تصاميم حصرية تميز إطلالتك)</label>
+                        <input
+                          type="text"
+                          value={settings.trending_subtitle || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSettings(prev => ({ ...prev, trending_subtitle: val }));
+                            updateSupabaseSetting("trending_subtitle", val);
+                          }}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex justify-between items-center">
                     <h2 className="text-xl font-bold">معرض وجرد المنتجات المتوفرة</h2>
                     <button
@@ -949,7 +990,7 @@ export default function AdminDashboard() {
                       className="px-5 py-3 bg-primary text-black hover:bg-primary-light rounded-xl font-black text-xs flex items-center gap-1.5 transition-all"
                     >
                       <Plus className="w-4.5 h-4.5" />
-                      إضافة منتج فاخر جديد
+                      إضافة منتج جديد
                     </button>
                   </div>
 
@@ -1124,6 +1165,46 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">عنوان قسم الأقسام المميزة</label>
+                      <input
+                        type="text"
+                        value={settings.categories_title || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, categories_title: e.target.value }))}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">وصف قسم الأقسام المميزة</label>
+                      <input
+                        type="text"
+                        value={settings.categories_subtitle || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, categories_subtitle: e.target.value }))}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">عنوان قسم الأكثر طلباً</label>
+                      <input
+                        type="text"
+                        value={settings.trending_title || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, trending_title: e.target.value }))}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">وصف قسم الأكثر طلباً</label>
+                      <input
+                        type="text"
+                        value={settings.trending_subtitle || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, trending_subtitle: e.target.value }))}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
                       <label className="block text-xs font-bold text-foreground/80">رقم الواتساب لاستقبال الفواتير</label>
                       <input
                         type="text"
@@ -1165,6 +1246,96 @@ export default function AdminDashboard() {
                         onChange={(e) => setSettings(prev => ({ ...prev, tiktok_link: e.target.value }))}
                         className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
                         dir="ltr"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">شعار قسم الهيرو الصغير (Kicker Badge)</label>
+                      <input
+                        type="text"
+                        value={settings.hero_badge || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, hero_badge: e.target.value }))}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+
+                    <div className="col-span-1 md:col-span-2 border-t border-border/40 pt-6 mt-4">
+                      <h3 className="text-sm font-black text-primary-light mb-4">قسم مميزات المتجر الأربعة (Trust Badges)</h3>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">الميزة الأولى - العنوان الرئيسي (مثال: ضمان الجودة)</label>
+                      <input
+                        type="text"
+                        value={settings.trust_badge_1_title || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_1_title: e.target.value }))}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">الميزة الأولى - الوصف الفرعي</label>
+                      <input
+                        type="text"
+                        value={settings.trust_badge_1_desc || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_1_desc: e.target.value }))}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">الميزة الثانية - العنوان الرئيسي (مثال: توصيل آمن)</label>
+                      <input
+                        type="text"
+                        value={settings.trust_badge_2_title || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_2_title: e.target.value }))}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">الميزة الثانية - الوصف الفرعي</label>
+                      <input
+                        type="text"
+                        value={settings.trust_badge_2_desc || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_2_desc: e.target.value }))}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">الميزة الثالثة - العنوان الرئيسي (مثال: دعم 24/7)</label>
+                      <input
+                        type="text"
+                        value={settings.trust_badge_3_title || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_3_title: e.target.value }))}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">الميزة الثالثة - الوصف الفرعي</label>
+                      <input
+                        type="text"
+                        value={settings.trust_badge_3_desc || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_3_desc: e.target.value }))}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">الميزة الرابعة - العنوان الرئيسي (مثال: تصاميم حصرية)</label>
+                      <input
+                        type="text"
+                        value={settings.trust_badge_4_title || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_4_title: e.target.value }))}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">الميزة الرابعة - الوصف الفرعي</label>
+                      <input
+                        type="text"
+                        value={settings.trust_badge_4_desc || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_4_desc: e.target.value }))}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
                       />
                     </div>
                   </div>
@@ -1403,8 +1574,16 @@ export default function AdminDashboard() {
                       </label>
                     </div>
                     {catImage && (
-                      <div className="relative w-full h-[120px] rounded-xl overflow-hidden border border-border">
+                      <div className="relative w-full h-[120px] rounded-xl overflow-hidden border border-border group">
                         <Image src={catImage} alt="Preview" fill className="object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setCatImage("")}
+                          className="absolute top-2 left-2 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors shadow-lg shadow-black/40 flex items-center justify-center"
+                          title="إزالة الصورة"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     )}
                   </div>
@@ -1493,8 +1672,19 @@ export default function AdminDashboard() {
                       </label>
                     </div>
                     {(catImage || editingCategory.image) && (
-                      <div className="relative w-full h-[120px] rounded-xl overflow-hidden border border-border">
+                      <div className="relative w-full h-[120px] rounded-xl overflow-hidden border border-border group">
                         <Image src={catImage || editingCategory.image} alt="Preview" fill className="object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCatImage("");
+                            setEditingCategory({ ...editingCategory, image: "" });
+                          }}
+                          className="absolute top-2 left-2 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors shadow-lg shadow-black/40 flex items-center justify-center"
+                          title="إزالة الصورة"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     )}
                   </div>
@@ -1692,7 +1882,7 @@ export default function AdminDashboard() {
                   <X className="w-4 h-4" />
                 </button>
 
-                <h3 className="text-xl font-bold border-b border-border pb-3">➕ إضافة منتج فاخر جديد</h3>
+                <h3 className="text-xl font-bold border-b border-border pb-3">➕ إضافة منتج جديد</h3>
 
                 <form onSubmit={handleAddProduct} className="space-y-4">
                   
@@ -1704,7 +1894,7 @@ export default function AdminDashboard() {
                         required
                         value={prodName}
                         onChange={(e) => setProdName(e.target.value)}
-                        placeholder="مثال: كيب كويتي فاخر مخمل"
+                        placeholder="مثال: كيب كويتي مخمل"
                         className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm"
                       />
                     </div>
@@ -1813,8 +2003,16 @@ export default function AdminDashboard() {
                         />
                       </label>
                       {prodImage && (
-                        <div className="relative w-full h-[100px] rounded-lg overflow-hidden border border-border">
+                        <div className="relative w-full h-[100px] rounded-lg overflow-hidden border border-border group">
                           <Image src={prodImage} alt="Cover Preview" fill className="object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => setProdImage("")}
+                            className="absolute top-2 left-2 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors shadow-lg shadow-black/40 flex items-center justify-center"
+                            title="إزالة الصورة"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       )}
                     </div>
@@ -2030,8 +2228,19 @@ export default function AdminDashboard() {
                         />
                       </label>
                       {(prodImage || editingProduct.image) && (
-                        <div className="relative w-full h-[100px] rounded-lg overflow-hidden border border-border">
+                        <div className="relative w-full h-[100px] rounded-lg overflow-hidden border border-border group">
                           <Image src={prodImage || editingProduct.image} alt="Cover Preview" fill className="object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProdImage("");
+                              setEditingProduct({ ...editingProduct, image: "" });
+                            }}
+                            className="absolute top-2 left-2 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors shadow-lg shadow-black/40 flex items-center justify-center"
+                            title="إزالة الصورة"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       )}
                     </div>

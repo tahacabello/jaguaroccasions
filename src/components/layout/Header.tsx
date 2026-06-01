@@ -149,7 +149,7 @@ export function Header() {
             <div className="mt-auto p-6 border-t border-border">
               <Link href={userLoggedIn ? "/account" : "/auth/login"} onClick={() => setIsMobileMenuOpen(false)} className="btn-premium w-full flex justify-center items-center gap-2">
                 <User className="w-5 h-5" />
-                {userLoggedIn ? "حسابي الفاخر" : "تسجيل الدخول"}
+                {userLoggedIn ? "حسابي" : "تسجيل الدخول"}
               </Link>
             </div>
           </motion.div>

@@ -4,13 +4,19 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
-import { getSupabaseCategories, defaultCategories } from "@/lib/supabase";
+import { getSupabaseCategories, defaultCategories, getCategoryImage, getSupabaseSettings } from "@/lib/supabase";
 
 export function FeaturedCategories() {
   const [categoriesList, setCategoriesList] = useState<any[]>(defaultCategories);
+  const [categoriesTitle, setCategoriesTitle] = useState("الأقسام المميزة");
+  const [categoriesSubtitle, setCategoriesSubtitle] = useState("اكتشف مجموعاتنا المصنفة بعناية");
 
   useEffect(() => {
     getSupabaseCategories().then(setCategoriesList).catch(err => console.error(err));
+    getSupabaseSettings().then(settings => {
+      if (settings.categories_title) setCategoriesTitle(settings.categories_title);
+      if (settings.categories_subtitle) setCategoriesSubtitle(settings.categories_subtitle);
+    }).catch(err => console.error(err));
   }, []);
 
   return (
@@ -18,8 +24,8 @@ export function FeaturedCategories() {
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex justify-between items-end mb-12 text-right">
           <div>
-            <h2 className="text-3xl md:text-5xl font-black mb-4">الأقسام المميزة</h2>
-            <p className="text-foreground/60 text-lg">اكتشف مجموعاتنا المصنفة بعناية</p>
+            <h2 className="text-3xl md:text-5xl font-black mb-4">{categoriesTitle}</h2>
+            <p className="text-foreground/60 text-lg">{categoriesSubtitle}</p>
           </div>
           <Link href="/categories" className="hidden sm:flex text-primary hover:text-primary-light font-bold items-center gap-2 transition-colors">
             عرض كل الأقسام
@@ -39,7 +45,7 @@ export function FeaturedCategories() {
                 {/* Background Image */}
                 <div className="absolute inset-0 z-0">
                   <Image 
-                    src={cat.image} 
+                    src={getCategoryImage(cat)} 
                     alt={cat.name} 
                     fill 
                     className="object-cover transition-transform duration-700 group-hover:scale-110 opacity-60 group-hover:opacity-80" 

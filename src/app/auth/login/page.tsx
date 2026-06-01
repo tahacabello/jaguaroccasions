@@ -89,7 +89,7 @@ function LoginContent() {
           <h1 className="text-3xl font-black mb-2 bg-gradient-to-r from-primary-light to-primary-dark bg-clip-text text-transparent">
             مرحباً بعودتك
           </h1>
-          <p className="text-foreground/60 text-sm">سجل دخولك لمتابعة طلباتك أو تتبع حجزك الفاخر</p>
+          <p className="text-foreground/60 text-sm">سجل دخولك لمتابعة طلباتك أو تتبع حجزك</p>
         </div>
 
         {errorMsg && (

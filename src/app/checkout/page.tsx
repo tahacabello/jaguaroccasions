@@ -188,7 +188,7 @@ export default function CheckoutPage() {
         <div className="container mx-auto px-4 lg:px-8 max-w-6xl">
           
           <h1 className="text-3xl md:text-5xl font-black mb-12 text-right bg-gradient-to-r from-primary-light to-primary-dark bg-clip-text text-transparent">
-            إتمام الطلب الفاخر
+            إتمام الطلب
           </h1>
 
           {/* WhatsApp confirmation prompt */}
@@ -390,7 +390,7 @@ export default function CheckoutPage() {
             <div className="lg:col-span-5 space-y-6">
               
               <div className="glass p-6 rounded-3xl border border-border space-y-6 sticky top-24">
-                <h2 className="text-xl font-bold border-b border-border pb-4 mb-4">ملخص الطلب الفاخر</h2>
+                <h2 className="text-xl font-bold border-b border-border pb-4 mb-4">ملخص الطلب</h2>
 
                 {/* Items list */}
                 <div className="max-h-[300px] overflow-y-auto space-y-4 pr-1">

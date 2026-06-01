@@ -7,7 +7,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ShoppingBag, Heart, Filter, ChevronRight } from "lucide-react";
 import { useCart } from "@/context/CartContext";
-import { getSupabaseProducts, getSupabaseCategories } from "@/lib/supabase";
+import { getSupabaseProducts, getSupabaseCategories, getProductImage } from "@/lib/supabase";
 
 export default function CategoryProductsClient({ params }: { params: { id: string } }) {
   const { addToCart } = useCart();
@@ -18,10 +18,44 @@ export default function CategoryProductsClient({ params }: { params: { id: strin
   useEffect(() => {
     // Fetch categories and resolve current
     getSupabaseCategories().then(cats => {
-      const found = cats.find((c: any) => c.id === params.id);
+      const decodedParamId = decodeURIComponent(params.id);
+      const found = cats.find((c: any) => 
+        c.id === params.id || 
+        c.slug === params.id || 
+        c.slug === decodedParamId ||
+        c.name === params.id ||
+        c.name === decodedParamId
+      );
+
       if (found) {
         setCategory(found);
         setIsValidCategory(true);
+
+        // Fetch products in category and filter them robustly
+        getSupabaseProducts().then(dbProducts => {
+          const filtered = dbProducts.filter(p => {
+            if (!p.categoryId) return false;
+
+            // 1. Direct UUID or ID match
+            if (p.categoryId === found.id) return true;
+
+            // 2. Direct slug match
+            if (p.categoryId === found.slug) return true;
+
+            // 3. Robust mapping for fallback IDs used in the DB vs the categories slugs
+            const pid = p.categoryId.toLowerCase();
+            const cslug = (found.slug || "").toLowerCase();
+            const cname = (found.name || "").toLowerCase();
+
+            if (pid === "gowns" && (cslug === "gowns" || cslug === "graduation-gowns" || cname.includes("كاب") || cname.includes("كيب"))) return true;
+            if (pid === "sashes" && (cslug === "sashes" || cslug === "graduation-sashes" || cname.includes("شال") || cname.includes("شيل"))) return true;
+            if (pid === "caps" && (cslug === "caps" || cslug === "graduation-caps" || cname.includes("قبع"))) return true;
+            if (pid === "pins" && (cslug === "pins" || cslug === "graduation-pins" || cname.includes("بروش") || cname.includes("إكسسوار"))) return true;
+
+            return false;
+          });
+          setProducts(filtered);
+        }).catch(err => console.error("Error loading products in CPC:", err));
       } else {
         setIsValidCategory(false);
       }
@@ -29,11 +63,6 @@ export default function CategoryProductsClient({ params }: { params: { id: strin
       console.error(err);
       setIsValidCategory(false);
     });
-
-    // Fetch products in category
-    getSupabaseProducts().then(dbProducts => {
-      setProducts(dbProducts.filter(p => p.categoryId === params.id));
-    }).catch(err => console.error("Error loading category products in CPC:", err));
   }, [params.id]);
 
   if (!isValidCategory) {
@@ -93,7 +122,7 @@ export default function CategoryProductsClient({ params }: { params: { id: strin
                   <div className="block relative h-72 w-full overflow-hidden bg-surface">
                     <Link href={`/products/${product.id}`} className="block h-full w-full">
                       <Image
-                        src={product.image}
+                        src={getProductImage(product)}
                         alt={product.name}
                         fill
                         className="object-cover transition-transform duration-500 group-hover:scale-105"

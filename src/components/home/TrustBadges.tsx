@@ -3,30 +3,51 @@
 import { motion } from "framer-motion";
 import { ShieldCheck, Truck, Clock, Gem } from "lucide-react";
 
-const features = [
-  {
-    icon: <ShieldCheck className="w-8 h-8 text-primary" />,
-    title: "ضمان الجودة",
-    desc: "أجود الخامات المستخدمة بضمان الاسترجاع"
-  },
-  {
-    icon: <Truck className="w-8 h-8 text-primary" />,
-    title: "توصيل آمن",
-    desc: "شحن سريع لجميع المدن الليبية"
-  },
-  {
-    icon: <Clock className="w-8 h-8 text-primary" />,
-    title: "دعم 24/7",
-    desc: "فريق مخصص للرد على استفساراتكم"
-  },
-  {
-    icon: <Gem className="w-8 h-8 text-primary" />,
-    title: "تصاميم حصرية",
-    desc: "تشكيلات فريدة لتناسب جميع الأذواق"
-  }
-];
+import { useState, useEffect } from "react";
+import { getSupabaseSettings } from "@/lib/supabase";
 
 export function TrustBadges() {
+  const [features, setFeatures] = useState([
+    {
+      icon: <ShieldCheck className="w-8 h-8 text-primary" />,
+      title: "ضمان الجودة",
+      desc: "أجود الخامات المستخدمة بضمان الاسترجاع",
+      keyTitle: "trust_badge_1_title",
+      keyDesc: "trust_badge_1_desc"
+    },
+    {
+      icon: <Truck className="w-8 h-8 text-primary" />,
+      title: "توصيل آمن",
+      desc: "شحن سريع لجميع المدن الليبية",
+      keyTitle: "trust_badge_2_title",
+      keyDesc: "trust_badge_2_desc"
+    },
+    {
+      icon: <Clock className="w-8 h-8 text-primary" />,
+      title: "دعم 24/7",
+      desc: "فريق مخصص للرد على استفساراتكم",
+      keyTitle: "trust_badge_3_title",
+      keyDesc: "trust_badge_3_desc"
+    },
+    {
+      icon: <Gem className="w-8 h-8 text-primary" />,
+      title: "تصاميم حصرية",
+      desc: "تشكيلات فريدة لتناسب جميع الأذواق",
+      keyTitle: "trust_badge_4_title",
+      keyDesc: "trust_badge_4_desc"
+    }
+  ]);
+
+  useEffect(() => {
+    getSupabaseSettings().then(settings => {
+      setFeatures(prev => prev.map(item => ({
+        ...item,
+        title: settings[item.keyTitle] || item.title,
+        desc: settings[item.keyDesc] || item.desc
+      })));
+    }).catch(err => console.error("Error fetching trust badge settings in TrustBadges:", err));
+  }, []);
+
   return (
     <section className="py-16 border-y border-border bg-surface-hover">
       <div className="container mx-auto px-4 lg:px-8">

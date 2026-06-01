@@ -5,7 +5,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import Link from "next/link";
 import Image from "next/image";
-import { getSupabaseCategories, defaultCategories } from "@/lib/supabase";
+import { getSupabaseCategories, defaultCategories, getCategoryImage } from "@/lib/supabase";
 
 export default function CategoriesPage() {
   const [categoriesList, setCategoriesList] = useState<any[]>(defaultCategories);
@@ -31,7 +31,7 @@ export default function CategoriesPage() {
               <Link key={cat.id} href={`/categories/${cat.id}`} className="group relative h-96 w-full overflow-hidden rounded-3xl glass border border-border flex items-end">
                 <div className="absolute inset-0 z-0">
                   <Image 
-                    src={cat.image} 
+                    src={getCategoryImage(cat)} 
                     alt={cat.name} 
                     fill 
                     className="object-cover transition-transform duration-700 group-hover:scale-110 opacity-70 group-hover:opacity-90" 

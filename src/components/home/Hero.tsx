@@ -8,12 +8,14 @@ import { getSupabaseSettings } from "@/lib/supabase";
 
 export function Hero() {
   const [heroTitle, setHeroTitle] = useState("لحظة تخرجك، بأرقى المعايير");
-  const [heroSubtitle, setHeroSubtitle] = useState("اكتشف مجموعتنا الحصرية من كابات التخرج، القبعات، والشالات الفاخرة. بيع وإيجار مع خدمة توصيل لجميع أنحاء ليبيا.");
+  const [heroSubtitle, setHeroSubtitle] = useState("اكتشف مجموعتنا الحصرية من كابات التخرج، القبعات، والشالات. بيع وإيجار مع خدمة توصيل لجميع أنحاء ليبيا.");
+  const [heroBadge, setHeroBadge] = useState("تشكيلة تخرج 2026 متوفرة الآن");
 
   useEffect(() => {
     getSupabaseSettings().then(settings => {
       if (settings.hero_title) setHeroTitle(settings.hero_title);
       if (settings.hero_subtitle) setHeroSubtitle(settings.hero_subtitle);
+      if (settings.hero_badge) setHeroBadge(settings.hero_badge);
     }).catch(err => console.error("Error fetching hero settings in Hero:", err));
   }, []);
 
@@ -41,7 +43,7 @@ export function Hero() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
             <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
           </span>
-          تشكيلة تخرج 2026 متوفرة الآن
+          {heroBadge}
         </motion.div>
 
         {/* Main Headline */}
@@ -92,7 +94,7 @@ export function Hero() {
         >
           <div className="flex flex-col items-center">
             <span className="text-4xl font-black text-primary-light">500+</span>
-            <span className="text-sm text-foreground/60 mt-1">منتج فاخر</span>
+            <span className="text-sm text-foreground/60 mt-1">منتج</span>
           </div>
           <div className="w-px h-12 bg-border"></div>
           <div className="flex flex-col items-center">

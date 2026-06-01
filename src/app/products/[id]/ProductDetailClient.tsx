@@ -24,10 +24,10 @@ const productsDb: Record<string, {
   code: string;
 }> = {
   "1": {
-    name: "كاب كويتي فاخر",
+    name: "كاب كويتي",
     priceSale: 85,
     priceRent: 40,
-    description: "كاب تخرج بتصميم كويتي أصيل، مصنوع من أجود أنواع المخمل الفاخر. يتميز بتفاصيل ذهبية دقيقة وحياكة يدوية متقنة تضمن لك إطلالة استثنائية في يوم تخرجك. متوفر للبيع والإيجار.",
+    description: "كاب تخرج بتصميم كويتي أصيل، مصنوع من أجود أنواع المخمل. يتميز بتفاصيل ذهبية دقيقة وحياكة يدوية متقنة تضمن لك إطلالة استثنائية في يوم تخرجك. متوفر للبيع والإيجار.",
     image: resolveAssetPath("/products/gallery/graduation_photo_01.jpg"),
     images: [
       resolveAssetPath("/products/gallery/graduation_photo_01.jpg"),
@@ -48,7 +48,7 @@ const productsDb: Record<string, {
     name: "شال تخرج مطرز",
     priceSale: 45,
     priceRent: 20,
-    description: "شال تخرج مطرز بخيوط حريرية فاخرة. يمكنك طلب كتابة اسمك وسنة التخرج بألوان متعددة. نسيج ناعم ومقاوم للتجعد.",
+    description: "شال تخرج مطرز بخيوط حريرية. يمكنك طلب كتابة اسمك وسنة التخرج بألوان متعددة. نسيج ناعم ومقاوم للتجعد.",
     image: "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=800&auto=format&fit=crop",
     status: "متوفر",
     category: "شالات التخرج",
@@ -81,7 +81,7 @@ const productsDb: Record<string, {
     name: "طقم كاب وشال",
     priceSale: 120,
     priceRent: 55,
-    description: "طقم تخرج ملكي متكامل يشمل الكاب الكويتي الفاخر مع شال مطرز مخصص بالاسم. وفر أكثر مع هذا الطقم المميز.",
+    description: "طقم تخرج ملكي متكامل يشمل الكاب الكويتي مع شال مطرز مخصص بالاسم. وفر أكثر مع هذا الطقم المميز.",
     image: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=800&auto=format&fit=crop",
     status: "متوفر",
     category: "كابات التخرج",
@@ -92,7 +92,7 @@ const productsDb: Record<string, {
     name: "قبعة تخرج مخمل",
     priceSale: 95,
     priceRent: 45,
-    description: "قبعة تخرج كلاسيكية مصنوعة من القطيفة الفاخرة مع شراشيب حريرية طويلة متدلية بلون ذهبي لامع.",
+    description: "قبعة تخرج كلاسيكية مصنوعة من القطيفة مع شراشيب حريرية طويلة متدلية بلون ذهبي لامع.",
     image: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=800&auto=format&fit=crop",
     status: "غير متوفر",
     category: "قبعات التخرج",
