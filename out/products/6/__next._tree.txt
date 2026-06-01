@@ -5,4 +5,4 @@
 :HL["/jaguaroccasions/_next/static/media/9ff27b8a0a8f3dc0-s.p.170gfl_1xpie6.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
 :HL["/jaguaroccasions/_next/static/media/d54db18e8cd5f74f-s.p.05.gztb3q6cix.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
 :HL["/jaguaroccasions/_next/static/media/e9f32d51db34fd0c-s.p.0.bpz~_xdhzbj.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
-0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"products","param":null,"prefetchHints":0,"slots":{"children":{"name":"id","param":{"type":"d","key":"6","siblings":null},"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}}}},"staleTime":300,"buildId":"SAu9g5hdopNzcw3N4nvGZ"}
+0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"products","param":null,"prefetchHints":0,"slots":{"children":{"name":"id","param":{"type":"d","key":"6","siblings":null},"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}}}},"staleTime":300,"buildId":"mu4m5s0RNoKKmRmoCw7if"}

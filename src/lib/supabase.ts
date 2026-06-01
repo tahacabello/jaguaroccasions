@@ -612,7 +612,8 @@ export async function updateSupabaseUserProfile(userId: string, profile: any): P
   try {
     const { error } = await supabase
       .from('profiles')
-      .update({
+      .upsert({
+        id: userId,
         name: profile.name,
         phone: profile.phone,
         backup_phone: profile.backup_phone || "",
@@ -620,8 +621,7 @@ export async function updateSupabaseUserProfile(userId: string, profile: any): P
         street: profile.street,
         additional_address: profile.additional_address || "",
         updated_at: new Date().toISOString()
-      })
-      .eq('id', userId);
+      });
     if (error) throw error;
     return true;
   } catch (err) {
