@@ -755,6 +755,155 @@ export async function updateSupabaseUserProfile(userId: string, profile: any): P
   }
 }
 
+// =====================================================================
+// 📂 الأقسام المميزة التجميلية بالرئيسية (Featured Cards Table Helpers)
+// =====================================================================
+export async function getSupabaseFeaturedCards(): Promise<any[]> {
+  try {
+    const { data: cards, error } = await supabase
+      .from('featured_cards')
+      .select('*')
+      .order('sort_order', { ascending: true });
+
+    if (error) throw error;
+
+    // Fetch all categories & subcategories to resolve fallback names & images
+    const categories = await getSupabaseCategories();
+    const subcategories = await getSupabaseSubcategories();
+
+    if (!cards || cards.length === 0) {
+      // Seed fallback cards based on default categories
+      return defaultCategories.map((c, idx) => ({
+        id: c.id,
+        display_title: c.name,
+        display_subtitle: c.desc || "",
+        display_image_url: c.image || "",
+        linked_type: "category",
+        linked_id: c.id,
+        is_visible: true,
+        sort_order: idx,
+        name: c.name,
+        desc: c.desc || "",
+        image: c.image || "",
+        categoryId: c.id,
+        isSubcategory: false
+      }));
+    }
+
+    return cards.map(card => {
+      let linkedItem: any = null;
+      if (card.linked_type === 'category') {
+        linkedItem = categories.find(c => c.id === card.linked_id);
+      } else {
+        linkedItem = subcategories.find(s => s.id === card.linked_id);
+      }
+
+      const name = card.display_title || linkedItem?.name || "بدون اسم";
+      const desc = card.display_subtitle || linkedItem?.desc || "";
+      const image = card.display_image_url || linkedItem?.image || "";
+      const categoryId = card.linked_type === 'subcategory' 
+        ? (linkedItem?.category_id || linkedItem?.categoryId || "")
+        : card.linked_id;
+
+      return {
+        ...card,
+        name,
+        desc,
+        image,
+        categoryId,
+        isSubcategory: card.linked_type === 'subcategory'
+      };
+    });
+  } catch (err) {
+    console.warn("Failed to fetch featured cards from Supabase:", err);
+    return defaultCategories.map((c, idx) => ({
+      id: c.id,
+      display_title: c.name,
+      display_subtitle: c.desc || "",
+      display_image_url: c.image || "",
+      linked_type: "category",
+      linked_id: c.id,
+      is_visible: true,
+      sort_order: idx,
+      name: c.name,
+      desc: c.desc || "",
+      image: c.image || "",
+      categoryId: c.id,
+      isSubcategory: false
+    }));
+  }
+}
+
+export async function addSupabaseFeaturedCard(card: any): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('featured_cards')
+      .insert([{
+        display_title: card.display_title || null,
+        display_subtitle: card.display_subtitle || null,
+        display_image_url: card.display_image_url || null,
+        linked_type: card.linked_type,
+        linked_id: card.linked_id,
+        is_visible: card.is_visible !== undefined ? card.is_visible : true,
+        sort_order: card.sort_order || 0
+      }]);
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.error("Failed to add featured card:", err);
+    return false;
+  }
+}
+
+export async function updateSupabaseFeaturedCard(id: string, updates: any): Promise<boolean> {
+  try {
+    const dbUpdates: any = {};
+    if (updates.display_title !== undefined) dbUpdates.display_title = updates.display_title;
+    if (updates.display_subtitle !== undefined) dbUpdates.display_subtitle = updates.display_subtitle;
+    if (updates.display_image_url !== undefined) dbUpdates.display_image_url = updates.display_image_url;
+    if (updates.linked_type !== undefined) dbUpdates.linked_type = updates.linked_type;
+    if (updates.linked_id !== undefined) dbUpdates.linked_id = updates.linked_id;
+    if (updates.is_visible !== undefined) dbUpdates.is_visible = updates.is_visible;
+    if (updates.sort_order !== undefined) dbUpdates.sort_order = updates.sort_order;
+
+    const { error } = await supabase
+      .from('featured_cards')
+      .update(dbUpdates)
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.error(`Failed to update featured card ${id}:`, err);
+    return false;
+  }
+}
+
+export async function deleteSupabaseFeaturedCard(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('featured_cards')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.error(`Failed to delete featured card ${id}:`, err);
+    return false;
+  }
+}
+
+export async function swapFeaturedCardOrderInDb(id1: string, order1: number, id2: string, order2: number): Promise<boolean> {
+  try {
+    const { error: err1 } = await supabase.from('featured_cards').update({ sort_order: order2 }).eq('id', id1);
+    const { error: err2 } = await supabase.from('featured_cards').update({ sort_order: order1 }).eq('id', id2);
+    if (err1 || err2) throw err1 || err2;
+    return true;
+  } catch (err) {
+    console.error("Failed to swap featured card order:", err);
+    return false;
+  }
+}
+
 // Resilient Image Helper with High-Quality Fallbacks for Categories
 export function getCategoryImage(cat: any): string {
   if (!cat || !cat.image || cat.image.startsWith("blob:") || cat.image.startsWith("data:")) {

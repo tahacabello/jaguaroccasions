@@ -31,7 +31,12 @@ import {
   resolveAssetPath,
   swapCategoryOrderInDb,
   swapSubcategoryOrderInDb,
-  swapProductOrderInDb
+  swapProductOrderInDb,
+  getSupabaseFeaturedCards,
+  addSupabaseFeaturedCard,
+  updateSupabaseFeaturedCard,
+  deleteSupabaseFeaturedCard,
+  swapFeaturedCardOrderInDb
 } from "@/lib/supabase";
 
 const statusTranslations: Record<string, string> = {
@@ -172,6 +177,18 @@ export default function AdminDashboard() {
   const [uploadingProdImg, setUploadingProdImg] = useState(false);
   const [uploadingGalleryImg, setUploadingGalleryImg] = useState(false);
 
+  // New Featured Cards State Declarations
+  const [featuredCardsList, setFeaturedCardsList] = useState<any[]>([]);
+  const [showAddFeaturedModal, setShowAddFeaturedModal] = useState(false);
+  const [editingFeaturedCard, setEditingFeaturedCard] = useState<any | null>(null);
+  
+  const [fCardTitle, setFCardTitle] = useState("");
+  const [fCardSubtitle, setFCardSubtitle] = useState("");
+  const [fCardImage, setFCardImage] = useState("");
+  const [fCardLinkedType, setFCardLinkedType] = useState<"category" | "subcategory">("category");
+  const [fCardLinkedId, setFCardLinkedId] = useState("");
+  const [fCardIsVisible, setFCardIsVisible] = useState(true);
+
   // Check auth session on mount
   useEffect(() => {
     const sessionAuth = sessionStorage.getItem("jaguar_admin_auth");
@@ -184,13 +201,14 @@ export default function AdminDashboard() {
   const refreshAllData = async () => {
     setIsLoading(true);
     try {
-      const [dbProducts, dbSettings, dbCategories, dbSubcategories, dbOrders, dbCustomers] = await Promise.all([
+      const [dbProducts, dbSettings, dbCategories, dbSubcategories, dbOrders, dbCustomers, dbFeaturedCards] = await Promise.all([
         getSupabaseProducts(),
         getSupabaseSettings(),
         getSupabaseCategories(),
         getSupabaseSubcategories(),
         getSupabaseOrders(),
-        getSupabaseCustomerProfiles()
+        getSupabaseCustomerProfiles(),
+        getSupabaseFeaturedCards()
       ]);
       
       setProducts(dbProducts);
@@ -199,6 +217,7 @@ export default function AdminDashboard() {
       setSubcategoriesList(dbSubcategories);
       setOrders(dbOrders);
       setCustomers(dbCustomers);
+      setFeaturedCardsList(dbFeaturedCards);
     } catch (err) {
       console.error("Error refreshing database tables in admin:", err);
     } finally {
@@ -242,9 +261,9 @@ export default function AdminDashboard() {
   };
 
   // Upload image handlers (Canvas compression + Supabase storage bucket)
-  const handleImageUpload = async (file: File, context: "cat" | "sub" | "prod-cover" | "prod-gallery") => {
+  const handleImageUpload = async (file: File, context: "cat" | "sub" | "prod-cover" | "prod-gallery" | "featured-card") => {
     try {
-      if (context === "cat" || context === "sub") setUploadingCatImg(true);
+      if (context === "cat" || context === "sub" || context === "featured-card") setUploadingCatImg(true);
       if (context === "prod-cover") setUploadingProdImg(true);
       if (context === "prod-gallery") setUploadingGalleryImg(true);
 
@@ -255,6 +274,7 @@ export default function AdminDashboard() {
       
       if (context === "cat") setCatImage(publicUrl);
       if (context === "sub") setSubImage(publicUrl);
+      if (context === "featured-card") setFCardImage(publicUrl);
       if (context === "prod-cover") setProdImage(publicUrl);
       if (context === "prod-gallery") setProdImages(prev => [...prev, publicUrl]);
 
@@ -325,89 +345,134 @@ export default function AdminDashboard() {
     }
   };
 
-  // 3. تبديل ترتيب المنتجات المعروضة
+  // =====================================================================
+  // 📂 منطق تصفية وجرد المنتجات التفاعلي بالأقسام
+  // =====================================================================
+  const [prodFilterType, setProdFilterType] = useState<"all" | "category" | "subcategory">("all");
+  const [prodFilterId, setProdFilterId] = useState("");
+
+  const filteredProducts = products.filter(prod => {
+    if (prodFilterType === "category") {
+      return prod.categoryId === prodFilterId;
+    }
+    if (prodFilterType === "subcategory") {
+      return prod.subcategoryId === prodFilterId;
+    }
+    return true;
+  });
+
   const handleMoveProduct = async (index: number, direction: 'up' | 'down') => {
     const targetIdx = direction === 'up' ? index - 1 : index + 1;
-    if (targetIdx < 0 || targetIdx >= products.length) return;
+    if (targetIdx < 0 || targetIdx >= filteredProducts.length) return;
     
-    const prod1 = products[index];
-    const prod2 = products[targetIdx];
+    const prod1 = filteredProducts[index];
+    const prod2 = filteredProducts[targetIdx];
     
     const success = await swapProductOrderInDb(prod1.id, prod1.sortOrder || 0, prod2.id, prod2.sortOrder || 0);
     if (success) {
       refreshAllData();
     } else {
-      alert("فشل تبديل ترتيب المنتجات. يرجى التأكد من تنفيذ سكربت الترقية في Supabase SQL Editor.");
+      alert("فشل تبديل ترتيب المنتجات");
     }
   };
 
-  // 4. حساب وعرض وتعديل ترتيب عناصر الصفحة الرئيسية المميزة (Featured Homepage Items)
-  const featuredCats = categoriesList.filter(c => c.is_featured);
-  const featuredSubs = subcategoriesList.filter(s => s.is_featured).map(s => {
-    const parent = categoriesList.find(c => c.id === s.category_id);
-    return {
-      ...s,
-      parentName: parent ? parent.name : "قسم رئيسي محذوف"
-    };
-  });
+  // =====================================================================
+  // 📂 الأقسام المميزة بالرئيسية (Featured Cards CRUD Handlers)
+  // =====================================================================
+  const handleAddFeaturedCard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fCardLinkedId) {
+      alert("يرجى اختيار القسم أو الفرع للمميزة");
+      return;
+    }
 
-  // تجميع وتوحيد شكل العناصر المميزة وفرزها حسب الترتيب
-  const featuredItems = [
-    ...featuredCats.map(c => ({ ...c, isSubcategory: false })), 
-    ...featuredSubs.map(s => ({ ...s, isSubcategory: true }))
-  ].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    const maxOrder = featuredCardsList.length > 0 ? Math.max(...featuredCardsList.map(i => i.sort_order || 0)) : 0;
+    const newOrder = maxOrder + 1;
 
-  // تبديل ترتيب العناصر المميزة بالرئيسية
-  const handleMoveFeaturedItem = async (index: number, direction: 'up' | 'down') => {
+    const success = await addSupabaseFeaturedCard({
+      display_title: fCardTitle || null,
+      display_subtitle: fCardSubtitle || null,
+      display_image_url: fCardImage || null,
+      linked_type: fCardLinkedType,
+      linked_id: fCardLinkedId,
+      is_visible: fCardIsVisible,
+      sort_order: newOrder
+    });
+
+    if (success) {
+      setShowAddFeaturedModal(false);
+      setFCardTitle("");
+      setFCardSubtitle("");
+      setFCardImage("");
+      setFCardLinkedId("");
+      setFCardLinkedType("category");
+      setFCardIsVisible(true);
+      refreshAllData();
+    } else {
+      alert("فشل إضافة القسم للمميزة");
+    }
+  };
+
+  const handleEditFeaturedCard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingFeaturedCard) return;
+
+    const success = await updateSupabaseFeaturedCard(editingFeaturedCard.id, {
+      display_title: editingFeaturedCard.display_title || null,
+      display_subtitle: editingFeaturedCard.display_subtitle || null,
+      display_image_url: catImage || editingFeaturedCard.display_image_url || null, // reuse catImage buffer
+      linked_type: editingFeaturedCard.linked_type,
+      linked_id: editingFeaturedCard.linked_id,
+      is_visible: editingFeaturedCard.is_visible,
+      sort_order: editingFeaturedCard.sort_order
+    });
+
+    if (success) {
+      setEditingFeaturedCard(null);
+      setCatImage("");
+      refreshAllData();
+    } else {
+      alert("فشل تعديل بطاقة المميزة");
+    }
+  };
+
+  const handleDeleteFeaturedCard = async (id: string) => {
+    if (!confirm("هل أنت متأكد من حذف هذه البطاقة المميزة من الصفحة الرئيسية؟")) return;
+    const success = await deleteSupabaseFeaturedCard(id);
+    if (success) {
+      refreshAllData();
+    } else {
+      alert("فشل حذف البطاقة المميزة");
+    }
+  };
+
+  const handleMoveFeaturedCard = async (index: number, direction: 'up' | 'down') => {
     const targetIdx = direction === 'up' ? index - 1 : index + 1;
-    if (targetIdx < 0 || targetIdx >= featuredItems.length) return;
+    if (targetIdx < 0 || targetIdx >= featuredCardsList.length) return;
 
-    const item1 = featuredItems[index];
-    const item2 = featuredItems[targetIdx];
+    const card1 = featuredCardsList[index];
+    const card2 = featuredCardsList[targetIdx];
 
-    const tempOrder = item1.sort_order || 0;
-    const order1 = item2.sort_order || 0;
-    const order2 = tempOrder;
-
-    let success = false;
-    if (item1.isSubcategory) {
-      if (item2.isSubcategory) {
-        success = await swapSubcategoryOrderInDb(item1.id, order2, item2.id, order1);
-      } else {
-        const s1 = await updateSupabaseSubcategory(item1.id, { sort_order: order1 });
-        const s2 = await updateSupabaseCategory(item2.id, { sort_order: order2 });
-        success = s1 && s2;
-      }
-    } else {
-      if (item2.isSubcategory) {
-        const s1 = await updateSupabaseCategory(item1.id, { sort_order: order1 });
-        const s2 = await updateSupabaseSubcategory(item2.id, { sort_order: order2 });
-        success = s1 && s2;
-      } else {
-        success = await swapCategoryOrderInDb(item1.id, order2, item2.id, order1);
-      }
-    }
+    const success = await swapFeaturedCardOrderInDb(
+      card1.id, card1.sort_order || 0,
+      card2.id, card2.sort_order || 0
+    );
 
     if (success) {
       refreshAllData();
     } else {
-      alert("فشل تبديل ترتيب العناصر المميزة بالرئيسية");
+      alert("فشل تبديل ترتيب البطاقات المميزة بالرئيسية");
     }
   };
 
-  // تفعيل أو إلغاء تميز عنصر بالرئيسية
-  const handleToggleFeatured = async (item: any, isSub: boolean) => {
-    const newFeatured = !item.is_featured;
-    let success = false;
-    if (isSub) {
-      success = await updateSupabaseSubcategory(item.id, { is_featured: newFeatured });
-    } else {
-      success = await updateSupabaseCategory(item.id, { is_featured: newFeatured });
-    }
+  const handleToggleFeaturedCardVisibility = async (card: any) => {
+    const success = await updateSupabaseFeaturedCard(card.id, {
+      is_visible: !card.is_visible
+    });
     if (success) {
       refreshAllData();
     } else {
-      alert("فشل تحديث حالة تميز العنصر بالرئيسية");
+      alert("فشل تحديث حالة ظهور البطاقة المميزة");
     }
   };
 
@@ -628,7 +693,7 @@ export default function AdminDashboard() {
       isFeatured: editingProduct.isFeatured,
       isHidden: editingProduct.isHidden,
       image: prodImage || editingProduct.image,
-      images: prodImages.length > 0 ? prodImages : editingProduct.images,
+      images: prodImages,
       sortOrder: editingProduct.sortOrder
     });
 
@@ -977,121 +1042,125 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  {/* Homepage Featured Categories / Subcategories Editor */}
+                  {/* Homepage Visual Featured Cards Editor */}
                   <div className="glass rounded-3xl border border-border p-6 space-y-6">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-border/40 pb-4 gap-4">
                       <div>
                         <h3 className="text-lg font-bold flex items-center gap-2">
                           <Star className="w-5 h-5 text-primary fill-primary" />
-                          أقسام وفروع الواجهة المميزة المعروضة بالرئيسية
+                          محرر بطاقات الواجهة المميزة (الأقسام المميزة) بالرئيسية
                         </h3>
-                        <p className="text-xs text-foreground/60 mt-1">اختر ورتب الأقسام الرئيسية والفرعية التي تود إبرازها للزبائن بالصفحة الرئيسية</p>
+                        <p className="text-xs text-foreground/60 mt-1">تنسيق وتصميم وترتيب البطاقات المميزة تماماً كما تظهر للزبائن في الصفحة العامة</p>
                       </div>
                       
-                      {/* Add to Featured dropdown selector */}
-                      <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <select 
-                          id="select-add-featured"
-                          className="bg-surface border border-border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-primary font-bold w-full sm:w-auto"
-                          defaultValue=""
-                          onChange={async (e) => {
-                            const val = e.target.value;
-                            if (!val) return;
-                            const [id, type] = val.split(":");
-                            const isSub = type === "sub";
-                            
-                            const maxOrder = featuredItems.length > 0 ? Math.max(...featuredItems.map(i => i.sort_order || 0)) : 0;
-                            const newOrder = maxOrder + 1;
-
-                            let success = false;
-                            if (isSub) {
-                              success = await updateSupabaseSubcategory(id, { is_featured: true, sort_order: newOrder });
-                            } else {
-                              success = await updateSupabaseCategory(id, { is_featured: true, sort_order: newOrder });
-                            }
-
-                            if (success) {
-                              refreshAllData();
-                              e.target.value = ""; // Reset selector
-                            } else {
-                              alert("فشل إضافة العنصر للمميزة");
-                            }
-                          }}
-                        >
-                          <option value="">➕ إضافة قسم/فرع للمميزة بالرئيسية...</option>
-                          <optgroup label="الأقسام الرئيسية">
-                            {categoriesList.filter(c => !c.is_featured && c.is_active).map(c => (
-                              <option key={c.id} value={`${c.id}:cat`}>{c.name}</option>
-                            ))}
-                          </optgroup>
-                          <optgroup label="الأقسام الفرعية">
-                            {subcategoriesList.filter(s => !s.is_featured && s.is_active).map(s => {
-                              const parent = categoriesList.find(c => c.id === s.category_id);
-                              return (
-                                <option key={s.id} value={`${s.id}:sub`}>{s.name} (يتبع: {parent?.name || "رئيسي"})</option>
-                              );
-                            })}
-                          </optgroup>
-                        </select>
-                      </div>
+                      <button
+                        onClick={() => {
+                          setFCardTitle("");
+                          setFCardSubtitle("");
+                          setFCardImage("");
+                          setFCardLinkedId("");
+                          setFCardLinkedType("category");
+                          setFCardIsVisible(true);
+                          setShowAddFeaturedModal(true);
+                        }}
+                        className="px-5 py-3 bg-primary text-black hover:bg-primary-light rounded-xl font-black text-xs flex items-center gap-1.5 transition-all w-full sm:w-auto justify-center"
+                      >
+                        <Plus className="w-4.5 h-4.5" />
+                        إضافة بطاقة مميزة جديدة
+                      </button>
                     </div>
 
-                    {featuredItems.length === 0 ? (
-                      <p className="text-xs text-foreground/40 font-bold text-center py-6">لا يوجد عناصر مميزة بالرئيسية بعد. اختر من القائمة بالأعلى لإضافة عناصرك المفضلة!</p>
+                    {featuredCardsList.length === 0 ? (
+                      <p className="text-xs text-foreground/40 font-bold text-center py-12">لا يوجد بطاقات مميزة بالرئيسية بعد. اضغط على الزر بالأعلى لإضافة أول بطاقة مميزة وتصميمها!</p>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {featuredItems.map((item, idx) => (
-                          <div key={item.id} className="p-4 rounded-2xl bg-surface/40 border border-border flex items-center justify-between gap-4 relative overflow-hidden group">
-                            <div className="flex items-center gap-3">
-                              <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-surface shrink-0 border border-border">
-                                <Image
-                                  src={resolveAssetPath(item.image || "/placeholder.jpg")}
-                                  alt={item.name}
-                                  fill
-                                  className="object-cover"
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {featuredCardsList.map((card, idx) => {
+                          const isSub = card.linked_type === "subcategory";
+                          return (
+                            <div 
+                              key={card.id} 
+                              className={`group relative h-[320px] flex flex-col justify-end overflow-hidden rounded-2xl bg-surface-hover border ${
+                                card.is_visible ? "border-border" : "border-red-500/40 opacity-70"
+                              }`}
+                            >
+                              {/* Background Image Preview */}
+                              <div className="absolute inset-0 z-0">
+                                <Image 
+                                  src={resolveAssetPath(card.image || "/placeholder.jpg")} 
+                                  alt={card.name} 
+                                  fill 
+                                  className="object-cover opacity-50 group-hover:opacity-70 transition-opacity duration-300" 
                                 />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent"></div>
                               </div>
-                              <div>
-                                <h4 className="font-bold text-sm flex items-center gap-1.5">
-                                  {item.name}
-                                </h4>
-                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-black mt-1 inline-block ${
-                                  item.isSubcategory ? "bg-primary/10 text-primary-light" : "bg-foreground/10 text-foreground/75"
+
+                              {/* Admin Visual Overlays / Controls */}
+                              <div className="absolute top-3 left-3 right-3 z-20 flex justify-between items-center opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                <span className={`text-[9px] px-2 py-0.5 rounded font-black shadow-lg ${
+                                  card.is_visible ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
                                 }`}>
-                                  {item.isSubcategory ? `فرعي (يتبع: ${item.parentName})` : "رئيسي"}
+                                  {card.is_visible ? "مرئي" : "مخفي"}
                                 </span>
+
+                                <div className="flex items-center gap-1">
+                                  {/* Visual Sorting */}
+                                  <button
+                                    onClick={() => handleMoveFeaturedCard(idx, 'up')}
+                                    disabled={idx === 0}
+                                    className="p-1.5 bg-black/85 hover:bg-black border border-border/40 rounded-lg text-white hover:text-primary disabled:opacity-30 transition-colors text-[10px] font-black"
+                                    title="تحريك لليمين/لأعلى"
+                                  >
+                                    ▲
+                                  </button>
+                                  <button
+                                    onClick={() => handleMoveFeaturedCard(idx, 'down')}
+                                    disabled={idx === featuredCardsList.length - 1}
+                                    className="p-1.5 bg-black/85 hover:bg-black border border-border/40 rounded-lg text-white hover:text-primary disabled:opacity-30 transition-colors text-[10px] font-black"
+                                    title="تحريك ليسار/لأسفل"
+                                  >
+                                    ▼
+                                  </button>
+
+                                  <button
+                                    onClick={() => {
+                                      setEditingFeaturedCard(card);
+                                      setCatImage(card.display_image_url || "");
+                                    }}
+                                    className="p-1.5 bg-primary/95 text-black hover:bg-primary-light rounded-lg transition-colors font-black"
+                                    title="تعديل البطاقة"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleToggleFeaturedCardVisibility(card)}
+                                    className="p-1.5 bg-black/80 hover:bg-black text-white rounded-lg transition-colors font-black border border-border/40"
+                                    title={card.is_visible ? "إخفاء من الصفحة" : "إظهار في الصفحة"}
+                                  >
+                                    {card.is_visible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleDeleteFeaturedCard(card.id)}
+                                    className="p-1.5 bg-red-600/90 text-white hover:bg-red-700 rounded-lg transition-colors font-black"
+                                    title="إزالة وحذف"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Card display info (Mimics storefront) */}
+                              <div className="relative z-10 p-5 text-right space-y-1">
+                                <h4 className="text-xl font-bold text-white leading-tight">{card.name}</h4>
+                                {card.desc && <p className="text-[11px] text-foreground/60 truncate leading-none">{card.desc}</p>}
+                                <p className="text-[9px] text-primary-light font-black tracking-wide pt-1">
+                                  {isSub ? `★ فرع: ${card.linked_type}` : `📁 قسم رئيسي: ${card.linked_type}`}
+                                </p>
                               </div>
                             </div>
-
-                            <div className="flex items-center gap-1">
-                              {/* Simple visual Up/Down arrow sorting buttons */}
-                              <button
-                                onClick={() => handleMoveFeaturedItem(idx, 'up')}
-                                disabled={idx === 0}
-                                className="p-1.5 bg-surface hover:bg-surface-hover border border-border rounded-lg text-foreground/60 hover:text-primary disabled:opacity-30 transition-colors font-black text-xs"
-                                title="تحريك لأعلى"
-                              >
-                                ▲
-                              </button>
-                              <button
-                                onClick={() => handleMoveFeaturedItem(idx, 'down')}
-                                disabled={idx === featuredItems.length - 1}
-                                className="p-1.5 bg-surface hover:bg-surface-hover border border-border rounded-lg text-foreground/60 hover:text-primary disabled:opacity-30 transition-colors font-black text-xs"
-                                title="تحريك لأسفل"
-                              >
-                                ▼
-                              </button>
-
-                              <button
-                                onClick={() => handleToggleFeatured(item, item.isSubcategory)}
-                                className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors ml-2"
-                                title="إزالة من المميزة"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -1304,19 +1373,57 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-bold">معرض وجرد المنتجات المتوفرة</h2>
-                    <button
-                      onClick={() => setShowAddProdModal(true)}
-                      className="px-5 py-3 bg-primary text-black hover:bg-primary-light rounded-xl font-black text-xs flex items-center gap-1.5 transition-all"
-                    >
-                      <Plus className="w-4.5 h-4.5" />
-                      إضافة منتج جديد
-                    </button>
+                  {/* Controllable Category/Subcategory products filter */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-border/40 pb-4 gap-4">
+                    <div>
+                      <h2 className="text-xl font-bold">معرض وجرد المنتجات المتوفرة</h2>
+                      <p className="text-xs text-foreground/60 mt-1">تصفية المنتجات حسب الأقسام أو الفرعيات وإعادة ترتيبها بصرياً داخل القسم المحدد</p>
+                    </div>
+                    
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                      <select 
+                        value={prodFilterType === "all" ? "all" : `${prodFilterType}:${prodFilterId}`}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === "all") {
+                            setProdFilterType("all");
+                            setProdFilterId("");
+                          } else {
+                            const [type, id] = val.split(":");
+                            setProdFilterType(type as any);
+                            setProdFilterId(id);
+                          }
+                        }}
+                        className="bg-surface border border-border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-primary font-bold w-full sm:w-auto"
+                      >
+                        <option value="all">🔍 عرض جميع المنتجات</option>
+                        <optgroup label="الأقسام الرئيسية">
+                          {categoriesList.map(c => (
+                            <option key={c.id} value={`category:${c.id}`}>{c.name}</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="الأقسام الفرعية">
+                          {subcategoriesList.map(s => {
+                            const parent = categoriesList.find(c => c.id === s.category_id);
+                            return (
+                              <option key={s.id} value={`subcategory:${s.id}`}>{s.name} (يتبع: {parent?.name || "رئيسي"})</option>
+                            );
+                          })}
+                        </optgroup>
+                      </select>
+
+                      <button
+                        onClick={() => setShowAddProdModal(true)}
+                        className="px-5 py-3 bg-primary text-black hover:bg-primary-light rounded-xl font-black text-xs flex items-center gap-1.5 transition-all w-full sm:w-auto justify-center"
+                      >
+                        <Plus className="w-4.5 h-4.5" />
+                        إضافة منتج جديد
+                      </button>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {products.map((prod, idx) => {
+                    {filteredProducts.map((prod, idx) => {
                       const cat = categoriesList.find(c => c.id === prod.categoryId);
                       return (
                         <div key={prod.id} className="glass rounded-2xl border border-border overflow-hidden flex flex-col group hover:border-primary/20">
@@ -2790,6 +2897,241 @@ export default function AdminDashboard() {
                     className="btn-premium w-full mt-4 py-3.5 font-bold text-sm"
                   >
                     حفظ التعديلات
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* 7. ADD FEATURED CARD MODAL */}
+          {showAddFeaturedModal && (
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
+              <div className="bg-background border border-border w-full max-w-md rounded-3xl p-8 relative space-y-6 text-right max-h-[90vh] overflow-y-auto">
+                <button
+                  onClick={() => setShowAddFeaturedModal(false)}
+                  className="absolute top-6 left-6 p-2 hover:bg-surface rounded-lg border border-border"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+
+                <h3 className="text-xl font-bold border-b border-border pb-3">➕ إضافة بطاقة مميزة للرئيسية</h3>
+
+                <form onSubmit={handleAddFeaturedCard} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-foreground/60">نوع التوجيه *</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFCardLinkedType("category");
+                          setFCardLinkedId("");
+                        }}
+                        className={`py-2 text-xs font-bold rounded-xl border ${
+                          fCardLinkedType === "category"
+                            ? "bg-primary border-primary text-black"
+                            : "bg-surface border-border text-foreground/60 hover:text-foreground"
+                        }`}
+                      >
+                        📁 قسم رئيسي
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFCardLinkedType("subcategory");
+                          setFCardLinkedId("");
+                        }}
+                        className={`py-2 text-xs font-bold rounded-xl border ${
+                          fCardLinkedType === "subcategory"
+                            ? "bg-primary border-primary text-black"
+                            : "bg-surface border-border text-foreground/60 hover:text-foreground"
+                        }`}
+                      >
+                        ★ قسم فرعي
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-foreground/60">اختر القسم المربوط *</label>
+                    <select
+                      required
+                      value={fCardLinkedId}
+                      onChange={(e) => setFCardLinkedId(e.target.value)}
+                      className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm font-bold"
+                    >
+                      <option value="">-- اختر من القائمة --</option>
+                      {fCardLinkedType === "category" ? (
+                        categoriesList.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))
+                      ) : (
+                        subcategoriesList.map(s => {
+                          const parent = categoriesList.find(c => c.id === s.category_id);
+                          return (
+                            <option key={s.id} value={s.id}>{s.name} (يتبع: {parent?.name || "رئيسي"})</option>
+                          );
+                        })
+                      )}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-foreground/60">العنوان التجميلي (اختياري)</label>
+                    <input
+                      type="text"
+                      value={fCardTitle}
+                      onChange={(e) => setFCardTitle(e.target.value)}
+                      placeholder="اتركه فارغاً لاستعمال اسم القسم الافتراضي"
+                      className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-foreground/60">العنوان الفرعي التجميلي (اختياري)</label>
+                    <input
+                      type="text"
+                      value={fCardSubtitle}
+                      onChange={(e) => setFCardSubtitle(e.target.value)}
+                      placeholder="مثال: تصاميم وموديلات مميزة"
+                      className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-foreground/60">صورة البطاقة المخصصة (اختيارية)</label>
+                    <div className="flex items-center gap-3">
+                      <label className="flex-1 border border-dashed border-border rounded-xl p-3 bg-surface hover:bg-surface-hover cursor-pointer transition-colors text-center text-xs font-bold text-foreground/65 flex justify-center items-center gap-1.5">
+                        <Upload className="w-4 h-4" />
+                        {uploadingCatImg ? "جاري الرفع..." : "اختر صورة سحابية"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], "featured-card")}
+                        />
+                      </label>
+                    </div>
+                    {fCardImage && (
+                      <div className="relative w-full h-[120px] rounded-xl overflow-hidden border border-border group">
+                        <Image src={fCardImage} alt="Preview" fill className="object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setFCardImage("")}
+                          className="absolute top-2 left-2 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors shadow-lg shadow-black/40 flex items-center justify-center"
+                          title="إزالة الصورة"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-center gap-2 pt-4">
+                    <input
+                      type="checkbox"
+                      id="fCardIsVisible"
+                      checked={fCardIsVisible}
+                      onChange={(e) => setFCardIsVisible(e.target.checked)}
+                      className="accent-primary"
+                    />
+                    <label htmlFor="fCardIsVisible" className="text-xs font-bold">تفعيل الظهور بالصفحة الرئيسية فوراً</label>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="btn-premium w-full mt-4 py-3 font-bold text-sm"
+                  >
+                    حفظ ونشر البطاقة المميزة
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* 8. EDIT FEATURED CARD MODAL */}
+          {editingFeaturedCard && (
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
+              <div className="bg-background border border-border w-full max-w-md rounded-3xl p-8 relative space-y-6 text-right max-h-[90vh] overflow-y-auto">
+                <button
+                  onClick={() => setEditingFeaturedCard(null)}
+                  className="absolute top-6 left-6 p-2 hover:bg-surface rounded-lg border border-border"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+
+                <h3 className="text-xl font-bold border-b border-border pb-3">✏️ تعديل البطاقة المميزة</h3>
+
+                <form onSubmit={handleEditFeaturedCard} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-foreground/60">العنوان التجميلي (اختياري)</label>
+                    <input
+                      type="text"
+                      value={editingFeaturedCard.display_title || ""}
+                      onChange={(e) => setEditingFeaturedCard({ ...editingFeaturedCard, display_title: e.target.value })}
+                      placeholder="اسم القسم الافتراضي"
+                      className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-foreground/60">العنوان الفرعي التجميلي (اختياري)</label>
+                    <input
+                      type="text"
+                      value={editingFeaturedCard.display_subtitle || ""}
+                      onChange={(e) => setEditingFeaturedCard({ ...editingFeaturedCard, display_subtitle: e.target.value })}
+                      placeholder="العنوان الفرعي الافتراضي"
+                      className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-foreground/60">صورة البطاقة السحابية المخصصة (اختيارية)</label>
+                    <div className="flex items-center gap-3">
+                      <label className="flex-1 border border-dashed border-border rounded-xl p-3 bg-surface hover:bg-surface-hover cursor-pointer transition-colors text-center text-xs font-bold text-foreground/65 flex justify-center items-center gap-1.5">
+                        <Upload className="w-4 h-4" />
+                        {uploadingCatImg ? "جاري الرفع..." : "تغيير الصورة"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], "cat")}
+                        />
+                      </label>
+                    </div>
+                    {(catImage || editingFeaturedCard.display_image_url) && (
+                      <div className="relative w-full h-[120px] rounded-xl overflow-hidden border border-border group">
+                        <Image src={catImage || editingFeaturedCard.display_image_url} alt="Preview" fill className="object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCatImage("");
+                            setEditingFeaturedCard({ ...editingFeaturedCard, display_image_url: "" });
+                          }}
+                          className="absolute top-2 left-2 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors shadow-lg shadow-black/40 flex items-center justify-center"
+                          title="إزالة الصورة"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-center gap-2 pt-4">
+                    <input
+                      type="checkbox"
+                      id="fCardEditIsVisible"
+                      checked={editingFeaturedCard.is_visible}
+                      onChange={(e) => setEditingFeaturedCard({ ...editingFeaturedCard, is_visible: e.target.checked })}
+                      className="accent-primary"
+                    />
+                    <label htmlFor="fCardEditIsVisible" className="text-xs font-bold">تفعيل الظهور بالصفحة الرئيسية</label>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="btn-premium w-full mt-4 py-3 font-bold text-sm"
+                  >
+                    حفظ التعديلات ونشرها
                   </button>
                 </form>
               </div>

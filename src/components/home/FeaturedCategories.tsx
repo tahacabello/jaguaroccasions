@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
-import { getSupabaseFeaturedItems, defaultCategories, getCategoryImage, getSupabaseSettings } from "@/lib/supabase";
+import { getSupabaseFeaturedCards, defaultCategories, getCategoryImage, getSupabaseSettings } from "@/lib/supabase";
 
 export function FeaturedCategories() {
   const [categoriesList, setCategoriesList] = useState<any[]>([]);
@@ -12,7 +12,9 @@ export function FeaturedCategories() {
   const [categoriesSubtitle, setCategoriesSubtitle] = useState("اكتشف مجموعاتنا المصنفة بعناية");
 
   useEffect(() => {
-    getSupabaseFeaturedItems().then(setCategoriesList).catch(err => console.error(err));
+    getSupabaseFeaturedCards()
+      .then(list => setCategoriesList(list.filter((c: any) => c.is_visible)))
+      .catch(err => console.error(err));
     getSupabaseSettings().then(settings => {
       if (settings.categories_title) setCategoriesTitle(settings.categories_title);
       if (settings.categories_subtitle) setCategoriesSubtitle(settings.categories_subtitle);
