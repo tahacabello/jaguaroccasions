@@ -28,7 +28,10 @@ import {
   deleteSupabaseOrder,
   getSupabaseCustomerProfiles,
   uploadProductImage,
-  resolveAssetPath
+  resolveAssetPath,
+  swapCategoryOrderInDb,
+  swapSubcategoryOrderInDb,
+  swapProductOrderInDb
 } from "@/lib/supabase";
 
 const statusTranslations: Record<string, string> = {
@@ -139,13 +142,17 @@ export default function AdminDashboard() {
   const [catImage, setCatImage] = useState("");
   const [catSortOrder, setCatSortOrder] = useState(0);
   const [catIsActive, setCatIsActive] = useState(true);
+  const [catIsFeatured, setCatIsFeatured] = useState(false);
   const [uploadingCatImg, setUploadingCatImg] = useState(false);
 
   // Dynamic input states for subcategories
   const [subName, setSubName] = useState("");
   const [subCatId, setSubCatId] = useState("");
+  const [subImage, setSubImage] = useState("");
+  const [subDesc, setSubDesc] = useState("");
   const [subSortOrder, setSubSortOrder] = useState(0);
   const [subIsActive, setSubIsActive] = useState(true);
+  const [subIsFeatured, setSubIsFeatured] = useState(false);
 
   // Dynamic input states for products
   const [prodName, setProdName] = useState("");
@@ -235,9 +242,9 @@ export default function AdminDashboard() {
   };
 
   // Upload image handlers (Canvas compression + Supabase storage bucket)
-  const handleImageUpload = async (file: File, context: "cat" | "prod-cover" | "prod-gallery") => {
+  const handleImageUpload = async (file: File, context: "cat" | "sub" | "prod-cover" | "prod-gallery") => {
     try {
-      if (context === "cat") setUploadingCatImg(true);
+      if (context === "cat" || context === "sub") setUploadingCatImg(true);
       if (context === "prod-cover") setUploadingProdImg(true);
       if (context === "prod-gallery") setUploadingGalleryImg(true);
 
@@ -247,6 +254,7 @@ export default function AdminDashboard() {
       const publicUrl = await uploadProductImage(compressedFile, context);
       
       if (context === "cat") setCatImage(publicUrl);
+      if (context === "sub") setSubImage(publicUrl);
       if (context === "prod-cover") setProdImage(publicUrl);
       if (context === "prod-gallery") setProdImages(prev => [...prev, publicUrl]);
 
@@ -278,6 +286,128 @@ export default function AdminDashboard() {
       alert("حدث خطأ أثناء حفظ الإعدادات");
     } finally {
       setIsSavingSettings(false);
+    }
+  };
+
+  // =====================================================================
+  // 📂 معالجات الترتيب الفوري للأدمن (Admin Dynamic Sorting Handlers)
+  // =====================================================================
+  
+  // 1. تبديل ترتيب الأقسام الرئيسية
+  const handleMoveCategory = async (index: number, direction: 'up' | 'down') => {
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= categoriesList.length) return;
+    
+    const cat1 = categoriesList[index];
+    const cat2 = categoriesList[targetIdx];
+    
+    const success = await swapCategoryOrderInDb(cat1.id, cat1.sort_order || 0, cat2.id, cat2.sort_order || 0);
+    if (success) {
+      refreshAllData();
+    } else {
+      alert("فشل تبديل ترتيب الأقسام. يرجى التأكد من تنفيذ سكربت الترقية في Supabase SQL Editor.");
+    }
+  };
+
+  // 2. تبديل ترتيب الأقسام الفرعية
+  const handleMoveSubcategory = async (index: number, direction: 'up' | 'down') => {
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= subcategoriesList.length) return;
+    
+    const sub1 = subcategoriesList[index];
+    const sub2 = subcategoriesList[targetIdx];
+    
+    const success = await swapSubcategoryOrderInDb(sub1.id, sub1.sort_order || 0, sub2.id, sub2.sort_order || 0);
+    if (success) {
+      refreshAllData();
+    } else {
+      alert("فشل تبديل ترتيب الأقسام الفرعية. يرجى التأكد من تنفيذ سكربت الترقية في Supabase SQL Editor.");
+    }
+  };
+
+  // 3. تبديل ترتيب المنتجات المعروضة
+  const handleMoveProduct = async (index: number, direction: 'up' | 'down') => {
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= products.length) return;
+    
+    const prod1 = products[index];
+    const prod2 = products[targetIdx];
+    
+    const success = await swapProductOrderInDb(prod1.id, prod1.sortOrder || 0, prod2.id, prod2.sortOrder || 0);
+    if (success) {
+      refreshAllData();
+    } else {
+      alert("فشل تبديل ترتيب المنتجات. يرجى التأكد من تنفيذ سكربت الترقية في Supabase SQL Editor.");
+    }
+  };
+
+  // 4. حساب وعرض وتعديل ترتيب عناصر الصفحة الرئيسية المميزة (Featured Homepage Items)
+  const featuredCats = categoriesList.filter(c => c.is_featured);
+  const featuredSubs = subcategoriesList.filter(s => s.is_featured).map(s => {
+    const parent = categoriesList.find(c => c.id === s.category_id);
+    return {
+      ...s,
+      parentName: parent ? parent.name : "قسم رئيسي محذوف"
+    };
+  });
+
+  // تجميع وتوحيد شكل العناصر المميزة وفرزها حسب الترتيب
+  const featuredItems = [
+    ...featuredCats.map(c => ({ ...c, isSubcategory: false })), 
+    ...featuredSubs.map(s => ({ ...s, isSubcategory: true }))
+  ].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+  // تبديل ترتيب العناصر المميزة بالرئيسية
+  const handleMoveFeaturedItem = async (index: number, direction: 'up' | 'down') => {
+    const targetIdx = direction === 'up' ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= featuredItems.length) return;
+
+    const item1 = featuredItems[index];
+    const item2 = featuredItems[targetIdx];
+
+    const tempOrder = item1.sort_order || 0;
+    const order1 = item2.sort_order || 0;
+    const order2 = tempOrder;
+
+    let success = false;
+    if (item1.isSubcategory) {
+      if (item2.isSubcategory) {
+        success = await swapSubcategoryOrderInDb(item1.id, order2, item2.id, order1);
+      } else {
+        const s1 = await updateSupabaseSubcategory(item1.id, { sort_order: order1 });
+        const s2 = await updateSupabaseCategory(item2.id, { sort_order: order2 });
+        success = s1 && s2;
+      }
+    } else {
+      if (item2.isSubcategory) {
+        const s1 = await updateSupabaseCategory(item1.id, { sort_order: order1 });
+        const s2 = await updateSupabaseSubcategory(item2.id, { sort_order: order2 });
+        success = s1 && s2;
+      } else {
+        success = await swapCategoryOrderInDb(item1.id, order2, item2.id, order1);
+      }
+    }
+
+    if (success) {
+      refreshAllData();
+    } else {
+      alert("فشل تبديل ترتيب العناصر المميزة بالرئيسية");
+    }
+  };
+
+  // تفعيل أو إلغاء تميز عنصر بالرئيسية
+  const handleToggleFeatured = async (item: any, isSub: boolean) => {
+    const newFeatured = !item.is_featured;
+    let success = false;
+    if (isSub) {
+      success = await updateSupabaseSubcategory(item.id, { is_featured: newFeatured });
+    } else {
+      success = await updateSupabaseCategory(item.id, { is_featured: newFeatured });
+    }
+    if (success) {
+      refreshAllData();
+    } else {
+      alert("فشل تحديث حالة تميز العنصر بالرئيسية");
     }
   };
 
@@ -326,7 +456,8 @@ export default function AdminDashboard() {
       desc: catDesc,
       image: catImage,
       sort_order: catSortOrder,
-      is_active: catIsActive
+      is_active: catIsActive,
+      is_featured: catIsFeatured
     });
 
     if (success) {
@@ -335,6 +466,7 @@ export default function AdminDashboard() {
       setCatDesc("");
       setCatImage("");
       setCatSortOrder(0);
+      setCatIsFeatured(false);
       refreshAllData();
     } else {
       alert("فشل إضافة القسم");
@@ -350,7 +482,8 @@ export default function AdminDashboard() {
       desc: editingCategory.desc,
       image: catImage || editingCategory.image, // use newly uploaded or existing
       sort_order: editingCategory.sort_order,
-      is_active: editingCategory.is_active
+      is_active: editingCategory.is_active,
+      is_featured: editingCategory.is_featured
     });
 
     if (success) {
@@ -380,6 +513,9 @@ export default function AdminDashboard() {
     const success = await addSupabaseSubcategory({
       name: subName,
       category_id: subCatId,
+      image: subImage,
+      desc: subDesc,
+      is_featured: subIsFeatured,
       sort_order: subSortOrder,
       is_active: subIsActive
     });
@@ -388,6 +524,9 @@ export default function AdminDashboard() {
       setShowAddSubModal(false);
       setSubName("");
       setSubCatId("");
+      setSubImage("");
+      setSubDesc("");
+      setSubIsFeatured(false);
       setSubSortOrder(0);
       refreshAllData();
     } else {
@@ -402,12 +541,16 @@ export default function AdminDashboard() {
     const success = await updateSupabaseSubcategory(editingSubcategory.id, {
       name: editingSubcategory.name,
       category_id: editingSubcategory.category_id,
+      image: catImage || editingSubcategory.image, // use newly uploaded or existing
+      desc: editingSubcategory.desc,
+      is_featured: editingSubcategory.is_featured,
       sort_order: editingSubcategory.sort_order,
       is_active: editingSubcategory.is_active
     });
 
     if (success) {
       setEditingSubcategory(null);
+      setCatImage("");
       refreshAllData();
     } else {
       alert("فشل تعديل القسم الفرعي");
@@ -834,117 +977,295 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Left panel: Categories List */}
+                  {/* Homepage Featured Categories / Subcategories Editor */}
                   <div className="glass rounded-3xl border border-border p-6 space-y-6">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-bold">الأقسام الرئيسية الـ 4 الحالية</h3>
-                      <button
-                        onClick={() => setShowAddCatModal(true)}
-                        className="px-4 py-2 bg-primary text-black hover:bg-primary-light rounded-xl font-bold text-xs flex items-center gap-1 transition-all"
-                      >
-                        <Plus className="w-4 h-4" />
-                        إضافة قسم رئيسي
-                      </button>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-border/40 pb-4 gap-4">
+                      <div>
+                        <h3 className="text-lg font-bold flex items-center gap-2">
+                          <Star className="w-5 h-5 text-primary fill-primary" />
+                          أقسام وفروع الواجهة المميزة المعروضة بالرئيسية
+                        </h3>
+                        <p className="text-xs text-foreground/60 mt-1">اختر ورتب الأقسام الرئيسية والفرعية التي تود إبرازها للزبائن بالصفحة الرئيسية</p>
+                      </div>
+                      
+                      {/* Add to Featured dropdown selector */}
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <select 
+                          id="select-add-featured"
+                          className="bg-surface border border-border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-primary font-bold w-full sm:w-auto"
+                          defaultValue=""
+                          onChange={async (e) => {
+                            const val = e.target.value;
+                            if (!val) return;
+                            const [id, type] = val.split(":");
+                            const isSub = type === "sub";
+                            
+                            const maxOrder = featuredItems.length > 0 ? Math.max(...featuredItems.map(i => i.sort_order || 0)) : 0;
+                            const newOrder = maxOrder + 1;
+
+                            let success = false;
+                            if (isSub) {
+                              success = await updateSupabaseSubcategory(id, { is_featured: true, sort_order: newOrder });
+                            } else {
+                              success = await updateSupabaseCategory(id, { is_featured: true, sort_order: newOrder });
+                            }
+
+                            if (success) {
+                              refreshAllData();
+                              e.target.value = ""; // Reset selector
+                            } else {
+                              alert("فشل إضافة العنصر للمميزة");
+                            }
+                          }}
+                        >
+                          <option value="">➕ إضافة قسم/فرع للمميزة بالرئيسية...</option>
+                          <optgroup label="الأقسام الرئيسية">
+                            {categoriesList.filter(c => !c.is_featured && c.is_active).map(c => (
+                              <option key={c.id} value={`${c.id}:cat`}>{c.name}</option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="الأقسام الفرعية">
+                            {subcategoriesList.filter(s => !s.is_featured && s.is_active).map(s => {
+                              const parent = categoriesList.find(c => c.id === s.category_id);
+                              return (
+                                <option key={s.id} value={`${s.id}:sub`}>{s.name} (يتبع: {parent?.name || "رئيسي"})</option>
+                              );
+                            })}
+                          </optgroup>
+                        </select>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4">
-                      {categoriesList.map((cat) => (
-                        <div key={cat.id} className="p-4 rounded-xl bg-surface/40 border border-border flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-4">
-                            <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-surface shrink-0 border border-border">
-                              <Image
-                                src={resolveAssetPath(cat.image || "/placeholder.jpg")}
-                                alt={cat.name}
-                                fill
-                                className="object-cover"
-                              />
-                            </div>
-                            <div>
-                              <h4 className="font-bold text-sm flex items-center gap-2">
-                                {cat.name}
-                                {!cat.is_active && <EyeOff className="w-3.5 h-3.5 text-foreground/40" />}
-                              </h4>
-                              <p className="text-xs text-foreground/50 max-w-[200px] truncate">{cat.desc}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => openEditCategory(cat)}
-                              className="p-2 bg-primary/10 hover:bg-primary/20 text-primary-light rounded-lg transition-colors"
-                              title="تعديل القسم"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteCategory(cat.id)}
-                              className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
-                              title="حذف القسم"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Right panel: Subcategories List */}
-                  <div className="glass rounded-3xl border border-border p-6 space-y-6">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-bold">الأقسام الفرعية (Subcategories)</h3>
-                      <button
-                        onClick={() => setShowAddSubModal(true)}
-                        className="px-4 py-2 bg-primary text-black hover:bg-primary-light rounded-xl font-bold text-xs flex items-center gap-1 transition-all"
-                      >
-                        <Plus className="w-4 h-4" />
-                        إضافة فرع جديد
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 max-h-[500px] overflow-y-auto pr-1">
-                      {subcategoriesList.length === 0 ? (
-                        <p className="text-xs text-foreground/40 font-bold text-center py-6">لا يوجد أقسام فرعية مضافة بعد.</p>
-                      ) : (
-                        subcategoriesList.map((sub) => {
-                          const parentCat = categoriesList.find(c => c.id === sub.category_id);
-                          return (
-                            <div key={sub.id} className="p-4 rounded-xl bg-surface/40 border border-border flex items-center justify-between gap-4">
+                    {featuredItems.length === 0 ? (
+                      <p className="text-xs text-foreground/40 font-bold text-center py-6">لا يوجد عناصر مميزة بالرئيسية بعد. اختر من القائمة بالأعلى لإضافة عناصرك المفضلة!</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {featuredItems.map((item, idx) => (
+                          <div key={item.id} className="p-4 rounded-2xl bg-surface/40 border border-border flex items-center justify-between gap-4 relative overflow-hidden group">
+                            <div className="flex items-center gap-3">
+                              <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-surface shrink-0 border border-border">
+                                <Image
+                                  src={resolveAssetPath(item.image || "/placeholder.jpg")}
+                                  alt={item.name}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
                               <div>
-                                <h4 className="font-bold text-sm flex items-center gap-2">
-                                  {sub.name}
-                                  {!sub.is_active && <EyeOff className="w-3.5 h-3.5 text-foreground/40" />}
+                                <h4 className="font-bold text-sm flex items-center gap-1.5">
+                                  {item.name}
                                 </h4>
-                                <span className="text-[10px] bg-primary/10 text-primary-light px-2 py-0.5 rounded font-black mt-1 inline-block">
-                                  يتبع: {parentCat?.name || "قسم محذوف"}
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-black mt-1 inline-block ${
+                                  item.isSubcategory ? "bg-primary/10 text-primary-light" : "bg-foreground/10 text-foreground/75"
+                                }`}>
+                                  {item.isSubcategory ? `فرعي (يتبع: ${item.parentName})` : "رئيسي"}
                                 </span>
                               </div>
+                            </div>
 
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => setEditingSubcategory(sub)}
-                                  className="p-2 bg-primary/10 hover:bg-primary/20 text-primary-light rounded-lg transition-colors"
-                                  title="تعديل القسم الفرعي"
-                                >
-                                  <Edit3 className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteSubcategory(sub.id)}
-                                  className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
-                                  title="حذف الفرع"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+                            <div className="flex items-center gap-1">
+                              {/* Simple visual Up/Down arrow sorting buttons */}
+                              <button
+                                onClick={() => handleMoveFeaturedItem(idx, 'up')}
+                                disabled={idx === 0}
+                                className="p-1.5 bg-surface hover:bg-surface-hover border border-border rounded-lg text-foreground/60 hover:text-primary disabled:opacity-30 transition-colors font-black text-xs"
+                                title="تحريك لأعلى"
+                              >
+                                ▲
+                              </button>
+                              <button
+                                onClick={() => handleMoveFeaturedItem(idx, 'down')}
+                                disabled={idx === featuredItems.length - 1}
+                                className="p-1.5 bg-surface hover:bg-surface-hover border border-border rounded-lg text-foreground/60 hover:text-primary disabled:opacity-30 transition-colors font-black text-xs"
+                                title="تحريك لأسفل"
+                              >
+                                ▼
+                              </button>
+
+                              <button
+                                onClick={() => handleToggleFeatured(item, item.isSubcategory)}
+                                className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors ml-2"
+                                title="إزالة من المميزة"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Left panel: Categories List */}
+                    <div className="glass rounded-3xl border border-border p-6 space-y-6">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-bold">الأقسام الرئيسية الحالية</h3>
+                        <button
+                          onClick={() => setShowAddCatModal(true)}
+                          className="px-4 py-2 bg-primary text-black hover:bg-primary-light rounded-xl font-bold text-xs flex items-center gap-1 transition-all"
+                        >
+                          <Plus className="w-4 h-4" />
+                          إضافة قسم رئيسي
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-4">
+                        {categoriesList.map((cat, idx) => (
+                          <div key={cat.id} className="p-4 rounded-xl bg-surface/40 border border-border flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                              <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-surface shrink-0 border border-border">
+                                <Image
+                                  src={resolveAssetPath(cat.image || "/placeholder.jpg")}
+                                  alt={cat.name}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-sm flex items-center gap-2">
+                                  {cat.name}
+                                  {!cat.is_active && <EyeOff className="w-3.5 h-3.5 text-foreground/40" />}
+                                </h4>
+                                <p className="text-xs text-foreground/50 max-w-[200px] truncate">{cat.desc}</p>
                               </div>
                             </div>
-                          );
-                        })
-                      )}
+
+                            <div className="flex items-center gap-1">
+                              {/* Simple visual Up/Down arrow sorting buttons */}
+                              <button
+                                onClick={() => handleMoveCategory(idx, 'up')}
+                                disabled={idx === 0}
+                                className="p-1.5 bg-surface hover:bg-surface-hover border border-border rounded-lg text-foreground/60 hover:text-primary disabled:opacity-30 transition-colors font-black text-xs"
+                                title="تحريك لأعلى"
+                              >
+                                ▲
+                              </button>
+                              <button
+                                onClick={() => handleMoveCategory(idx, 'down')}
+                                disabled={idx === categoriesList.length - 1}
+                                className="p-1.5 bg-surface hover:bg-surface-hover border border-border rounded-lg text-foreground/60 hover:text-primary disabled:opacity-30 transition-colors font-black text-xs"
+                                title="تحريك لأسفل"
+                              >
+                                ▼
+                              </button>
+
+                              <button
+                                onClick={() => openEditCategory(cat)}
+                                className="p-2 bg-primary/10 hover:bg-primary/20 text-primary-light rounded-lg transition-colors ml-1"
+                                title="تعديل القسم"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteCategory(cat.id)}
+                                className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
+                                title="حذف القسم"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Right panel: Subcategories List */}
+                    <div className="glass rounded-3xl border border-border p-6 space-y-6">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-bold">الأقسام الفرعية (Subcategories)</h3>
+                        <button
+                          onClick={() => {
+                            // Reset state for new subcategory
+                            setSubName("");
+                            setSubCatId("");
+                            setSubImage("");
+                            setSubDesc("");
+                            setSubIsFeatured(false);
+                            setSubSortOrder(0);
+                            setShowAddSubModal(true);
+                          }}
+                          className="px-4 py-2 bg-primary text-black hover:bg-primary-light rounded-xl font-bold text-xs flex items-center gap-1 transition-all"
+                        >
+                          <Plus className="w-4 h-4" />
+                          إضافة فرع جديد
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-4 max-h-[500px] overflow-y-auto pr-1">
+                        {subcategoriesList.length === 0 ? (
+                          <p className="text-xs text-foreground/40 font-bold text-center py-6">لا يوجد أقسام فرعية مضافة بعد.</p>
+                        ) : (
+                          subcategoriesList.map((sub, idx) => {
+                            const parentCat = categoriesList.find(c => c.id === sub.category_id);
+                            return (
+                              <div key={sub.id} className="p-4 rounded-xl bg-surface/40 border border-border flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-surface shrink-0 border border-border">
+                                    <Image
+                                      src={resolveAssetPath(sub.image || "/placeholder.jpg")}
+                                      alt={sub.name}
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  </div>
+                                  <div>
+                                    <h4 className="font-bold text-sm flex items-center gap-2">
+                                      {sub.name}
+                                      {!sub.is_active && <EyeOff className="w-3.5 h-3.5 text-foreground/40" />}
+                                    </h4>
+                                    <span className="text-[10px] bg-primary/10 text-primary-light px-2 py-0.5 rounded font-black mt-1 inline-block">
+                                      يتبع: {parentCat?.name || "قسم محذوف"}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  {/* Simple visual Up/Down arrow sorting buttons */}
+                                  <button
+                                    onClick={() => handleMoveSubcategory(idx, 'up')}
+                                    disabled={idx === 0}
+                                    className="p-1.5 bg-surface hover:bg-surface-hover border border-border rounded-lg text-foreground/60 hover:text-primary disabled:opacity-30 transition-colors font-black text-xs"
+                                    title="تحريك لأعلى"
+                                  >
+                                    ▲
+                                  </button>
+                                  <button
+                                    onClick={() => handleMoveSubcategory(idx, 'down')}
+                                    disabled={idx === subcategoriesList.length - 1}
+                                    className="p-1.5 bg-surface hover:bg-surface-hover border border-border rounded-lg text-foreground/60 hover:text-primary disabled:opacity-30 transition-colors font-black text-xs"
+                                    title="تحريك لأسفل"
+                                  >
+                                    ▼
+                                  </button>
+
+                                  <button
+                                    onClick={() => {
+                                      setEditingSubcategory(sub);
+                                      // pre-fill general uploaded image helper
+                                      setCatImage("");
+                                    }}
+                                    className="p-2 bg-primary/10 hover:bg-primary/20 text-primary-light rounded-lg transition-colors ml-1"
+                                    title="تعديل القسم الفرعي"
+                                  >
+                                    <Edit3 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteSubcategory(sub.id)}
+                                    className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
+                                    title="حذف الفرع"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
               )}
 
               {/* Tab: Inventory (Products) */}
@@ -995,7 +1316,7 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {products.map((prod) => {
+                    {products.map((prod, idx) => {
                       const cat = categoriesList.find(c => c.id === prod.categoryId);
                       return (
                         <div key={prod.id} className="glass rounded-2xl border border-border overflow-hidden flex flex-col group hover:border-primary/20">
@@ -1039,10 +1360,28 @@ export default function AdminDashboard() {
                                 <span className="text-foreground/60 font-semibold text-xs">{prod.priceRent} د.ل</span>
                               </div>
 
-                              <div className="flex gap-2">
+                              <div className="flex gap-1.5 items-center">
+                                {/* Simple visual Up/Down arrow sorting buttons */}
+                                <button
+                                  onClick={() => handleMoveProduct(idx, 'up')}
+                                  disabled={idx === 0}
+                                  className="p-1.5 bg-surface hover:bg-surface-hover border border-border rounded-lg text-foreground/60 hover:text-primary disabled:opacity-30 transition-colors font-black text-xs"
+                                  title="تحريك لأعلى"
+                                >
+                                  ▲
+                                </button>
+                                <button
+                                  onClick={() => handleMoveProduct(idx, 'down')}
+                                  disabled={idx === products.length - 1}
+                                  className="p-1.5 bg-surface hover:bg-surface-hover border border-border rounded-lg text-foreground/60 hover:text-primary disabled:opacity-30 transition-colors font-black text-xs"
+                                  title="تحريك لأسفل"
+                                >
+                                  ▼
+                                </button>
+
                                 <button
                                   onClick={() => openEditProduct(prod)}
-                                  className="p-2 bg-primary/10 hover:bg-primary/20 text-primary-light rounded-lg transition-colors"
+                                  className="p-2 bg-primary/10 hover:bg-primary/20 text-primary-light rounded-lg transition-colors ml-1"
                                   title="تعديل المنتج ومعرض صوره"
                                 >
                                   <Edit3 className="w-4 h-4" />
@@ -1588,18 +1927,18 @@ export default function AdminDashboard() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="block text-xs font-bold text-foreground/60">ترتيب العرض</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1 col-span-1">
+                      <label className="block text-xs font-bold text-foreground/60">الترتيب</label>
                       <input
                         type="number"
                         value={catSortOrder}
                         onChange={(e) => setCatSortOrder(Number(e.target.value))}
-                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm"
+                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm text-center"
                       />
                     </div>
 
-                    <div className="flex items-center justify-center gap-2 pt-6">
+                    <div className="flex items-center justify-center gap-1.5 pt-6 col-span-1">
                       <input
                         type="checkbox"
                         id="catActive"
@@ -1607,7 +1946,18 @@ export default function AdminDashboard() {
                         onChange={(e) => setCatIsActive(e.target.checked)}
                         className="accent-primary"
                       />
-                      <label htmlFor="catActive" className="text-xs font-bold">قسم نشط</label>
+                      <label htmlFor="catActive" className="text-xs font-bold">نشط</label>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-1.5 pt-6 col-span-1">
+                      <input
+                        type="checkbox"
+                        id="catFeatured"
+                        checked={catIsFeatured}
+                        onChange={(e) => setCatIsFeatured(e.target.checked)}
+                        className="accent-primary"
+                      />
+                      <label htmlFor="catFeatured" className="text-xs font-bold text-primary-light">★ مميز</label>
                     </div>
                   </div>
 
@@ -1689,18 +2039,18 @@ export default function AdminDashboard() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="block text-xs font-bold text-foreground/60">ترتيب العرض</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1 col-span-1">
+                      <label className="block text-xs font-bold text-foreground/60">الترتيب</label>
                       <input
                         type="number"
                         value={editingCategory.sort_order}
                         onChange={(e) => setEditingCategory({ ...editingCategory, sort_order: Number(e.target.value) })}
-                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm"
+                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm text-center"
                       />
                     </div>
 
-                    <div className="flex items-center justify-center gap-2 pt-6">
+                    <div className="flex items-center justify-center gap-1.5 pt-6 col-span-1">
                       <input
                         type="checkbox"
                         id="catEditActive"
@@ -1708,7 +2058,18 @@ export default function AdminDashboard() {
                         onChange={(e) => setEditingCategory({ ...editingCategory, is_active: e.target.checked })}
                         className="accent-primary"
                       />
-                      <label htmlFor="catEditActive" className="text-xs font-bold">قسم نشط</label>
+                      <label htmlFor="catEditActive" className="text-xs font-bold">نشط</label>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-1.5 pt-6 col-span-1">
+                      <input
+                        type="checkbox"
+                        id="catEditFeatured"
+                        checked={editingCategory.is_featured || false}
+                        onChange={(e) => setEditingCategory({ ...editingCategory, is_featured: e.target.checked })}
+                        className="accent-primary"
+                      />
+                      <label htmlFor="catEditFeatured" className="text-xs font-bold text-primary-light">★ مميز</label>
                     </div>
                   </div>
 
@@ -1726,7 +2087,7 @@ export default function AdminDashboard() {
           {/* 4. ADD SUBCATEGORY MODAL */}
           {showAddSubModal && (
             <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-              <div className="bg-background border border-border w-full max-w-md rounded-3xl p-8 relative space-y-6 text-right">
+              <div className="bg-background border border-border w-full max-w-md rounded-3xl p-8 relative space-y-6 text-right max-h-[90vh] overflow-y-auto">
                 <button
                   onClick={() => setShowAddSubModal(false)}
                   className="absolute top-6 left-6 p-2 hover:bg-surface rounded-lg border border-border"
@@ -1764,18 +2125,58 @@ export default function AdminDashboard() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="block text-xs font-bold text-foreground/60">ترتيب العرض</label>
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-foreground/60">وصف القسم الفرعي</label>
+                    <textarea
+                      value={subDesc}
+                      onChange={(e) => setSubDesc(e.target.value)}
+                      placeholder="وصف مختصر يظهر للزبون..."
+                      rows={2}
+                      className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-foreground/60">صورة القسم الفرعي</label>
+                    <div className="flex items-center gap-3">
+                      <label className="flex-1 border border-dashed border-border rounded-xl p-3 bg-surface hover:bg-surface-hover cursor-pointer transition-colors text-center text-xs font-bold text-foreground/65 flex justify-center items-center gap-1.5">
+                        <Upload className="w-4 h-4" />
+                        {uploadingCatImg ? "جاري الرفع..." : "اختر صورة سحابية"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], "sub")}
+                        />
+                      </label>
+                    </div>
+                    {subImage && (
+                      <div className="relative w-full h-[120px] rounded-xl overflow-hidden border border-border group">
+                        <Image src={subImage} alt="Preview" fill className="object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setSubImage("")}
+                          className="absolute top-2 left-2 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors shadow-lg shadow-black/40 flex items-center justify-center"
+                          title="إزالة الصورة"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1 col-span-1">
+                      <label className="block text-xs font-bold text-foreground/60">الترتيب</label>
                       <input
                         type="number"
                         value={subSortOrder}
                         onChange={(e) => setSubSortOrder(Number(e.target.value))}
-                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm"
+                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm text-center"
                       />
                     </div>
 
-                    <div className="flex items-center justify-center gap-2 pt-6">
+                    <div className="flex items-center justify-center gap-1.5 pt-6 col-span-1">
                       <input
                         type="checkbox"
                         id="subActive"
@@ -1783,7 +2184,18 @@ export default function AdminDashboard() {
                         onChange={(e) => setSubIsActive(e.target.checked)}
                         className="accent-primary"
                       />
-                      <label htmlFor="subActive" className="text-xs font-bold">فرع نشط</label>
+                      <label htmlFor="subActive" className="text-xs font-bold">نشط</label>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-1.5 pt-6 col-span-1">
+                      <input
+                        type="checkbox"
+                        id="subIsFeatured"
+                        checked={subIsFeatured}
+                        onChange={(e) => setSubIsFeatured(e.target.checked)}
+                        className="accent-primary"
+                      />
+                      <label htmlFor="subIsFeatured" className="text-xs font-bold text-primary-light">★ مميز</label>
                     </div>
                   </div>
 
@@ -1801,7 +2213,7 @@ export default function AdminDashboard() {
           {/* 5. EDIT SUBCATEGORY MODAL */}
           {editingSubcategory && (
             <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-              <div className="bg-background border border-border w-full max-w-md rounded-3xl p-8 relative space-y-6 text-right">
+              <div className="bg-background border border-border w-full max-w-md rounded-3xl p-8 relative space-y-6 text-right max-h-[90vh] overflow-y-auto">
                 <button
                   onClick={() => setEditingSubcategory(null)}
                   className="absolute top-6 left-6 p-2 hover:bg-surface rounded-lg border border-border"
@@ -1837,18 +2249,61 @@ export default function AdminDashboard() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="block text-xs font-bold text-foreground/60">ترتيب العرض</label>
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-foreground/60">وصف القسم الفرعي</label>
+                    <textarea
+                      value={editingSubcategory.desc || ""}
+                      onChange={(e) => setEditingSubcategory({ ...editingSubcategory, desc: e.target.value })}
+                      placeholder="وصف مختصر يظهر للزبون..."
+                      rows={2}
+                      className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-foreground/60">صورة القسم الفرعي السحابية</label>
+                    <div className="flex items-center gap-3">
+                      <label className="flex-1 border border-dashed border-border rounded-xl p-3 bg-surface hover:bg-surface-hover cursor-pointer transition-colors text-center text-xs font-bold text-foreground/65 flex justify-center items-center gap-1.5">
+                        <Upload className="w-4 h-4" />
+                        {uploadingCatImg ? "جاري رفع الصورة..." : "تغيير الصورة"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], "cat")}
+                        />
+                      </label>
+                    </div>
+                    {(catImage || editingSubcategory.image) && (
+                      <div className="relative w-full h-[120px] rounded-xl overflow-hidden border border-border group">
+                        <Image src={catImage || editingSubcategory.image} alt="Preview" fill className="object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCatImage("");
+                            setEditingSubcategory({ ...editingSubcategory, image: "" });
+                          }}
+                          className="absolute top-2 left-2 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors shadow-lg shadow-black/40 flex items-center justify-center"
+                          title="إزالة الصورة"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1 col-span-1">
+                      <label className="block text-xs font-bold text-foreground/60">الترتيب</label>
                       <input
                         type="number"
                         value={editingSubcategory.sort_order}
                         onChange={(e) => setEditingSubcategory({ ...editingSubcategory, sort_order: Number(e.target.value) })}
-                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm"
+                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm text-center"
                       />
                     </div>
 
-                    <div className="flex items-center justify-center gap-2 pt-6">
+                    <div className="flex items-center justify-center gap-1.5 pt-6 col-span-1">
                       <input
                         type="checkbox"
                         id="subEditActive"
@@ -1856,7 +2311,18 @@ export default function AdminDashboard() {
                         onChange={(e) => setEditingSubcategory({ ...editingSubcategory, is_active: e.target.checked })}
                         className="accent-primary"
                       />
-                      <label htmlFor="subEditActive" className="text-xs font-bold">فرع نشط</label>
+                      <label htmlFor="subEditActive" className="text-xs font-bold">نشط</label>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-1.5 pt-6 col-span-1">
+                      <input
+                        type="checkbox"
+                        id="subEditFeatured"
+                        checked={editingSubcategory.is_featured || false}
+                        onChange={(e) => setEditingSubcategory({ ...editingSubcategory, is_featured: e.target.checked })}
+                        className="accent-primary"
+                      />
+                      <label htmlFor="subEditFeatured" className="text-xs font-bold text-primary-light">★ مميز</label>
                     </div>
                   </div>
 

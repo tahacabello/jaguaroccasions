@@ -202,7 +202,8 @@ export async function addSupabaseCategory(category: any): Promise<boolean> {
         image: category.image || "",
         desc: category.desc || "",
         sort_order: category.sort_order || 0,
-        is_active: category.is_active !== undefined ? category.is_active : true
+        is_active: category.is_active !== undefined ? category.is_active : true,
+        is_featured: category.is_featured !== undefined ? category.is_featured : false
       }]);
     if (error) throw error;
     return true;
@@ -221,6 +222,7 @@ export async function updateSupabaseCategory(id: string, updates: any): Promise<
     if (updates.desc !== undefined) dbUpdates.desc = updates.desc;
     if (updates.sort_order !== undefined) dbUpdates.sort_order = updates.sort_order;
     if (updates.is_active !== undefined) dbUpdates.is_active = updates.is_active;
+    if (updates.is_featured !== undefined) dbUpdates.is_featured = updates.is_featured;
 
     const { error } = await supabase
       .from('categories')
@@ -274,6 +276,9 @@ export async function addSupabaseSubcategory(sub: any): Promise<boolean> {
       .insert([{
         category_id: sub.category_id,
         name: sub.name,
+        image: sub.image || "",
+        desc: sub.desc || "",
+        is_featured: sub.is_featured !== undefined ? sub.is_featured : false,
         sort_order: sub.sort_order || 0,
         is_active: sub.is_active !== undefined ? sub.is_active : true
       }]);
@@ -290,6 +295,9 @@ export async function updateSupabaseSubcategory(id: string, updates: any): Promi
     const dbUpdates: any = {};
     if (updates.name !== undefined) dbUpdates.name = updates.name;
     if (updates.category_id !== undefined) dbUpdates.category_id = updates.category_id;
+    if (updates.image !== undefined) dbUpdates.image = updates.image;
+    if (updates.desc !== undefined) dbUpdates.desc = updates.desc;
+    if (updates.is_featured !== undefined) dbUpdates.is_featured = updates.is_featured;
     if (updates.sort_order !== undefined) dbUpdates.sort_order = updates.sort_order;
     if (updates.is_active !== undefined) dbUpdates.is_active = updates.is_active;
 
@@ -315,6 +323,102 @@ export async function deleteSupabaseSubcategory(id: string): Promise<boolean> {
     return true;
   } catch (err) {
     console.error(`Failed to delete subcategory ${id}:`, err);
+    return false;
+  }
+}
+
+// =====================================================================
+// 📂 الأقسام المميزة بالصفحة الرئيسية (Homepage Featured Items)
+// =====================================================================
+export async function getSupabaseFeaturedItems(): Promise<any[]> {
+  try {
+    const { data: cats, error: catErr } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('is_featured', true)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    const { data: subs, error: subErr } = await supabase
+      .from('subcategories')
+      .select('*')
+      .eq('is_featured', true)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    if (catErr) throw catErr;
+    if (subErr) throw subErr;
+
+    // Map categories to unified shape
+    const featuredCats = (cats || []).map(c => ({
+      id: c.id,
+      name: c.name,
+      image: c.image || "",
+      desc: c.desc || "",
+      isSubcategory: false,
+      sort_order: c.sort_order || 0
+    }));
+
+    // Map subcategories to unified shape
+    const featuredSubs = (subs || []).map(s => ({
+      id: s.id,
+      name: s.name,
+      image: s.image || "",
+      desc: s.desc || "",
+      isSubcategory: true,
+      categoryId: s.category_id,
+      sort_order: s.sort_order || 0
+    }));
+
+    const combined = [...featuredCats, ...featuredSubs].sort((a, b) => a.sort_order - b.sort_order);
+
+    if (combined.length === 0) {
+      // Fallback
+      return defaultCategories.map(c => ({ ...c, isSubcategory: false }));
+    }
+
+    return combined;
+  } catch (err) {
+    console.warn("Failed to get featured items from Supabase, using defaults:", err);
+    return defaultCategories.map(c => ({ ...c, isSubcategory: false }));
+  }
+}
+
+// =====================================================================
+// 📂 تبديل الترتيب الفوري لقاعدة البيانات (Database Sorting Swappers)
+// =====================================================================
+export async function swapCategoryOrderInDb(id1: string, order1: number, id2: string, order2: number): Promise<boolean> {
+  try {
+    const { error: err1 } = await supabase.from('categories').update({ sort_order: order2 }).eq('id', id1);
+    const { error: err2 } = await supabase.from('categories').update({ sort_order: order1 }).eq('id', id2);
+    if (err1 || err2) throw err1 || err2;
+    return true;
+  } catch (err) {
+    console.error("Failed to swap category order:", err);
+    return false;
+  }
+}
+
+export async function swapSubcategoryOrderInDb(id1: string, order1: number, id2: string, order2: number): Promise<boolean> {
+  try {
+    const { error: err1 } = await supabase.from('subcategories').update({ sort_order: order2 }).eq('id', id1);
+    const { error: err2 } = await supabase.from('subcategories').update({ sort_order: order1 }).eq('id', id2);
+    if (err1 || err2) throw err1 || err2;
+    return true;
+  } catch (err) {
+    console.error("Failed to swap subcategory order:", err);
+    return false;
+  }
+}
+
+export async function swapProductOrderInDb(id1: string, order1: number, id2: string, order2: number): Promise<boolean> {
+  try {
+    const { error: err1 } = await supabase.from('products').update({ sort_order: order2 }).eq('id', id1);
+    const { error: err2 } = await supabase.from('products').update({ sort_order: order1 }).eq('id', id2);
+    if (err1 || err2) throw err1 || err2;
+    return true;
+  } catch (err) {
+    console.error("Failed to swap product order:", err);
     return false;
   }
 }
