@@ -36,7 +36,17 @@ import {
   addSupabaseFeaturedCard,
   updateSupabaseFeaturedCard,
   deleteSupabaseFeaturedCard,
-  swapFeaturedCardOrderInDb
+  swapFeaturedCardOrderInDb,
+  getSupabaseHomepageSections,
+  addSupabaseHomepageSection,
+  updateSupabaseHomepageSection,
+  deleteSupabaseHomepageSection,
+  swapHomepageSectionOrderInDb,
+  addSupabaseHomepageSectionItem,
+  updateSupabaseHomepageSectionItem,
+  deleteSupabaseHomepageSectionItem,
+  swapHomepageSectionItemOrderInDb,
+  seedDefaultHomepageSections
 } from "@/lib/supabase";
 
 const statusTranslations: Record<string, string> = {
@@ -117,7 +127,30 @@ export default function AdminDashboard() {
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<"analytics" | "orders" | "inventory" | "settings" | "categories" | "customers">("analytics");
+  const [activeTab, setActiveTab] = useState<"analytics" | "orders" | "inventory" | "settings" | "categories" | "customers" | "homepage_builder">("analytics");
+
+  // Homepage Sections Builder States
+  const [homepageSectionsList, setHomepageSectionsList] = useState<any[]>([]);
+  const [showAddSectionModal, setShowAddSectionModal] = useState(false);
+  const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [editingSectionItem, setEditingSectionItem] = useState<any | null>(null);
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+  const [isSavingSection, setIsSavingSection] = useState(false);
+  const [isSeedingSections, setIsSeedingSections] = useState(false);
+
+  // Section Input States
+  const [secTitle, setSecTitle] = useState("");
+  const [secSubtitle, setSecSubtitle] = useState("");
+  const [secType, setSecType] = useState<"categories" | "subcategories" | "products" | "mixed">("mixed");
+  const [secIsVisible, setSecIsVisible] = useState(true);
+
+  // Section Item Input States
+  const [itemLinkedType, setItemLinkedType] = useState<"category" | "subcategory" | "product">("category");
+  const [itemLinkedId, setItemLinkedId] = useState("");
+  const [itemDisplayTitle, setItemDisplayTitle] = useState("");
+  const [itemDisplaySubtitle, setItemDisplaySubtitle] = useState("");
+  const [itemDisplayImage, setItemDisplayImage] = useState("");
+  const [uploadingItemImg, setUploadingItemImg] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [categoriesList, setCategoriesList] = useState<any[]>([]);
@@ -201,14 +234,15 @@ export default function AdminDashboard() {
   const refreshAllData = async () => {
     setIsLoading(true);
     try {
-      const [dbProducts, dbSettings, dbCategories, dbSubcategories, dbOrders, dbCustomers, dbFeaturedCards] = await Promise.all([
+      const [dbProducts, dbSettings, dbCategories, dbSubcategories, dbOrders, dbCustomers, dbFeaturedCards, dbSections] = await Promise.all([
         getSupabaseProducts(),
         getSupabaseSettings(),
         getSupabaseCategories(),
         getSupabaseSubcategories(),
         getSupabaseOrders(),
         getSupabaseCustomerProfiles(),
-        getSupabaseFeaturedCards()
+        getSupabaseFeaturedCards(),
+        getSupabaseHomepageSections()
       ]);
       
       setProducts(dbProducts);
@@ -218,6 +252,7 @@ export default function AdminDashboard() {
       setOrders(dbOrders);
       setCustomers(dbCustomers);
       setFeaturedCardsList(dbFeaturedCards);
+      setHomepageSectionsList(dbSections);
     } catch (err) {
       console.error("Error refreshing database tables in admin:", err);
     } finally {
@@ -230,6 +265,148 @@ export default function AdminDashboard() {
       refreshAllData();
     }
   }, [isAuthenticated]);
+
+  // Homepage sections builder handler functions
+  const handleCreateSection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!secTitle) return;
+    setIsSavingSection(true);
+    const order = homepageSectionsList.length;
+    const res = await addSupabaseHomepageSection({
+      title: secTitle,
+      subtitle: secSubtitle,
+      section_type: secType,
+      sort_order: order,
+      is_visible: secIsVisible
+    });
+    if (res.success) {
+      setSecTitle("");
+      setSecSubtitle("");
+      setSecType("mixed");
+      setSecIsVisible(true);
+      setShowAddSectionModal(false);
+      await refreshAllData();
+    } else {
+      alert("فشل إضافة القسم: " + res.error);
+    }
+    setIsSavingSection(false);
+  };
+
+  const handleDeleteSection = async (id: string) => {
+    if (!confirm("هل أنت متأكد من حذف هذا القسم بالكامل بجميع محتوياته؟")) return;
+    const success = await deleteSupabaseHomepageSection(id);
+    if (success) {
+      await refreshAllData();
+    } else {
+      alert("فشل حذف القسم.");
+    }
+  };
+
+  const handleToggleSectionVisibility = async (section: any) => {
+    const success = await updateSupabaseHomepageSection(section.id, { is_visible: !section.is_visible });
+    if (success) {
+      await refreshAllData();
+    } else {
+      alert("فشل تعديل الظهور.");
+    }
+  };
+
+  const handleMoveSection = async (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= homepageSectionsList.length) return;
+    const sec1 = homepageSectionsList[index];
+    const sec2 = homepageSectionsList[targetIndex];
+    const success = await swapHomepageSectionOrderInDb(sec1.id, sec1.sort_order, sec2.id, sec2.sort_order);
+    if (success) {
+      await refreshAllData();
+    }
+  };
+
+  const handleAddItemToSection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeSectionId || !itemLinkedId) return;
+    const section = homepageSectionsList.find(s => s.id === activeSectionId);
+    if (!section) return;
+    setIsSavingSection(true);
+    const order = (section.homepage_section_items || []).length;
+    const res = await addSupabaseHomepageSectionItem({
+      section_id: activeSectionId,
+      linked_type: itemLinkedType,
+      linked_id: itemLinkedId,
+      sort_order: order,
+      is_visible: true
+    });
+    if (res.success) {
+      setItemLinkedId("");
+      setShowAddItemModal(false);
+      await refreshAllData();
+    } else {
+      alert("فشل إضافة العنصر: " + res.error);
+    }
+    setIsSavingSection(false);
+  };
+
+  const handleDeleteItemFromSection = async (itemId: string) => {
+    if (!confirm("هل أنت متأكد من إزالة هذا العنصر من القسم؟")) return;
+    const success = await deleteSupabaseHomepageSectionItem(itemId);
+    if (success) {
+      await refreshAllData();
+    } else {
+      alert("فشل إزالة العنصر.");
+    }
+  };
+
+  const handleToggleItemVisibility = async (item: any) => {
+    const success = await updateSupabaseHomepageSectionItem(item.id, { is_visible: !item.is_visible });
+    if (success) {
+      await refreshAllData();
+    } else {
+      alert("فشل تعديل ظهور العنصر.");
+    }
+  };
+
+  const handleMoveSectionItem = async (section: any, itemIdx: number, direction: 'up' | 'down') => {
+    const targetIdx = direction === 'up' ? itemIdx - 1 : itemIdx + 1;
+    const items = section.homepage_section_items || [];
+    if (targetIdx < 0 || targetIdx >= items.length) return;
+    const item1 = items[itemIdx];
+    const item2 = items[targetIdx];
+    const success = await swapHomepageSectionItemOrderInDb(item1.id, item1.sort_order, item2.id, item2.sort_order);
+    if (success) {
+      await refreshAllData();
+    }
+  };
+
+  const handleSaveItemOverrides = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSectionItem) return;
+    setIsSavingSection(true);
+    const success = await updateSupabaseHomepageSectionItem(editingSectionItem.id, {
+      display_title: itemDisplayTitle || null,
+      display_subtitle: itemDisplaySubtitle || null,
+      display_image_url: itemDisplayImage || null
+    });
+    if (success) {
+      setEditingSectionItem(null);
+      await refreshAllData();
+    } else {
+      alert("فشل تعديل العنصر.");
+    }
+    setIsSavingSection(false);
+  };
+
+  const handleManualSeedSections = async () => {
+    if (!confirm("هل تريد توليد الأقسام الافتراضية التلقائية بالصفحة الرئيسية؟ (سيتم إضافة قسم للأقسام وقسم للمنتجات)")) return;
+    setIsSeedingSections(true);
+    const success = await seedDefaultHomepageSections();
+    if (success) {
+      await refreshAllData();
+      alert("تم إنشاء الأقسام الافتراضية بنجاح!");
+    } else {
+      alert("حدث خطأ أثناء إنشاء الأقسام الافتراضية.");
+    }
+    setIsSeedingSections(false);
+  };
 
   // Handle Admin Sign In (Passcode `9999` only)
   const handleAdminSignIn = async (e: React.FormEvent) => {
@@ -885,6 +1062,16 @@ export default function AdminDashboard() {
               <Settings className="w-4 h-4 inline-block ml-2" />
               إعدادات الموقع
             </button>
+
+            <button
+              onClick={() => setActiveTab("homepage_builder")}
+              className={`px-5 py-3 rounded-xl font-bold text-xs shrink-0 transition-all ${
+                activeTab === "homepage_builder" ? "bg-primary text-black" : "bg-surface hover:bg-surface-hover text-foreground/75"
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4 inline-block ml-2" />
+              بناء الصفحة الرئيسية
+            </button>
           </div>
 
           {isLoading ? (
@@ -1457,6 +1644,33 @@ export default function AdminDashboard() {
                               </span>
                               <h3 className="font-bold text-base truncate">{prod.name}</h3>
                               <p className="text-xs text-foreground/50 line-clamp-2 h-8">{prod.description}</p>
+
+                              {/* Quick Subcategory Assignment */}
+                              <div className="space-y-1 mt-2">
+                                <label className="block text-[10px] text-foreground/45 font-bold">القسم الفرعي السريع:</label>
+                                <select
+                                  value={prod.subcategoryId || ""}
+                                  onChange={async (e) => {
+                                    const val = e.target.value || null;
+                                    const res = await updateSupabaseProduct(prod.id, { subcategoryId: val });
+                                    if (res.success) {
+                                      await refreshAllData();
+                                    } else {
+                                      alert("فشل تحديث القسم الفرعي السريع: " + res.error);
+                                    }
+                                  }}
+                                  className="w-full bg-surface border border-border rounded-lg px-2 py-1 text-[11px] text-foreground/80 focus:outline-none focus:border-primary font-bold"
+                                >
+                                  <option value="">-- بدون قسم فرعي (رئيسي فقط) --</option>
+                                  {subcategoriesList
+                                    .filter((sub: any) => sub.category_id === prod.categoryId)
+                                    .map((sub: any) => (
+                                      <option key={sub.id} value={sub.id}>
+                                        {sub.name}
+                                      </option>
+                                    ))}
+                                </select>
+                              </div>
                             </div>
 
                             <div className="flex justify-between items-center border-t border-border/40 pt-4">
@@ -1830,12 +2044,453 @@ export default function AdminDashboard() {
                 </form>
               )}
 
+              {/* Tab: Homepage Builder */}
+              {activeTab === "homepage_builder" && (
+                <div className="space-y-8 text-right">
+                  <div className="glass p-8 rounded-3xl border border-border flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <div>
+                      <h2 className="text-xl font-bold">مُهندس الصفحة الرئيسية الديناميكي (Homepage Builder)</h2>
+                      <p className="text-xs text-foreground/60 mt-1">تحكم كامل في الأقسام، العناصر، الصور والترتيب المعروض في واجهة المتجر</p>
+                    </div>
+
+                    <div className="flex gap-3">
+                      {homepageSectionsList.length === 0 && (
+                        <button
+                          onClick={handleManualSeedSections}
+                          disabled={isSeedingSections}
+                          className="px-5 py-3 border border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary-light rounded-xl font-black text-xs transition-all"
+                        >
+                          {isSeedingSections ? "جاري التوليد..." : "🔄 توليد الأقسام الافتراضية"}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setShowAddSectionModal(true)}
+                        className="px-5 py-3 bg-primary text-black hover:bg-primary-light rounded-xl font-black text-xs flex items-center gap-1.5 transition-all"
+                      >
+                        <Plus className="w-4 h-4" />
+                        إضافة قسم رئيسي جديد
+                      </button>
+                    </div>
+                  </div>
+
+                  {homepageSectionsList.length === 0 ? (
+                    <div className="text-center py-20 glass rounded-3xl border border-border">
+                      <p className="text-foreground/60 text-lg mb-6">لا توجد أي أقسام معروضة في الصفحة الرئيسية حالياً.</p>
+                      <button onClick={() => setShowAddSectionModal(true)} className="btn-premium">➕ إضافة أول قسم الآن</button>
+                    </div>
+                  ) : (
+                    <div className="space-y-8">
+                      {homepageSectionsList.map((sec, secIdx) => {
+                        const items = sec.homepage_section_items || [];
+                        return (
+                          <div key={sec.id} className="glass p-6 rounded-2xl border border-border space-y-6 relative hover:border-primary/10 transition-colors">
+                            {/* Section Header */}
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-border/40">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h3 className="text-lg font-black">{sec.title}</h3>
+                                  <span className="text-[10px] bg-primary/10 text-primary-light px-2 py-0.5 rounded font-black">
+                                    {sec.section_type === "categories" ? "مجموعة أقسام رئيسية" :
+                                     sec.section_type === "subcategories" ? "مجموعة أقسام فرعية" :
+                                     sec.section_type === "products" ? "مجموعة منتجات" : "مجموعة مختلطة"}
+                                  </span>
+                                  {!sec.is_visible && (
+                                    <span className="text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded font-black">مخفي</span>
+                                  )}
+                                </div>
+                                {sec.subtitle && <p className="text-xs text-foreground/50">{sec.subtitle}</p>}
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {/* Up/Down order arrows for sections */}
+                                <button
+                                  onClick={() => handleMoveSection(secIdx, 'up')}
+                                  disabled={secIdx === 0}
+                                  className="p-2 bg-surface hover:bg-surface-hover border border-border rounded-xl text-foreground/60 hover:text-primary disabled:opacity-30 transition-colors text-xs font-bold"
+                                  title="تحريك للأعلى"
+                                >
+                                  ▲
+                                </button>
+                                <button
+                                  onClick={() => handleMoveSection(secIdx, 'down')}
+                                  disabled={secIdx === homepageSectionsList.length - 1}
+                                  className="p-2 bg-surface hover:bg-surface-hover border border-border rounded-xl text-foreground/60 hover:text-primary disabled:opacity-30 transition-colors text-xs font-bold"
+                                  title="تحريك للأسفل"
+                                >
+                                  ▼
+                                </button>
+
+                                <button
+                                  onClick={() => handleToggleSectionVisibility(sec)}
+                                  className="p-2.5 bg-surface hover:bg-surface-hover border border-border rounded-xl text-foreground/80 hover:text-primary transition-colors"
+                                  title={sec.is_visible ? "إخفاء القسم" : "إظهار القسم"}
+                                >
+                                  {sec.is_visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4 text-red-400" />}
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    setActiveSectionId(sec.id);
+                                    setItemLinkedType(
+                                      sec.section_type === "categories" ? "category" :
+                                      sec.section_type === "subcategories" ? "subcategory" :
+                                      sec.section_type === "products" ? "product" : "category"
+                                    );
+                                    setShowAddItemModal(true);
+                                  }}
+                                  className="px-4 py-2.5 bg-primary/10 hover:bg-primary/20 text-primary-light border border-primary/20 rounded-xl font-bold text-xs"
+                                >
+                                  ➕ إضافة عنصر
+                                </button>
+
+                                <button
+                                  onClick={() => handleDeleteSection(sec.id)}
+                                  className="p-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-colors"
+                                  title="حذف القسم بالكامل"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Section Items Grid */}
+                            {items.length === 0 ? (
+                              <div className="text-center py-8 bg-surface/30 border border-dashed border-border rounded-xl">
+                                <p className="text-xs text-foreground/40 font-bold">لا توجد أي عناصر مضافة داخل هذا القسم بعد.</p>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {items.map((item: any, itemIdx: number) => {
+                                  // Resolve falling back values
+                                  let originalName = "عنصر غير معروف";
+                                  let imagePlaceholder = "/placeholder.jpg";
+
+                                  if (item.linked_type === "category") {
+                                    const cat = categoriesList.find(c => c.id === item.linked_id);
+                                    originalName = cat?.name || "قسم رئيسي غير موجود";
+                                    imagePlaceholder = cat?.image || "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=800&auto=format&fit=crop";
+                                  } else if (item.linked_type === "subcategory") {
+                                    const sub = subcategoriesList.find(s => s.id === item.linked_id);
+                                    originalName = sub?.name || "قسم فرعي غير موجود";
+                                    imagePlaceholder = sub?.image || "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=800&auto=format&fit=crop";
+                                  } else if (item.linked_type === "product") {
+                                    const prod = products.find(p => p.id === item.linked_id);
+                                    originalName = prod?.name || "منتج غير موجود";
+                                    imagePlaceholder = prod?.image || "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=800&auto=format&fit=crop";
+                                  }
+
+                                  const title = item.display_title || originalName;
+                                  const image = item.display_image_url || imagePlaceholder;
+
+                                  return (
+                                    <div key={item.id} className="bg-surface/50 border border-border/70 rounded-xl overflow-hidden flex flex-col group relative">
+                                      <div className="relative h-40 w-full bg-surface">
+                                        <Image
+                                          src={resolveAssetPath(image)}
+                                          alt={title}
+                                          fill
+                                          className="object-cover"
+                                          sizes="(max-width: 640px) 100vw, 20vw"
+                                        />
+                                        <span className="absolute top-2 right-2 bg-black/60 text-white backdrop-blur-sm px-2 py-0.5 rounded text-[9px] font-black">
+                                          {item.linked_type === "category" ? "قسم رئيسي" :
+                                           item.linked_type === "subcategory" ? "قسم فرعي" : "منتج"}
+                                        </span>
+                                      </div>
+
+                                      <div className="p-3 flex-1 flex flex-col justify-between space-y-3">
+                                        <div>
+                                          <h4 className="font-bold text-xs truncate" title={title}>{title}</h4>
+                                          {item.display_title && (
+                                            <p className="text-[10px] text-foreground/40 font-semibold truncate mt-0.5">الاسم الأصلي: {originalName}</p>
+                                          )}
+                                        </div>
+
+                                        <div className="flex justify-between items-center border-t border-border/20 pt-2.5">
+                                          {/* Item sorting buttons */}
+                                          <div className="flex gap-1">
+                                            <button
+                                              onClick={() => handleMoveSectionItem(sec, itemIdx, 'up')}
+                                              disabled={itemIdx === 0}
+                                              className="p-1 bg-surface border border-border rounded text-[10px] disabled:opacity-30"
+                                            >
+                                              ▲
+                                            </button>
+                                            <button
+                                              onClick={() => handleMoveSectionItem(sec, itemIdx, 'down')}
+                                              disabled={itemIdx === items.length - 1}
+                                              className="p-1 bg-surface border border-border rounded text-[10px] disabled:opacity-30"
+                                            >
+                                              ▼
+                                            </button>
+                                          </div>
+
+                                          <div className="flex gap-1.5">
+                                            <button
+                                              onClick={() => {
+                                                setEditingSectionItem(item);
+                                                setItemDisplayTitle(item.display_title || "");
+                                                setItemDisplaySubtitle(item.display_subtitle || "");
+                                                setItemDisplayImage(item.display_image_url || "");
+                                              }}
+                                              className="p-1.5 bg-primary/10 hover:bg-primary/20 text-primary-light rounded transition-colors"
+                                              title="تعديل المظهر المخصص"
+                                            >
+                                              <Edit3 className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                              onClick={() => handleDeleteItemFromSection(item.id)}
+                                              className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded transition-colors"
+                                              title="إزالة من القسم"
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
           )}
 
           {/* ============================================== */}
           {/* ================ MODAL WINDOWS =============== */}
           {/* ============================================== */}
+
+          {/* ============================================== */}
+          {/* ============ HOMEPAGE BUILDER MODALS ========== */}
+          {/* ============================================== */}
+
+          {/* A. ADD SECTION MODAL */}
+          {showAddSectionModal && (
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
+              <div className="bg-background border border-border w-full max-w-md rounded-3xl p-8 relative space-y-6 text-right">
+                <button
+                  onClick={() => setShowAddSectionModal(false)}
+                  className="absolute top-6 left-6 p-2 hover:bg-surface rounded-lg border border-border"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+
+                <h3 className="text-xl font-bold border-b border-border pb-3">➕ إضافة قسم رئيسي جديد بالصفحة</h3>
+
+                <form onSubmit={handleCreateSection} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-foreground/60">عنوان القسم *</label>
+                    <input
+                      type="text"
+                      required
+                      value={secTitle}
+                      onChange={(e) => setSecTitle(e.target.value)}
+                      placeholder="مثال: الأكثر طلباً أو جديد متجرنا"
+                      className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-foreground/60">الوصف الفرعي للقسم</label>
+                    <input
+                      type="text"
+                      value={secSubtitle}
+                      onChange={(e) => setSecSubtitle(e.target.value)}
+                      placeholder="وصف تجميلي يظهر تحت العنوان"
+                      className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-foreground/60">نوع ومحتوى القسم *</label>
+                    <select
+                      value={secType}
+                      onChange={(e) => setSecType(e.target.value as any)}
+                      className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm font-bold"
+                    >
+                      <option value="categories">أقسام رئيسية فقط (Categories Grid)</option>
+                      <option value="subcategories">أقسام فرعية فقط (Subcategories Grid)</option>
+                      <option value="products">منتجات تخرج للبيع/الإيجار (Products Grid)</option>
+                      <option value="mixed">مختلط (رئيسي / فرعي / منتجات)</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSavingSection}
+                    className="btn-premium w-full mt-4 py-3 font-bold text-sm"
+                  >
+                    {isSavingSection ? "جاري الحفظ..." : "إضافة القسم"}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* B. ADD ITEM TO SECTION MODAL */}
+          {showAddItemModal && activeSectionId && (
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
+              <div className="bg-background border border-border w-full max-w-md rounded-3xl p-8 relative space-y-6 text-right">
+                <button
+                  onClick={() => setShowAddItemModal(false)}
+                  className="absolute top-6 left-6 p-2 hover:bg-surface rounded-lg border border-border"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+
+                <h3 className="text-xl font-bold border-b border-border pb-3">➕ إضافة عنصر للقسم</h3>
+
+                <form onSubmit={handleAddItemToSection} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-foreground/60">نوع العنصر المراد ربطه</label>
+                    <select
+                      value={itemLinkedType}
+                      onChange={(e) => {
+                        setItemLinkedType(e.target.value as any);
+                        setItemLinkedId("");
+                      }}
+                      className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm font-bold"
+                    >
+                      <option value="category">قسم رئيسي (Category)</option>
+                      <option value="subcategory">قسم فرعي (Subcategory)</option>
+                      <option value="product">منتج معروض (Product)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-foreground/60">اختر العنصر للربط والربط التلقائي</label>
+                    <select
+                      required
+                      value={itemLinkedId}
+                      onChange={(e) => setItemLinkedId(e.target.value)}
+                      className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm"
+                    >
+                      <option value="">-- اختر من القائمة --</option>
+                      {itemLinkedType === "category" &&
+                        categoriesList.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))
+                      }
+                      {itemLinkedType === "subcategory" &&
+                        subcategoriesList.map(s => {
+                          const p = categoriesList.find(c => c.id === s.category_id);
+                          return (
+                            <option key={s.id} value={s.id}>{s.name} (الأب: {p?.name || "عام"})</option>
+                          );
+                        })
+                      }
+                      {itemLinkedType === "product" &&
+                        products.map(p => (
+                          <option key={p.id} value={p.id}>{p.name} [{p.code}]</option>
+                        ))
+                      }
+                    </select>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSavingSection || !itemLinkedId}
+                    className="btn-premium w-full mt-4 py-3 font-bold text-sm"
+                  >
+                    {isSavingSection ? "جاري الحفظ..." : "إضافة العنصر للقسم"}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* C. EDIT ITEM OVERRIDES MODAL */}
+          {editingSectionItem && (
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
+              <div className="bg-background border border-border w-full max-w-md rounded-3xl p-8 relative space-y-6 text-right">
+                <button
+                  onClick={() => setEditingSectionItem(null)}
+                  className="absolute top-6 left-6 p-2 hover:bg-surface rounded-lg border border-border"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+
+                <h3 className="text-xl font-bold border-b border-border pb-3">⚙️ تعديل وتخصيص بطاقة العرض بالرئيسية</h3>
+
+                <form onSubmit={handleSaveItemOverrides} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-foreground/60">العنوان البديل المخصص (اتركه فارغاً للافتراضي)</label>
+                    <input
+                      type="text"
+                      value={itemDisplayTitle}
+                      onChange={(e) => setItemDisplayTitle(e.target.value)}
+                      placeholder="عنوان بديل مخصص للمظهر فقط"
+                      className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-foreground/60">الوصف البديل المخصص (اتركه فارغاً للافتراضي)</label>
+                    <input
+                      type="text"
+                      value={itemDisplaySubtitle}
+                      onChange={(e) => setItemDisplaySubtitle(e.target.value)}
+                      placeholder="وصف فرعي بديل مخصص"
+                      className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-foreground/60">الصورة المخصصة (اتركها فارغة للافتراضية)</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={itemDisplayImage}
+                        onChange={(e) => setItemDisplayImage(e.target.value)}
+                        placeholder="رابط الصورة أو ارفع واحدة"
+                        className="flex-1 bg-surface border border-border rounded-xl px-3 py-2 text-xs text-left"
+                        dir="ltr"
+                      />
+                      <label className="px-4 py-2 bg-surface hover:bg-surface-hover border border-border rounded-xl font-bold text-xs cursor-pointer flex items-center gap-1.5 shrink-0 transition-colors">
+                        <Upload className="w-4 h-4 text-primary" />
+                        <span>{uploadingItemImg ? "جاري الرفع..." : "رفع ملف"}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setUploadingItemImg(true);
+                              try {
+                                const url = await uploadProductImage(file, "sec_item_" + editingSectionItem.id);
+                                setItemDisplayImage(url);
+                              } catch (err) {
+                                alert("فشل رفع الملف.");
+                              } finally {
+                                setUploadingItemImg(false);
+                              }
+                            }
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSavingSection || uploadingItemImg}
+                    className="btn-premium w-full mt-4 py-3 font-bold text-sm"
+                  >
+                    {isSavingSection ? "جاري الحفظ..." : "حفظ التخصيص والعودة"}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
 
           {/* 1. EDIT ORDER MODAL */}
           {editingOrder && (

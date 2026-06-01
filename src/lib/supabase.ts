@@ -942,3 +942,251 @@ export function getProductImage(product: any): string {
   }
   return resolveAssetPath(product.image);
 }
+
+// =====================================================================
+// 📂 بناء الصفحة الرئيسية الديناميكي (Dynamic Homepage Sections Builder)
+// =====================================================================
+
+export async function getSupabaseHomepageSections(): Promise<any[]> {
+  try {
+    const { data, error } = await supabase
+      .from('homepage_sections')
+      .select('*, homepage_section_items(*)')
+      .order('sort_order', { ascending: true });
+
+    if (error) throw error;
+    if (!data) return [];
+
+    // Sort items inside each section client-side for safety
+    return data.map(section => {
+      const items = (section.homepage_section_items || [])
+        .sort((a: any, b: any) => a.sort_order - b.sort_order);
+      return {
+        ...section,
+        homepage_section_items: items
+      };
+    });
+  } catch (err) {
+    console.warn("Failed to get homepage sections from Supabase:", err);
+    return [];
+  }
+}
+
+export async function addSupabaseHomepageSection(section: any): Promise<any> {
+  try {
+    const { data, error } = await supabase
+      .from('homepage_sections')
+      .insert([{
+        title: section.title,
+        subtitle: section.subtitle || null,
+        image_url: section.image_url || null,
+        section_type: section.section_type || 'mixed',
+        sort_order: section.sort_order || 0,
+        is_visible: section.is_visible !== undefined ? section.is_visible : true
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { success: true, data };
+  } catch (err: any) {
+    console.error("Failed to add homepage section:", err);
+    return { success: false, error: err?.message || String(err) };
+  }
+}
+
+export async function updateSupabaseHomepageSection(id: string, updates: any): Promise<boolean> {
+  try {
+    const dbUpdates: any = {};
+    if (updates.title !== undefined) dbUpdates.title = updates.title;
+    if (updates.subtitle !== undefined) dbUpdates.subtitle = updates.subtitle;
+    if (updates.image_url !== undefined) dbUpdates.image_url = updates.image_url;
+    if (updates.section_type !== undefined) dbUpdates.section_type = updates.section_type;
+    if (updates.sort_order !== undefined) dbUpdates.sort_order = updates.sort_order;
+    if (updates.is_visible !== undefined) dbUpdates.is_visible = updates.is_visible;
+
+    const { error } = await supabase
+      .from('homepage_sections')
+      .update(dbUpdates)
+      .eq('id', id);
+
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.error(`Failed to update homepage section ${id}:`, err);
+    return false;
+  }
+}
+
+export async function deleteSupabaseHomepageSection(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('homepage_sections')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.error(`Failed to delete homepage section ${id}:`, err);
+    return false;
+  }
+}
+
+export async function swapHomepageSectionOrderInDb(id1: string, order1: number, id2: string, order2: number): Promise<boolean> {
+  try {
+    const { error: err1 } = await supabase.from('homepage_sections').update({ sort_order: order2 }).eq('id', id1);
+    const { error: err2 } = await supabase.from('homepage_sections').update({ sort_order: order1 }).eq('id', id2);
+    if (err1 || err2) throw err1 || err2;
+    return true;
+  } catch (err) {
+    console.error("Failed to swap homepage sections order:", err);
+    return false;
+  }
+}
+
+// Items under section
+export async function addSupabaseHomepageSectionItem(item: any): Promise<any> {
+  try {
+    const { data, error } = await supabase
+      .from('homepage_section_items')
+      .insert([{
+        section_id: item.section_id,
+        display_title: item.display_title || null,
+        display_subtitle: item.display_subtitle || null,
+        display_image_url: item.display_image_url || null,
+        linked_type: item.linked_type,
+        linked_id: item.linked_id,
+        sort_order: item.sort_order || 0,
+        is_visible: item.is_visible !== undefined ? item.is_visible : true
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { success: true, data };
+  } catch (err: any) {
+    console.error("Failed to add homepage section item:", err);
+    return { success: false, error: err?.message || String(err) };
+  }
+}
+
+export async function updateSupabaseHomepageSectionItem(id: string, updates: any): Promise<boolean> {
+  try {
+    const dbUpdates: any = {};
+    if (updates.display_title !== undefined) dbUpdates.display_title = updates.display_title;
+    if (updates.display_subtitle !== undefined) dbUpdates.display_subtitle = updates.display_subtitle;
+    if (updates.display_image_url !== undefined) dbUpdates.display_image_url = updates.display_image_url;
+    if (updates.is_visible !== undefined) dbUpdates.is_visible = updates.is_visible;
+    if (updates.sort_order !== undefined) dbUpdates.sort_order = updates.sort_order;
+
+    const { error } = await supabase
+      .from('homepage_section_items')
+      .update(dbUpdates)
+      .eq('id', id);
+
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.error(`Failed to update homepage section item ${id}:`, err);
+    return false;
+  }
+}
+
+export async function deleteSupabaseHomepageSectionItem(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('homepage_section_items')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.error(`Failed to delete homepage section item ${id}:`, err);
+    return false;
+  }
+}
+
+export async function swapHomepageSectionItemOrderInDb(id1: string, order1: number, id2: string, order2: number): Promise<boolean> {
+  try {
+    const { error: err1 } = await supabase.from('homepage_section_items').update({ sort_order: order2 }).eq('id', id1);
+    const { error: err2 } = await supabase.from('homepage_section_items').update({ sort_order: order1 }).eq('id', id2);
+    if (err1 || err2) throw err1 || err2;
+    return true;
+  } catch (err) {
+    console.error("Failed to swap homepage section item order:", err);
+    return false;
+  }
+}
+
+export async function seedDefaultHomepageSections(): Promise<boolean> {
+  try {
+    // 1. Create a section for Categories
+    const { data: catSec, error: catSecErr } = await supabase
+      .from('homepage_sections')
+      .insert([{
+        title: "الأقسام المميزة",
+        subtitle: "اكتشف مجموعاتنا المصنفة بعناية",
+        section_type: "categories",
+        sort_order: 0,
+        is_visible: true
+      }])
+      .select()
+      .single();
+
+    if (catSecErr) throw catSecErr;
+
+    // Fetch active categories
+    const categories = await getSupabaseCategories();
+    if (categories && categories.length > 0) {
+      const catItems = categories.map((c, index) => ({
+        section_id: catSec.id,
+        linked_type: "category",
+        linked_id: c.id,
+        sort_order: index,
+        is_visible: true
+      }));
+      const { error: catItemsErr } = await supabase
+        .from('homepage_section_items')
+        .insert(catItems);
+      if (catItemsErr) console.error("Error seeding default category items:", catItemsErr);
+    }
+
+    // 2. Create a section for Products
+    const { data: prodSec, error: prodSecErr } = await supabase
+      .from('homepage_sections')
+      .insert([{
+        title: "الأكثر طلباً",
+        subtitle: "تصاميم حصرية تميز إطلالتك في يوم تخرجك",
+        section_type: "products",
+        sort_order: 1,
+        is_visible: true
+      }])
+      .select()
+      .single();
+
+    if (prodSecErr) throw prodSecErr;
+
+    // Fetch active products
+    const products = await getSupabaseProducts();
+    const featuredProds = products.slice(0, 4);
+    if (featuredProds && featuredProds.length > 0) {
+      const prodItems = featuredProds.map((p, index) => ({
+        section_id: prodSec.id,
+        linked_type: "product",
+        linked_id: p.id,
+        sort_order: index,
+        is_visible: true
+      }));
+      const { error: prodItemsErr } = await supabase
+        .from('homepage_section_items')
+        .insert(prodItems);
+      if (prodItemsErr) console.error("Error seeding default product items:", prodItemsErr);
+    }
+
+    return true;
+  } catch (err) {
+    console.error("Failed to seed default homepage sections:", err);
+    return false;
+  }
+}
+
