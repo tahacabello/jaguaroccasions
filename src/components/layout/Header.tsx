@@ -78,9 +78,6 @@ export function Header() {
             <Link href="/" className="text-sm font-medium hover:text-primary transition-colors">
               الرئيسية
             </Link>
-            <Link href="/products" className="text-sm font-medium hover:text-primary transition-colors">
-              المنتجات
-            </Link>
             <Link href="/categories" className="text-sm font-medium hover:text-primary transition-colors">
               الأقسام
             </Link>
@@ -141,7 +138,6 @@ export function Header() {
             
             <nav className="flex flex-col p-6 gap-6 text-xl font-bold">
               <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-primary">الرئيسية</Link>
-              <Link href="/products" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-primary">المنتجات</Link>
               <Link href="/categories" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-primary">الأقسام</Link>
               <Link href="/about" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-primary">من نحن</Link>
             </nav>
