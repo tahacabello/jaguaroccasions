@@ -118,14 +118,15 @@ export default function ProductDetailClient({ params }: { params: { id: string }
       const found = dbProducts.find(p => p.id === params.id);
       if (found) {
         // If DB product doesn't have images array, we use its main image as a single-item array
-        if (!found.images) {
+        const dbProduct: any = found;
+        if (!dbProduct.images) {
           // If we found the Kuwaiti cap from db, and we want to preserve our mock gallery for it:
-          if (found.id === "1" && productsDb["1"].images) {
-             found.images = productsDb["1"].images;
+          if (dbProduct.id === "1" && productsDb["1"].images) {
+             dbProduct.images = productsDb["1"].images;
           }
         }
-        setProduct(found);
-        setActiveImage(found.images ? found.images[0] : found.image);
+        setProduct(dbProduct);
+        setActiveImage(dbProduct.images ? dbProduct.images[0] : dbProduct.image);
       }
     }).catch(err => console.error("Error fetching product detail in PD:", err));
   }, [params.id]);
