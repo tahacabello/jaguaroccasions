@@ -9,21 +9,16 @@ import { getSupabaseSettings } from "@/lib/supabase";
 export function Hero() {
   const [heroTitle, setHeroTitle] = useState("لحظة تخرجك، بأرقى المعايير");
   const [heroSubtitle, setHeroSubtitle] = useState("اكتشف مجموعتنا الحصرية من كابات التخرج، القبعات، والشالات الفاخرة. بيع وإيجار مع خدمة توصيل لجميع أنحاء ليبيا.");
-  const [heroImage, setHeroImage] = useState("");
 
   useEffect(() => {
     getSupabaseSettings().then(settings => {
       if (settings.hero_title) setHeroTitle(settings.hero_title);
       if (settings.hero_subtitle) setHeroSubtitle(settings.hero_subtitle);
-      if (settings.hero_image) setHeroImage(settings.hero_image);
     }).catch(err => console.error("Error fetching hero settings in Hero:", err));
   }, []);
 
   return (
-    <section
-      className="relative min-h-[85vh] flex items-center justify-center overflow-hidden bg-background"
-      style={heroImage ? { backgroundImage: `url(${heroImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
-    >
+    <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden bg-background">
       {/* Dynamic Background Glow */}
       <div className="absolute inset-0 z-0">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[120px] opacity-50 mix-blend-screen animate-pulse"></div>

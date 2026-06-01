@@ -11,106 +11,80 @@ export const mockProducts = [
   {
     id: "1",
     name: "كاب كويتي فاخر",
-    priceSale: 375,
-    priceRent: 85,
-    description: "كاب تخرج بتصميم كويتي أصيل مع شال مطرز بالاسم بخط عربي ذهبي فاخر. مصنوع من أجود أنواع الساتان والمخمل الأسود مع تفاصيل ذهبية وشراشيب حريرية. يشمل القبعة والشال. متوفر للبيع والإيجار.",
-    image: "/products/kuwaiti-cap-1.jpg",
+    priceSale: 85,
+    priceRent: 40,
+    description: "كاب تخرج بتصميم كويتي أصيل، مصنوع من أجود أنواع المخمل الفاخر. يتميز بتفاصيل ذهبية دقيقة وحياكة يدوية متقنة تضمن لك إطلالة استثنائية في يوم تخرجك. متوفر للبيع والإيجار.",
+    image: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=800&auto=format&fit=crop",
     status: "متوفر",
     category: "كابات التخرج",
     categoryId: "gowns",
     code: "JG-001",
-    sales: 48
+    sales: 24
   },
   {
     id: "2",
-    name: "كاب تخرج مع باقة ورد",
-    priceSale: 375,
-    priceRent: 85,
-    description: "كاب تخرج كويتي أنيق مع شال مطرز بالذهبي. تصميم عصري يناسب جميع المناسبات الأكاديمية. خامة ساتان فاخرة مع حياكة متقنة وتفاصيل ذهبية.",
-    image: "/products/kuwaiti-cap-2.jpg",
+    name: "شال تخرج مطرز",
+    priceSale: 45,
+    priceRent: 20,
+    description: "شال تخرج مطرز بخيوط حريرية فاخرة. يمكنك طلب كتابة اسمك وسنة التخرج بألوان متعددة. نسيج ناعم ومقاوم للتجعد.",
+    image: "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=800&auto=format&fit=crop",
     status: "متوفر",
-    category: "كابات التخرج",
-    categoryId: "gowns",
+    category: "شالات التخرج",
+    categoryId: "sashes",
     code: "JG-002",
-    sales: 35
+    sales: 42
   },
   {
     id: "3",
-    name: "كاب تخرج مع شال أحمر",
-    priceSale: 375,
-    priceRent: 85,
-    description: "كاب تخرج فاخر بقبعة بوردو مميزة وشال أحمر مطرز بخط عربي ذهبي. تصميم فريد يجمع بين الأناقة والتميز. مناسب لحفلات التخرج الجامعية.",
-    image: "/products/kuwaiti-cap-3.jpg",
-    status: "متوفر",
-    category: "كابات التخرج",
-    categoryId: "gowns",
+    name: "بروش مخصص",
+    priceSale: 25,
+    priceRent: 12,
+    description: "بروش تخرج معدني أنيق ومطلي بالذهب عيار 18 قيراط. يتم قصه بالليزر بالاسم أو الشعار الذي تفضله. هدية تذكارية رائعة.",
+    image: "https://images.unsplash.com/photo-1627384113743-6bd5a479fffd?q=80&w=800&auto=format&fit=crop",
+    status: "محجوز",
+    category: "بروشات التخرج",
+    categoryId: "pins",
     code: "JG-003",
-    sales: 22
+    sales: 18
   },
   {
     id: "4",
-    name: "كاب كويتي كلاسيك Class 2026",
-    priceSale: 375,
-    priceRent: 85,
-    description: "كاب تخرج كويتي كلاسيكي من المخمل الأسود الفاخر مع شال مطرز يحمل عبارة Class 2026 بخط ذهبي أنيق. تصميم فخم يليق بلحظة التخرج المميزة.",
-    image: "/products/kuwaiti-cap-4.jpg",
+    name: "روب تخرج أطفال",
+    priceSale: 60,
+    priceRent: 30,
+    description: "روب تخرج للأطفال بتصميم مريح وألوان زاهية تناسب حفلات تخرج الروضة والابتدائي. خامة خفيفة وباردة تناسب الصيف.",
+    image: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=800&auto=format&fit=crop",
     status: "متوفر",
     category: "كابات التخرج",
     categoryId: "gowns",
     code: "JG-004",
-    sales: 30
+    sales: 15
   },
   {
     id: "5",
-    name: "كاب تخرج مع باقة زهور",
-    priceSale: 375,
-    priceRent: 85,
-    description: "كاب تخرج أنيق بتصميم كويتي مع شال مطرز بالذهبي ورقم السنة. إطلالة راقية ومثالية لتصوير لحظات التخرج الخالدة.",
-    image: "/products/kuwaiti-cap-5.jpg",
+    name: "طقم كاب وشال",
+    priceSale: 120,
+    priceRent: 55,
+    description: "طقم تخرج ملكي متكامل يشمل الكاب الكويتي الفاخر مع شال مطرز مخصص بالاسم. وفر أكثر مع هذا الطقم المميز.",
+    image: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=800&auto=format&fit=crop",
     status: "متوفر",
     category: "كابات التخرج",
     categoryId: "gowns",
     code: "JG-005",
-    sales: 28
+    sales: 30
   },
   {
     id: "6",
-    name: "طقم تخرج جماعي - شال ذهبي",
-    priceSale: 375,
-    priceRent: 85,
-    description: "كاب تخرج مع شال ذهبي فاخر مطرز بالاسم. مثالي للطلب الجماعي لمجموعات التخرج. خصم خاص على الطلبات الجماعية (5 قطع فأكثر).",
-    image: "/products/kuwaiti-cap-6.jpg",
-    status: "متوفر",
-    category: "كابات التخرج",
-    categoryId: "gowns",
+    name: "قبعة تخرج مخمل",
+    priceSale: 95,
+    priceRent: 45,
+    description: "قبعة تخرج كلاسيكية مصنوعة من القطيفة الفاخرة مع شراشيب حريرية طويلة متدلية بلون ذهبي لامع.",
+    image: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=800&auto=format&fit=crop",
+    status: "غير متوفر",
+    category: "قبعات التخرج",
+    categoryId: "caps",
     code: "JG-006",
-    sales: 42
-  },
-  {
-    id: "7",
-    name: "كاب تخرج مع بالون ذهبي",
-    priceSale: 375,
-    priceRent: 85,
-    description: "كاب تخرج كويتي من المخمل الأسود مع شال مطرز. تصميم عصري وأنيق مع إكسسوارات التخرج. يشمل القبعة والشال والشراشيب الذهبية.",
-    image: "/products/kuwaiti-cap-7.jpg",
-    status: "متوفر",
-    category: "كابات التخرج",
-    categoryId: "gowns",
-    code: "JG-007",
-    sales: 19
-  },
-  {
-    id: "8",
-    name: "كاب تخرج احتفالي",
-    priceSale: 375,
-    priceRent: 85,
-    description: "كاب تخرج كويتي فاخر من المخمل الأسود الممتاز. مثالي للحظات الاحتفالية المميزة. تطريز يدوي بخيوط ذهبية فاخرة مع شراشيب حريرية.",
-    image: "/products/kuwaiti-cap-8.jpg",
-    status: "متوفر",
-    category: "كابات التخرج",
-    categoryId: "gowns",
-    code: "JG-008",
-    sales: 15
+    sales: 5
   }
 ];
 
@@ -119,42 +93,13 @@ export const defaultSettings: Record<string, string> = {
   contact_phone: "+218 92 123 4567",
   contact_email: "info@jaguar.ly",
   location: "ليبيا - طرابلس، شارع النصر",
-  contact_location_link: "https://maps.app.goo.gl/9Zc4k2g18uH3q9pY6",
-  telegram_bot_token: "8840923993:AAEz0V-OvMlYsEzD_S4McSCNf7NMR_fcs3o",
-  telegram_chat_id: "889242214",
-  hero_image: "",
   announcement_text: "توصيل لجميع أنحاء ليبيا 🎓",
   hero_title: "لحظة تخرجك، بأرقى المعايير",
   hero_subtitle: "اكتشف مجموعتنا الحصرية من كابات التخرج، القبعات، والشالات الفاخرة. بيع وإيجار مع خدمة توصيل لجميع أنحاء ليبيا."
 };
 
-// Upload product image to Supabase Storage (falls back to base64 if bucket not configured)
-export async function uploadProductImage(file: File): Promise<string> {
-  // Try Supabase Storage first
-  try {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `product_${Date.now()}_${Math.random().toString(36).slice(2)}.${fileExt}`;
-    const { data, error } = await supabase.storage
-      .from('product-images')
-      .upload(fileName, file, { cacheControl: '3600', upsert: false, contentType: file.type });
-    if (!error && data) {
-      const { data: pub } = supabase.storage.from('product-images').getPublicUrl(data.path);
-      return pub.publicUrl;
-    }
-  } catch { /* fall through */ }
-
-  // Fallback: base64 data URL (works without Supabase Storage setup)
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('فشل قراءة الصورة'));
-    reader.readAsDataURL(file);
-  });
-}
-
 // Database helper functions for Products
 export async function getSupabaseProducts() {
-
   try {
     const { data, error } = await supabase
       .from('products')
@@ -289,45 +234,3 @@ export async function updateSupabaseSetting(key: string, value: string) {
     return false;
   }
 }
-
-// Resilient Mock Profiles Database
-export const mockProfiles = [
-  { id: "usr-1", first_name: "أحمد", last_name: "الورفلي", phone_number: "+218 91 345 6789", address_line1: "السياحية - قرب جامع طيبة", city: "طرابلس", created_at: "2026-05-30T10:14:00Z" },
-  { id: "usr-2", first_name: "معتز", last_name: "بن علي", phone_number: "+218 92 654 3210", address_line1: "الفويهات - شارع دبي", city: "بنغازي", created_at: "2026-05-29T15:24:00Z" },
-  { id: "usr-3", first_name: "روان", last_name: "الشركسي", phone_number: "+218 91 789 4561", address_line1: "الرويسات", city: "مصراتة", created_at: "2026-05-28T18:40:00Z" },
-  { id: "usr-4", first_name: "منى", last_name: "الترهوني", phone_number: "+218 92 123 7890", address_line1: "وسط المدينة", city: "الخمس", created_at: "2026-05-27T11:05:00Z" }
-];
-
-// Database helper functions for User Profiles
-export async function getSupabaseProfiles() {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    if (!data || data.length === 0) return mockProfiles;
-    
-    return data;
-  } catch (err) {
-    console.warn("Supabase profiles fetch failed, returning mock profiles fallback:", err);
-    return mockProfiles;
-  }
-}
-
-export async function updateSupabaseProfile(profileId: string, updates: any) {
-  try {
-    const { error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', profileId);
-
-    if (error) throw error;
-    return true;
-  } catch (err) {
-    console.error(`Supabase profile update failed for ${profileId}:`, err);
-    return false;
-  }
-}
-

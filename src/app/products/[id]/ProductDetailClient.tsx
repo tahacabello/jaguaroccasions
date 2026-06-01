@@ -4,19 +4,20 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import Image from "next/image";
-import { ShoppingCart, Heart, ShieldCheck, Truck, ChevronRight, Plus, Minus, Check, Star, Send } from "lucide-react";
+import { ShoppingCart, Heart, ShieldCheck, Truck, ChevronRight, Plus, Minus, Check, X } from "lucide-react";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
-import { useWishlist } from "@/context/WishlistContext";
 import { getSupabaseProducts } from "@/lib/supabase";
+import { motion, AnimatePresence } from "framer-motion";
 
-// Products database for details fetching
+// Mock products database for details fetching
 const productsDb: Record<string, {
   name: string;
   priceSale: number;
   priceRent: number;
   description: string;
   image: string;
+  images?: string[];
   status: string;
   category: string;
   categoryId: string;
@@ -24,91 +25,79 @@ const productsDb: Record<string, {
 }> = {
   "1": {
     name: "كاب كويتي فاخر",
-    priceSale: 375,
-    priceRent: 85,
-    description: "كاب تخرج بتصميم كويتي أصيل مع شال مطرز بالاسم بخط عربي ذهبي فاخر. مصنوع من أجود أنواع الساتان والمخمل الأسود مع تفاصيل ذهبية وشراشيب حريرية. يشمل القبعة والشال. متوفر للبيع والإيجار.",
-    image: "/products/kuwaiti-cap-1.jpg",
+    priceSale: 85,
+    priceRent: 40,
+    description: "كاب تخرج بتصميم كويتي أصيل، مصنوع من أجود أنواع المخمل الفاخر. يتميز بتفاصيل ذهبية دقيقة وحياكة يدوية متقنة تضمن لك إطلالة استثنائية في يوم تخرجك. متوفر للبيع والإيجار.",
+    image: "/products/gallery/graduation_photo_01.jpg",
+    images: [
+      "/products/gallery/graduation_photo_01.jpg",
+      "/products/gallery/graduation_photo_02.jpg",
+      "/products/gallery/graduation_photo_03.jpg",
+      "/products/gallery/graduation_photo_04.jpg",
+      "/products/gallery/graduation_photo_05.jpg",
+      "/products/gallery/graduation_photo_06.jpg",
+      "/products/gallery/graduation_photo_07.jpg",
+      "/products/gallery/graduation_photo_08.jpg",
+    ],
     status: "متوفر",
     category: "كابات التخرج",
     categoryId: "gowns",
     code: "JG-001",
   },
   "2": {
-    name: "كاب تخرج مع باقة ورد",
-    priceSale: 375,
-    priceRent: 85,
-    description: "كاب تخرج كويتي أنيق مع شال مطرز بالذهبي. تصميم عصري يناسب جميع المناسبات الأكاديمية. خامة ساتان فاخرة مع حياكة متقنة وتفاصيل ذهبية.",
-    image: "/products/kuwaiti-cap-2.jpg",
+    name: "شال تخرج مطرز",
+    priceSale: 45,
+    priceRent: 20,
+    description: "شال تخرج مطرز بخيوط حريرية فاخرة. يمكنك طلب كتابة اسمك وسنة التخرج بألوان متعددة. نسيج ناعم ومقاوم للتجعد.",
+    image: "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?q=80&w=800&auto=format&fit=crop",
     status: "متوفر",
-    category: "كابات التخرج",
-    categoryId: "gowns",
+    category: "شالات التخرج",
+    categoryId: "sashes",
     code: "JG-002",
   },
   "3": {
-    name: "كاب تخرج مع شال أحمر",
-    priceSale: 375,
-    priceRent: 85,
-    description: "كاب تخرج فاخر بقبعة بوردو مميزة وشال أحمر مطرز بخط عربي ذهبي. تصميم فريد يجمع بين الأناقة والتميز. مناسب لحفلات التخرج الجامعية.",
-    image: "/products/kuwaiti-cap-3.jpg",
-    status: "متوفر",
-    category: "كابات التخرج",
-    categoryId: "gowns",
+    name: "بروش مخصص",
+    priceSale: 25,
+    priceRent: 12,
+    description: "بروش تخرج معدني أنيق ومطلي بالذهب عيار 18 قيراط. يتم قصه بالليزر بالاسم أو الشعار الذي تفضله. هدية تذكارية رائعة.",
+    image: "https://images.unsplash.com/photo-1627384113743-6bd5a479fffd?q=80&w=800&auto=format&fit=crop",
+    status: "محجوز",
+    category: "بروشات التخرج",
+    categoryId: "pins",
     code: "JG-003",
   },
   "4": {
-    name: "كاب كويتي كلاسيك Class 2026",
-    priceSale: 375,
-    priceRent: 85,
-    description: "كاب تخرج كويتي كلاسيكي من المخمل الأسود الفاخر مع شال مطرز يحمل عبارة Class 2026 بخط ذهبي أنيق. تصميم فخم يليق بلحظة التخرج المميزة.",
-    image: "/products/kuwaiti-cap-4.jpg",
+    name: "روب تخرج أطفال",
+    priceSale: 60,
+    priceRent: 30,
+    description: "روب تخرج للأطفال بتصميم مريح وألوان زاهية تناسب حفلات تخرج الروضة والابتدائي. خامة خفيفة وباردة تناسب الصيف.",
+    image: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=800&auto=format&fit=crop",
     status: "متوفر",
     category: "كابات التخرج",
     categoryId: "gowns",
     code: "JG-004",
   },
   "5": {
-    name: "كاب تخرج مع باقة زهور",
-    priceSale: 375,
-    priceRent: 85,
-    description: "كاب تخرج أنيق بتصميم كويتي مع شال مطرز بالذهبي ورقم السنة. إطلالة راقية ومثالية لتصوير لحظات التخرج الخالدة.",
-    image: "/products/kuwaiti-cap-5.jpg",
+    name: "طقم كاب وشال",
+    priceSale: 120,
+    priceRent: 55,
+    description: "طقم تخرج ملكي متكامل يشمل الكاب الكويتي الفاخر مع شال مطرز مخصص بالاسم. وفر أكثر مع هذا الطقم المميز.",
+    image: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=800&auto=format&fit=crop",
     status: "متوفر",
     category: "كابات التخرج",
     categoryId: "gowns",
     code: "JG-005",
   },
   "6": {
-    name: "طقم تخرج جماعي - شال ذهبي",
-    priceSale: 375,
-    priceRent: 85,
-    description: "كاب تخرج مع شال ذهبي فاخر مطرز بالاسم. مثالي للطلب الجماعي لمجموعات التخرج. خصم خاص على الطلبات الجماعية (5 قطع فأكثر).",
-    image: "/products/kuwaiti-cap-6.jpg",
-    status: "متوفر",
-    category: "كابات التخرج",
-    categoryId: "gowns",
+    name: "قبعة تخرج مخمل",
+    priceSale: 95,
+    priceRent: 45,
+    description: "قبعة تخرج كلاسيكية مصنوعة من القطيفة الفاخرة مع شراشيب حريرية طويلة متدلية بلون ذهبي لامع.",
+    image: "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=800&auto=format&fit=crop",
+    status: "غير متوفر",
+    category: "قبعات التخرج",
+    categoryId: "caps",
     code: "JG-006",
-  },
-  "7": {
-    name: "كاب تخرج مع بالون ذهبي",
-    priceSale: 375,
-    priceRent: 85,
-    description: "كاب تخرج كويتي من المخمل الأسود مع شال مطرز. تصميم عصري وأنيق مع إكسسوارات التخرج. يشمل القبعة والشال والشراشيب الذهبية.",
-    image: "/products/kuwaiti-cap-7.jpg",
-    status: "متوفر",
-    category: "كابات التخرج",
-    categoryId: "gowns",
-    code: "JG-007",
-  },
-  "8": {
-    name: "كاب تخرج احتفالي",
-    priceSale: 375,
-    priceRent: 85,
-    description: "كاب تخرج كويتي فاخر من المخمل الأسود الممتاز. مثالي للحظات الاحتفالية المميزة. تطريز يدوي بخيوط ذهبية فاخرة مع شراشيب حريرية.",
-    image: "/products/kuwaiti-cap-8.jpg",
-    status: "متوفر",
-    category: "كابات التخرج",
-    categoryId: "gowns",
-    code: "JG-008",
   },
 };
 
@@ -118,28 +107,25 @@ export default function ProductDetailClient({ params }: { params: { id: string }
   const [quantity, setQuantity] = useState(1);
   const [isAdded, setIsAdded] = useState(false);
   const { addToCart } = useCart();
-  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
 
-  // Reviews State
-  interface Review { name: string; rating: number; comment: string; date: string; }
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [reviewName, setReviewName] = useState("");
-  const [reviewRating, setReviewRating] = useState(5);
-  const [reviewComment, setReviewComment] = useState("");
-  const [hoverRating, setHoverRating] = useState(0);
-  const [reviewSubmitted, setReviewSubmitted] = useState(false);
-
-  useEffect(() => {
-    // Load reviews from localStorage
-    const storedReviews = localStorage.getItem(`jaguar_reviews_${params.id}`);
-    if (storedReviews) setReviews(JSON.parse(storedReviews));
-  }, [params.id]);
+  // Gallery state
+  const productImages = product.images && product.images.length > 0 ? product.images : [product.image];
+  const [activeImage, setActiveImage] = useState(productImages[0]);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
   useEffect(() => {
     getSupabaseProducts().then(dbProducts => {
       const found = dbProducts.find(p => p.id === params.id);
       if (found) {
+        // If DB product doesn't have images array, we use its main image as a single-item array
+        if (!found.images) {
+          // If we found the Kuwaiti cap from db, and we want to preserve our mock gallery for it:
+          if (found.id === "1" && productsDb["1"].images) {
+             found.images = productsDb["1"].images;
+          }
+        }
         setProduct(found);
+        setActiveImage(found.images ? found.images[0] : found.image);
       }
     }).catch(err => console.error("Error fetching product detail in PD:", err));
   }, [params.id]);
@@ -160,27 +146,6 @@ export default function ProductDetailClient({ params }: { params: { id: string }
     setIsAdded(true);
     setTimeout(() => setIsAdded(false), 2000);
   };
-
-  const handleSubmitReview = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reviewName.trim() || !reviewComment.trim()) return;
-    const newReview: Review = {
-      name: reviewName,
-      rating: reviewRating,
-      comment: reviewComment,
-      date: new Date().toLocaleDateString("ar-LY"),
-    };
-    const updated = [newReview, ...reviews];
-    setReviews(updated);
-    localStorage.setItem(`jaguar_reviews_${params.id}`, JSON.stringify(updated));
-    setReviewName("");
-    setReviewComment("");
-    setReviewRating(5);
-    setReviewSubmitted(true);
-    setTimeout(() => setReviewSubmitted(false), 3000);
-  };
-
-  const avgRating = reviews.length > 0 ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1) : null;
 
   return (
     <>
@@ -203,15 +168,57 @@ export default function ProductDetailClient({ params }: { params: { id: string }
             
             {/* Product Image Gallery */}
             <div className="space-y-4">
-              <div className="relative aspect-square w-full rounded-2xl overflow-hidden glass border border-border">
-                <Image
-                  src={product.image}
-                  alt={product.name}
-                  fill
-                  className="object-cover"
-                  priority
-                />
+              <div 
+                className="relative aspect-square w-full rounded-2xl overflow-hidden glass border border-border cursor-pointer group"
+                onClick={() => setIsLightboxOpen(true)}
+              >
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeImage}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 1.05 }}
+                    transition={{ duration: 0.3 }}
+                    className="absolute inset-0"
+                  >
+                    <Image
+                      src={activeImage}
+                      alt={product.name}
+                      fill
+                      className="object-cover transition-transform duration-700 group-hover:scale-110"
+                      priority
+                    />
+                  </motion.div>
+                </AnimatePresence>
+                {/* Overlay hint for Lightbox */}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
+                  <span className="text-white font-bold text-lg bg-black/50 px-6 py-3 rounded-full backdrop-blur-sm">
+                    انقر للتكبير
+                  </span>
+                </div>
               </div>
+
+              {/* Thumbnails */}
+              {productImages.length > 1 && (
+                <div className="flex gap-4 overflow-x-auto pb-2 snap-x hide-scrollbar">
+                  {productImages.map((img: string, idx: number) => (
+                    <button
+                      key={idx}
+                      onClick={() => setActiveImage(img)}
+                      className={`relative w-24 h-24 shrink-0 rounded-xl overflow-hidden border-2 transition-all snap-start ${
+                        activeImage === img ? "border-primary scale-105" : "border-transparent opacity-60 hover:opacity-100"
+                      }`}
+                    >
+                      <Image
+                        src={img}
+                        alt={`${product.name} - ${idx + 1}`}
+                        fill
+                        className="object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Product Info */}
@@ -317,22 +324,9 @@ export default function ProductDetailClient({ params }: { params: { id: string }
                     </>
                   )}
                 </button>
-                <button
-                  onClick={() => {
-                    if (isInWishlist(params.id)) {
-                      removeFromWishlist(params.id);
-                    } else {
-                      addToWishlist({ id: params.id, name: product.name, price: product.priceSale, image: product.image });
-                    }
-                  }}
-                  className={`flex items-center justify-center gap-2 px-8 py-4 rounded-xl border transition-all duration-300 font-bold ${
-                    isInWishlist(params.id)
-                      ? "border-red-500 bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                      : "border-border bg-surface hover:bg-surface-hover hover:border-primary/50 text-foreground"
-                  }`}
-                >
-                  <Heart className="w-5 h-5" fill={isInWishlist(params.id) ? "currentColor" : "none"} />
-                  {isInWishlist(params.id) ? "في المفضلة" : "حفظ"}
+                <button className="flex items-center justify-center gap-2 px-8 py-4 rounded-xl border border-border bg-surface hover:bg-surface-hover hover:border-primary/50 text-foreground transition-all duration-300 font-bold">
+                  <Heart className="w-5 h-5" />
+                  حفظ
                 </button>
               </div>
 
@@ -355,120 +349,47 @@ export default function ProductDetailClient({ params }: { params: { id: string }
             </div>
           </div>
 
-          {/* ===== REVIEWS SECTION ===== */}
-          <div className="mt-20 border-t border-border pt-12">
-            <div className="flex items-center justify-between mb-10">
-              <div>
-                <h2 className="text-3xl font-black mb-1">آراء العملاء</h2>
-                {avgRating ? (
-                  <div className="flex items-center gap-2">
-                    <div className="flex">
-                      {[1,2,3,4,5].map(s => (
-                        <Star key={s} className="w-5 h-5" fill={s <= Math.round(Number(avgRating)) ? "#c9a84c" : "none"} stroke="#c9a84c" />
-                      ))}
-                    </div>
-                    <span className="text-primary-light font-bold text-lg">{avgRating}</span>
-                    <span className="text-foreground/50 text-sm">({reviews.length} تقييم)</span>
-                  </div>
-                ) : (
-                  <p className="text-foreground/50">لا توجد تقييمات بعد — كن أول من يقيّم!</p>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-              {/* Review Form */}
-              <div className="glass rounded-2xl border border-border p-6">
-                <h3 className="text-xl font-bold mb-5">أضف تقييمك</h3>
-                <form onSubmit={handleSubmitReview} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-bold text-foreground/70 mb-2">اسمك *</label>
-                    <input
-                      type="text"
-                      value={reviewName}
-                      onChange={(e) => setReviewName(e.target.value)}
-                      placeholder="أدخل اسمك"
-                      required
-                      className="w-full px-4 py-2 rounded-xl border border-border bg-background focus:border-primary focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-foreground/70 mb-2">تقييمك *</label>
-                    <div className="flex gap-1">
-                      {[1,2,3,4,5].map(s => (
-                        <button
-                          key={s}
-                          type="button"
-                          onMouseEnter={() => setHoverRating(s)}
-                          onMouseLeave={() => setHoverRating(0)}
-                          onClick={() => setReviewRating(s)}
-                        >
-                          <Star
-                            className="w-8 h-8 transition-colors"
-                            fill={s <= (hoverRating || reviewRating) ? "#c9a84c" : "none"}
-                            stroke="#c9a84c"
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-foreground/70 mb-2">تعليقك *</label>
-                    <textarea
-                      value={reviewComment}
-                      onChange={(e) => setReviewComment(e.target.value)}
-                      placeholder="شاركنا رأيك في المنتج..."
-                      required
-                      rows={3}
-                      className="w-full px-4 py-2 rounded-xl border border-border bg-background focus:border-primary focus:outline-none resize-none"
-                    />
-                  </div>
-                  <button type="submit" className="w-full btn-premium flex items-center justify-center gap-2">
-                    {reviewSubmitted ? (
-                      <><Check className="w-5 h-5" /> شكراً على تقييمك!</>
-                    ) : (
-                      <><Send className="w-5 h-5" /> إرسال التقييم</>
-                    )}
-                  </button>
-                </form>
-              </div>
-
-              {/* Reviews List */}
-              <div className="space-y-4 max-h-[500px] overflow-y-auto pl-2">
-                {reviews.length === 0 ? (
-                  <div className="glass rounded-2xl border border-border p-8 text-center text-foreground/50">
-                    <Star className="w-12 h-12 mx-auto mb-3 text-foreground/20" />
-                    <p>لا توجد تقييمات بعد</p>
-                  </div>
-                ) : (
-                  reviews.map((rev, idx) => (
-                    <div key={idx} className="glass rounded-xl border border-border p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-primary/20 text-primary-light flex items-center justify-center font-black text-sm">
-                            {rev.name.charAt(0)}
-                          </div>
-                          <div>
-                            <p className="font-bold text-sm">{rev.name}</p>
-                            <p className="text-foreground/40 text-xs">{rev.date}</p>
-                          </div>
-                        </div>
-                        <div className="flex">
-                          {[1,2,3,4,5].map(s => (
-                            <Star key={s} className="w-4 h-4" fill={s <= rev.rating ? "#c9a84c" : "none"} stroke="#c9a84c" />
-                          ))}
-                        </div>
-                      </div>
-                      <p className="text-foreground/70 text-sm leading-relaxed">{rev.comment}</p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-
         </div>
       </main>
+
+      {/* Lightbox Modal */}
+      <AnimatePresence>
+        {isLightboxOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4 md:p-12"
+            onClick={() => setIsLightboxOpen(false)}
+          >
+            <button 
+              className="absolute top-6 right-6 text-white/70 hover:text-white bg-black/50 p-2 rounded-full transition-colors z-50"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsLightboxOpen(false);
+              }}
+            >
+              <X className="w-8 h-8" />
+            </button>
+            <motion.div 
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="relative w-full max-w-5xl aspect-square md:aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Image
+                src={activeImage}
+                alt={product.name}
+                fill
+                className="object-contain"
+                quality={100}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <Footer />
     </>
   );

@@ -2,11 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, ShoppingBag, User, Menu, X, Heart, Moon, Sun } from "lucide-react";
+import { Search, ShoppingBag, User, Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "@/context/CartContext";
-import { useTheme } from "@/context/ThemeContext";
-import { useWishlist } from "@/context/WishlistContext";
 import { CartDrawer } from "@/components/layout/CartDrawer";
 import { getSupabaseSettings } from "@/lib/supabase";
 
@@ -17,8 +15,6 @@ export function Header() {
   const [announcementText, setAnnouncementText] = useState("توصيل لجميع أنحاء ليبيا 🎓");
 
   const { cartCount } = useCart();
-  const { theme, toggleTheme } = useTheme();
-  const { wishlistItems } = useWishlist();
 
   // Load dynamic settings from Supabase
   useEffect(() => {
@@ -82,21 +78,10 @@ export function Header() {
 
           {/* Actions */}
           <div className="flex items-center gap-4">
-            <button onClick={toggleTheme} className="p-2 text-foreground/80 hover:text-primary transition-colors rounded-full hover:bg-surface-hover">
-              {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
-            <Link href="/wishlist" className="relative p-2 text-foreground/80 hover:text-primary transition-colors rounded-full hover:bg-surface-hover">
-              <Heart className="w-5 h-5" />
-              {wishlistItems.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
-                  {wishlistItems.length}
-                </span>
-              )}
-            </Link>
-            <button className="p-2 text-foreground/80 hover:text-primary transition-colors rounded-full hover:bg-surface-hover hidden md:block">
+            <button className="p-2 text-foreground/80 hover:text-primary transition-colors rounded-full hover:bg-surface-hover">
               <Search className="w-5 h-5" />
             </button>
-            <Link href="/auth/login" className="p-2 text-foreground/80 hover:text-primary transition-colors rounded-full hover:bg-surface-hover hidden md:block">
+            <Link href="/auth/login" className="p-2 text-foreground/80 hover:text-primary transition-colors rounded-full hover:bg-surface-hover">
               <User className="w-5 h-5" />
             </Link>
             <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-foreground/80 hover:text-primary transition-colors rounded-full hover:bg-surface-hover">

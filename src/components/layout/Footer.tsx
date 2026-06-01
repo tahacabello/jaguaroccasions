@@ -9,14 +9,12 @@ export function Footer() {
   const [phone, setPhone] = useState("+218 92 123 4567");
   const [email, setEmail] = useState("info@jaguar.ly");
   const [location, setLocation] = useState("ليبيا - طرابلس، شارع النصر");
-  const [locationLink, setLocationLink] = useState("https://maps.app.goo.gl/9Zc4k2g18uH3q9pY6");
 
   useEffect(() => {
     getSupabaseSettings().then(settings => {
       if (settings.contact_phone) setPhone(settings.contact_phone);
       if (settings.contact_email) setEmail(settings.contact_email);
       if (settings.location) setLocation(settings.location);
-      if (settings.contact_location_link) setLocationLink(settings.contact_location_link);
     }).catch(err => console.error("Error fetching contact settings in Footer:", err));
   }, []);
 
@@ -82,13 +80,7 @@ export function Footer() {
             <ul className="space-y-4">
               <li className="flex items-start gap-3">
                 <MapPin className="w-5 h-5 text-primary shrink-0" />
-                {locationLink ? (
-                  <a href={locationLink} target="_blank" rel="noopener noreferrer" className="text-sm text-foreground/70 hover:text-primary transition-colors cursor-pointer">
-                    {location}
-                  </a>
-                ) : (
-                  <span className="text-sm text-foreground/70">{location}</span>
-                )}
+                <span className="text-sm text-foreground/70">{location}</span>
               </li>
               <li className="flex items-center gap-3">
                 <Phone className="w-5 h-5 text-primary shrink-0" />

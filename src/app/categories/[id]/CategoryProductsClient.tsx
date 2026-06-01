@@ -7,7 +7,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { ShoppingBag, Heart, Filter, ChevronRight } from "lucide-react";
 import { useCart } from "@/context/CartContext";
-import { useWishlist } from "@/context/WishlistContext";
 import { getSupabaseProducts } from "@/lib/supabase";
 
 // Mock categories map
@@ -20,7 +19,6 @@ const categoriesMap: Record<string, { name: string; desc: string }> = {
 
 export default function CategoryProductsClient({ params }: { params: { id: string } }) {
   const { addToCart } = useCart();
-  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const category = categoriesMap[params.id];
   const [products, setProducts] = useState<any[]>([]);
 
@@ -102,25 +100,8 @@ export default function CategoryProductsClient({ params }: { params: { id: strin
                         {product.status}
                       </span>
                     </div>
-                    <button 
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (isInWishlist(product.id)) {
-                          removeFromWishlist(product.id);
-                        } else {
-                          addToWishlist({
-                            id: product.id,
-                            name: product.name,
-                            price: product.priceSale,
-                            image: product.image
-                          });
-                        }
-                      }}
-                      className={`absolute top-4 left-4 p-2 rounded-full backdrop-blur-sm transition-colors opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 ${
-                        isInWishlist(product.id) ? "bg-red-500 text-white" : "bg-black/50 text-white hover:bg-primary"
-                      }`}
-                    >
-                      <Heart className="w-5 h-5" fill={isInWishlist(product.id) ? "currentColor" : "none"} />
+                    <button className="absolute top-4 left-4 p-2 rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-primary transition-colors opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0" onClick={(e) => e.preventDefault()}>
+                      <Heart className="w-5 h-5" />
                     </button>
                   </div>
 

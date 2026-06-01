@@ -6,19 +6,16 @@ import Link from "next/link";
 import Image from "next/image";
 import { ShoppingBag, Heart } from "lucide-react";
 import { useCart } from "@/context/CartContext";
-import { useWishlist } from "@/context/WishlistContext";
 import { getSupabaseProducts, mockProducts } from "@/lib/supabase";
 
 export function TrendingProducts() {
   const { addToCart } = useCart();
-  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
   const [products, setProducts] = useState<any[]>(mockProducts.slice(0, 4));
 
   useEffect(() => {
     getSupabaseProducts().then(dbProducts => {
-      // Sort by sales descending, show top 4 as trending
-      const sorted = [...dbProducts].sort((a, b) => (b.sales || 0) - (a.sales || 0));
-      setProducts(sorted.slice(0, 4));
+      // Show first 4 products on the homepage carousel
+      setProducts(dbProducts.slice(0, 4));
     }).catch(err => console.error("Error loading products in TrendingProducts:", err));
   }, []);
 
@@ -63,25 +60,8 @@ export function TrendingProducts() {
                   </span>
                 </div>
                 {/* Wishlist Button */}
-                <button 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (isInWishlist(product.id)) {
-                      removeFromWishlist(product.id);
-                    } else {
-                      addToWishlist({
-                        id: product.id,
-                        name: product.name,
-                        price: product.price,
-                        image: product.image
-                      });
-                    }
-                  }}
-                  className={`absolute top-4 left-4 p-2 rounded-full backdrop-blur-sm transition-colors opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 ${
-                    isInWishlist(product.id) ? "bg-red-500 text-white" : "bg-black/50 text-white hover:bg-primary"
-                  }`}
-                >
-                  <Heart className="w-5 h-5" fill={isInWishlist(product.id) ? "currentColor" : "none"} />
+                <button className="absolute top-4 left-4 p-2 rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-primary transition-colors opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0">
+                  <Heart className="w-5 h-5" />
                 </button>
               </div>
 
