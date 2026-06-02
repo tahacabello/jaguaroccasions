@@ -28,6 +28,8 @@ import {
   updateSupabaseOrderDetails,
   deleteSupabaseOrder,
   getSupabaseCustomerProfiles,
+  adminUpdateCustomerProfile,
+  adminDeleteCustomer,
   uploadProductImage,
   resolveAssetPath,
   swapCategoryOrderInDb,
@@ -49,6 +51,20 @@ import {
   swapHomepageSectionItemOrderInDb,
   seedDefaultHomepageSections
 } from "@/lib/supabase";
+
+const cityNames: Record<string, string> = {
+  tripoli: "طرابلس",
+  benghazi: "بنغازي",
+  misrata: "مصراتة",
+  khoms: "الخمس",
+  zawiya: "الزاوية",
+  sebha: "سبها",
+  garian: "غريان",
+  tobruk: "طبرق",
+  zleten: "زليتن",
+  msallata: "مسلاتة",
+  other: "مدينة أخرى",
+};
 
 const statusTranslations: Record<string, string> = {
   new: "طلب جديد",
@@ -222,6 +238,82 @@ export default function AdminDashboard() {
   const [fCardLinkedType, setFCardLinkedType] = useState<"category" | "subcategory">("category");
   const [fCardLinkedId, setFCardLinkedId] = useState("");
   const [fCardIsVisible, setFCardIsVisible] = useState(true);
+
+  // Customer Management States
+  const [selectedCust, setSelectedCust] = useState<any | null>(null);
+  const [isCustDetailsOpen, setIsCustDetailsOpen] = useState(false);
+  const [isCustEditOpen, setIsCustEditOpen] = useState(false);
+  const [isCustDeleteOpen, setIsCustDeleteOpen] = useState(false);
+  
+  const [custFirstName, setCustFirstName] = useState("");
+  const [custLastName, setCustLastName] = useState("");
+  const [custPhone, setCustPhone] = useState("");
+  const [custBackupPhone, setCustBackupPhone] = useState("");
+  const [custCity, setCustCity] = useState("tripoli");
+  const [custStreet, setCustStreet] = useState("");
+  const [custAdditionalAddress, setCustAdditionalAddress] = useState("");
+
+  const [isSavingCust, setIsSavingCust] = useState(false);
+  const [isDeletingCust, setIsDeletingCust] = useState(false);
+  const [custSaveSuccess, setCustSaveSuccess] = useState(false);
+
+  const handleOpenEditCustomer = (cust: any) => {
+    setSelectedCust(cust);
+    setCustFirstName(cust.first_name || "");
+    setCustLastName(cust.last_name || "");
+    setCustPhone(cust.phone_number || "");
+    setCustBackupPhone(cust.backup_phone || "");
+    const cityKey = Object.keys(cityNames).find(key => cityNames[key] === cust.city) || "tripoli";
+    setCustCity(cityKey);
+    setCustStreet(cust.street || "");
+    setCustAdditionalAddress(cust.additional_address || "");
+    setIsCustEditOpen(true);
+  };
+
+  const handleEditCustomerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCust) return;
+    setIsSavingCust(true);
+    setCustSaveSuccess(false);
+
+    const success = await adminUpdateCustomerProfile(selectedCust.id, {
+      first_name: custFirstName,
+      last_name: custLastName,
+      phone_number: custPhone,
+      backup_phone: custBackupPhone,
+      city: cityNames[custCity] || custCity,
+      street: custStreet,
+      additional_address: custAdditionalAddress
+    });
+
+    setIsSavingCust(false);
+    if (success) {
+      setCustSaveSuccess(true);
+      refreshAllData();
+      setTimeout(() => {
+        setCustSaveSuccess(false);
+        setIsCustEditOpen(false);
+      }, 1500);
+    } else {
+      alert("فشل تحديث بيانات العميل. يرجى المحاولة مرة أخرى.");
+    }
+  };
+
+  const handleDeleteCustomerSubmit = async () => {
+    if (!selectedCust) return;
+    setIsDeletingCust(true);
+    
+    const success = await adminDeleteCustomer(selectedCust.id);
+    
+    setIsDeletingCust(false);
+    setIsCustDeleteOpen(false);
+    if (success) {
+      alert("تم حذف حساب العميل من النظام بالكامل بنجاح!");
+      refreshAllData();
+    } else {
+      alert("فشل حذف الحساب. يرجى المحاولة مرة أخرى.");
+    }
+  };
 
   // Check auth session on mount
   useEffect(() => {
@@ -1160,7 +1252,12 @@ export default function AdminDashboard() {
                           orders.map((ord) => (
                             <tr key={ord.id} className="border-b border-border/30 hover:bg-surface/20 transition-all font-semibold text-sm">
                               <td className="p-4 font-black text-primary-light">{ord.tracking_number}</td>
-                              <td className="p-4">{ord.guest_name}</td>
+                              <td className="p-4 flex flex-col items-start gap-0.5 mt-2">
+                                <span>{ord.guest_name}</span>
+                                <span className={`text-[9px] font-black ${ord.customer_id ? "text-primary-light" : "text-foreground/40"}`}>
+                                  {ord.customer_id ? "زبون مسجل" : "حساب محذوف / زائر"}
+                                </span>
+                              </td>
                               <td className="p-4">{ord.guest_city}</td>
                               <td className="p-4 truncate max-w-[200px]">{ord.guest_street}</td>
                               <td className="p-4 text-primary-light font-black">{ord.total_amount} د.ل</td>
@@ -1649,25 +1746,57 @@ export default function AdminDashboard() {
                       <thead>
                         <tr className="bg-surface/50 border-b border-border/40 text-xs font-bold text-foreground/60">
                           <th className="p-4">اسم الزبون</th>
+                          <th className="p-4">البريد الإلكتروني</th>
                           <th className="p-4">رقم الهاتف</th>
                           <th className="p-4">الهاتف الاحتياطي</th>
                           <th className="p-4">المدينة</th>
-                          <th className="p-4">الشارع والحي الافتراضي</th>
+                          <th className="p-4">الشارع والحي</th>
                           <th className="p-4">دور العضوية</th>
+                          <th className="p-4">التحكم</th>
                         </tr>
                       </thead>
                       <tbody>
                         {customers.map((cust) => (
                           <tr key={cust.id} className="border-b border-border/30 hover:bg-surface/20 transition-all font-semibold text-sm">
                             <td className="p-4 font-black">{`${cust.first_name || ""} ${cust.last_name || ""}`.trim() || "زبون جديد"}</td>
+                            <td className="p-4 text-left font-medium text-foreground/70" dir="ltr">{cust.email || "-"}</td>
                             <td className="p-4 text-left" dir="ltr">{cust.phone_number || "-"}</td>
-                            <td className="p-4 text-left" dir="ltr">-</td>
+                            <td className="p-4 text-left" dir="ltr">{cust.backup_phone || "-"}</td>
                             <td className="p-4">{cust.city || "-"}</td>
-                            <td className="p-4">-</td>
+                            <td className="p-4 truncate max-w-[150px]">{cust.street || "-"}</td>
                             <td className="p-4">
                               <span className={`px-2 py-0.5 rounded text-[10px] font-black ${cust.is_admin ? "bg-primary text-black" : "bg-foreground/10 text-foreground/70"}`}>
                                 {cust.is_admin ? "مسؤول (أدمن)" : "زبون مشترك"}
                               </span>
+                            </td>
+                            <td className="p-4 flex items-center gap-1.5 flex-wrap">
+                              <button
+                                onClick={() => {
+                                  setSelectedCust(cust);
+                                  setIsCustDetailsOpen(true);
+                                }}
+                                className="px-2 py-1 bg-surface hover:bg-surface-hover text-foreground border border-border hover:border-primary/40 text-[10px] font-black rounded transition-all flex items-center gap-1"
+                              >
+                                <Eye className="w-3 h-3 text-primary" />
+                                عرض التفاصيل
+                              </button>
+                              <button
+                                onClick={() => handleOpenEditCustomer(cust)}
+                                className="px-2 py-1 bg-primary/10 hover:bg-primary/20 text-primary-light border border-primary/20 text-[10px] font-black rounded transition-all flex items-center gap-1"
+                              >
+                                <Edit3 className="w-3 h-3" />
+                                تعديل المستخدم
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSelectedCust(cust);
+                                  setIsCustDeleteOpen(true);
+                                }}
+                                className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-[10px] font-black rounded transition-all flex items-center gap-1"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                حذف الحساب
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -3472,8 +3601,282 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          
+          {/* Customer Details Modal */}
+          {isCustDetailsOpen && selectedCust && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+              <div className="bg-surface border border-border rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+                <div className="p-6 border-b border-border flex justify-between items-center bg-surface-hover">
+                  <h3 className="text-xl font-bold bg-gradient-to-r from-primary-light to-primary-dark bg-clip-text text-transparent">تفاصيل حساب العميل المشترك</h3>
+                  <button onClick={() => setIsCustDetailsOpen(false)} className="p-2 hover:bg-surface rounded-full transition-all text-foreground/50 hover:text-foreground">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto text-right">
+                  {/* Basic Details Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 bg-surface-hover border border-border/40 rounded-2xl">
+                      <p className="text-[10px] text-foreground/50 font-bold mb-1">الاسم الكامل:</p>
+                      <p className="font-bold text-sm">{`${selectedCust.first_name || ""} ${selectedCust.last_name || ""}`.trim() || "زبون جديد"}</p>
+                    </div>
+                    <div className="p-4 bg-surface-hover border border-border/40 rounded-2xl">
+                      <p className="text-[10px] text-foreground/50 font-bold mb-1">البريد الإلكتروني:</p>
+                      <p className="font-bold text-sm text-left" dir="ltr">{selectedCust.email || "-"}</p>
+                    </div>
+                    <div className="p-4 bg-surface-hover border border-border/40 rounded-2xl">
+                      <p className="text-[10px] text-foreground/50 font-bold mb-1">رقم الهاتف الأساسي:</p>
+                      <p className="font-bold text-sm text-left" dir="ltr">{selectedCust.phone_number || "-"}</p>
+                    </div>
+                    <div className="p-4 bg-surface-hover border border-border/40 rounded-2xl">
+                      <p className="text-[10px] text-foreground/50 font-bold mb-1">رقم الهاتف الاحتياطي:</p>
+                      <p className="font-bold text-sm text-left" dir="ltr">{selectedCust.backup_phone || "-"}</p>
+                    </div>
+                    <div className="p-4 bg-surface-hover border border-border/40 rounded-2xl">
+                      <p className="text-[10px] text-foreground/50 font-bold mb-1">المدينة:</p>
+                      <p className="font-bold text-sm">{selectedCust.city || "-"}</p>
+                    </div>
+                    <div className="p-4 bg-surface-hover border border-border/40 rounded-2xl">
+                      <p className="text-[10px] text-foreground/50 font-bold mb-1">الشارع والحي:</p>
+                      <p className="font-bold text-sm">{selectedCust.street || "-"}</p>
+                    </div>
+                    <div className="p-4 bg-surface-hover border border-border/40 rounded-2xl md:col-span-2">
+                      <p className="text-[10px] text-foreground/50 font-bold mb-1">تفاصيل إضافية للعنوان:</p>
+                      <p className="font-bold text-sm">{selectedCust.additional_address || "-"}</p>
+                    </div>
+                    <div className="p-3 bg-surface-hover/50 border border-border/30 rounded-xl">
+                      <p className="text-[9px] text-foreground/40 font-bold">معرف العميل (User ID):</p>
+                      <p className="text-[11px] font-mono text-foreground/70 text-left" dir="ltr">{selectedCust.id}</p>
+                    </div>
+                    <div className="p-3 bg-surface-hover/50 border border-border/30 rounded-xl">
+                      <p className="text-[9px] text-foreground/40 font-bold">تاريخ الانضمام:</p>
+                      <p className="text-xs font-bold text-foreground/70">{selectedCust.created_at ? new Date(selectedCust.created_at).toLocaleDateString("ar-LY", { year: "numeric", month: "long", day: "numeric" }) : "-"}</p>
+                    </div>
+                  </div>
 
+                  {/* Customer Orders History */}
+                  <div className="space-y-3 pt-4 border-t border-border">
+                    <div className="flex justify-between items-center">
+                      <span className="px-2.5 py-0.5 rounded bg-primary/10 text-primary-light font-black text-xs">
+                        {orders.filter(o => o.customer_id === selectedCust.id).length} طلبات
+                      </span>
+                      <h4 className="text-base font-bold text-foreground">سجل وطلبيات العميل السابقة</h4>
+                    </div>
+
+                    <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                      {orders.filter(o => o.customer_id === selectedCust.id).length === 0 ? (
+                        <p className="text-xs text-foreground/45 text-center py-6 font-bold bg-surface-hover rounded-xl border border-border/30">
+                          لم يقم هذا العميل بإتمام أي طلبات شراء بعد.
+                        </p>
+                      ) : (
+                        orders.filter(o => o.customer_id === selectedCust.id).map(ord => (
+                          <div key={ord.id} className="p-3 bg-surface-hover border border-border/40 rounded-xl flex justify-between items-center text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-black ${statusColors[ord.status] || "bg-foreground/5 text-foreground border-border"}`}>
+                                {statusTranslations[ord.status] || ord.status}
+                              </span>
+                              <span className="font-black text-primary-light">{ord.total_amount} د.ل</span>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-black text-foreground">{ord.tracking_number}</p>
+                              <p className="text-[10px] text-foreground/50 mt-0.5">
+                                {new Date(ord.created_at).toLocaleDateString("ar-LY")}
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-surface-hover border-t border-border flex justify-end">
+                  <button onClick={() => setIsCustDetailsOpen(false)} className="px-6 py-2 bg-surface hover:bg-surface-hover border border-border hover:border-foreground/20 rounded-xl text-xs font-black transition-all">
+                    إغلاق النافذة
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Customer Modal */}
+          {isCustEditOpen && selectedCust && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+              <div className="bg-surface border border-border rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+                <div className="p-6 border-b border-border flex justify-between items-center bg-surface-hover">
+                  <h3 className="text-xl font-bold bg-gradient-to-r from-primary-light to-primary-dark bg-clip-text text-transparent">تعديل بيانات حساب العميل</h3>
+                  <button onClick={() => setIsCustEditOpen(false)} className="p-2 hover:bg-surface rounded-full transition-all text-foreground/50 hover:text-foreground">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleEditCustomerSubmit} className="p-6 space-y-4 text-right">
+                  {custSaveSuccess && (
+                    <div className="p-4 text-xs font-bold text-green-400 bg-green-950/20 border border-green-500/20 rounded-xl">
+                      🎉 تم تحديث الملف الشخصي للزبون سحابياً بنجاح!
+                    </div>
+                  )}
+
+                  {/* Name (First / Last) */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="block text-xs font-bold text-foreground/80">الاسم الأول *</label>
+                      <input
+                        type="text"
+                        required
+                        value={custFirstName}
+                        onChange={(e) => setCustFirstName(e.target.value)}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 transition-colors font-semibold"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-xs font-bold text-foreground/80">الاسم الأخير *</label>
+                      <input
+                        type="text"
+                        required
+                        value={custLastName}
+                        onChange={(e) => setCustLastName(e.target.value)}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 transition-colors font-semibold"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Phone & Backup Phone */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="block text-xs font-bold text-foreground/80">الهاتف الأساسي *</label>
+                      <input
+                        type="tel"
+                        required
+                        value={custPhone}
+                        onChange={(e) => setCustPhone(e.target.value)}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 transition-colors font-semibold text-left"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-xs font-bold text-foreground/80">الهاتف الاحتياطي</label>
+                      <input
+                        type="tel"
+                        value={custBackupPhone}
+                        onChange={(e) => setCustBackupPhone(e.target.value)}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 transition-colors font-semibold text-left"
+                        dir="ltr"
+                      />
+                    </div>
+                  </div>
+
+                  {/* City & Street */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="block text-xs font-bold text-foreground/80">المدينة الافتراضية *</label>
+                      <select
+                        value={custCity}
+                        onChange={(e) => setCustCity(e.target.value)}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 transition-colors font-bold"
+                      >
+                        {Object.entries(cityNames).map(([key, name]) => (
+                          <option key={key} value={key}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-xs font-bold text-foreground/80">الشارع والحي *</label>
+                      <input
+                        type="text"
+                        required
+                        value={custStreet}
+                        onChange={(e) => setCustStreet(e.target.value)}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 transition-colors font-semibold"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Additional address */}
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-foreground/80">تفاصيل إضافية للعنوان</label>
+                    <input
+                      type="text"
+                      value={custAdditionalAddress}
+                      onChange={(e) => setCustAdditionalAddress(e.target.value)}
+                      className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 transition-colors font-semibold"
+                    />
+                  </div>
+
+                  <div className="flex gap-3 pt-4 border-t border-border justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsCustEditOpen(false)}
+                      className="px-6 py-3 bg-surface hover:bg-surface-hover border border-border hover:border-foreground/20 rounded-xl text-xs font-black transition-all"
+                    >
+                      إلغاء
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingCust}
+                      className="btn-premium px-8 py-3 text-xs font-black flex items-center gap-1.5"
+                    >
+                      {isSavingCust ? (
+                        <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        "حفظ البيانات"
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Delete Customer Account Modal */}
+          {isCustDeleteOpen && selectedCust && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+              <div className="bg-surface border border-border rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+                <div className="p-6 border-b border-border flex justify-between items-center bg-surface-hover">
+                  <h3 className="text-xl font-bold text-red-400">⚠️ تأكيد حذف حساب العميل</h3>
+                  <button onClick={() => setIsCustDeleteOpen(false)} className="p-2 hover:bg-surface rounded-full transition-all text-foreground/50 hover:text-foreground">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-6 space-y-4 text-right">
+                  <div className="p-4 bg-red-950/20 border border-red-500/20 rounded-2xl text-xs leading-relaxed text-red-400 font-bold">
+                    ⚠️ **تحذير شديد اللهجة:** 
+                    “هل أنت متأكد من حذف حساب هذا المستخدم بالكامل؟ لا يمكن التراجع عن هذه العملية. ستبقى الطلبات السابقة محفوظة لأغراض السجل.”
+                  </div>
+                  
+                  <div className="text-xs text-foreground/70 space-y-1">
+                    <p>**الاسم**: {`${selectedCust.first_name || ""} ${selectedCust.last_name || ""}`.trim()}</p>
+                    <p>**البريد الإلكتروني**: {selectedCust.email || "-"}</p>
+                    <p>**معرف المستخدم**: <span className="font-mono">{selectedCust.id}</span></p>
+                  </div>
+
+                  <div className="flex gap-3 pt-4 border-t border-border justify-end">
+                    <button
+                      type="button"
+                      disabled={isDeletingCust}
+                      onClick={() => setIsCustDeleteOpen(false)}
+                      className="px-6 py-3 bg-surface hover:bg-surface-hover border border-border hover:border-foreground/20 rounded-xl text-xs font-black transition-all"
+                    >
+                      إلغاء
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isDeletingCust}
+                      onClick={handleDeleteCustomerSubmit}
+                      className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5"
+                    >
+                      {isDeletingCust ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        "نعم، احذف الحساب بالكامل"
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
         </div>
       </main>
       <Footer />

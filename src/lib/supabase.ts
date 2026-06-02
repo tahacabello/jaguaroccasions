@@ -708,7 +708,7 @@ export async function getSupabaseUserProfile(userId: string): Promise<any> {
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, first_name, last_name, phone_number, backup_phone, city, street, additional_address, is_admin, created_at, updated_at')
       .eq('id', userId)
       .single();
     if (error) throw error;
@@ -732,13 +732,71 @@ export async function updateSupabaseUserProfile(userId: string, profile: any): P
         first_name: firstName,
         last_name: lastName,
         phone_number: profile.phone,
+        backup_phone: profile.backup_phone || "",
         city: profile.city,
+        street: profile.street || "",
+        additional_address: profile.additional_address || "",
         updated_at: new Date().toISOString()
       });
     if (error) throw error;
     return true;
   } catch (err) {
     console.error(`Failed to update profile for ${userId}:`, err);
+    return false;
+  }
+}
+
+export async function adminUpdateCustomerProfile(userId: string, profile: any): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .rpc('admin_update_customer_profile', {
+        p_user_id: userId,
+        p_first_name: profile.first_name,
+        p_last_name: profile.last_name,
+        p_phone_number: profile.phone_number,
+        p_backup_phone: profile.backup_phone || "",
+        p_city: profile.city,
+        p_street: profile.street || "",
+        p_additional_address: profile.additional_address || "",
+        p_passcode: '9922'
+      });
+    if (error) throw error;
+    return !!data;
+  } catch (err) {
+    console.error(`Failed to update customer profile ${userId} via RPC:`, err);
+    return false;
+  }
+}
+
+export async function adminDeleteCustomer(userId: string): Promise<boolean> {
+  try {
+    console.log(`Invoking Edge Function to delete customer: ${userId}`);
+    // Invoke the Edge Function first
+    const { data, error } = await supabase.functions.invoke('admin_delete_customer', {
+      body: { user_id: userId, passcode: '9922' }
+    });
+
+    if (!error && data?.success) {
+      console.log("✅ Edge Function deletion succeeded!");
+      return true;
+    }
+
+    console.warn("⚠️ Edge Function failed or not deployed, falling back to secure RPC...", error);
+  } catch (edgeErr) {
+    console.warn("⚠️ Edge Function invocation threw error, falling back to secure RPC...", edgeErr);
+  }
+
+  // Fallback to secure Definer RPC
+  try {
+    console.log(`Calling secure fallback RPC to delete customer: ${userId}`);
+    const { data, error } = await supabase.rpc('admin_delete_customer', {
+      p_user_id: userId,
+      p_passcode: '9922'
+    });
+    if (error) throw error;
+    return !!data;
+  } catch (rpcErr) {
+    console.error(`❌ Fallback RPC deletion failed:`, rpcErr);
     return false;
   }
 }

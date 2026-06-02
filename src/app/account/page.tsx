@@ -82,11 +82,11 @@ export default function AccountPage() {
         setProfile(prof);
         setName(`${prof.first_name || ""} ${prof.last_name || ""}`.trim() || "");
         setPhone(prof.phone_number || "");
-        setBackupPhone("");
+        setBackupPhone(prof.backup_phone || "");
         const cityKey = Object.keys(cityNames).find(key => cityNames[key] === prof.city) || "tripoli";
         setCity(cityKey);
-        setStreet("");
-        setAddressDetail("");
+        setStreet(prof.street || "");
+        setAddressDetail(prof.additional_address || "");
       }
 
       // Fetch Customer Orders
