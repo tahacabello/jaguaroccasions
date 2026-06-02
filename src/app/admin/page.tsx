@@ -1659,11 +1659,11 @@ export default function AdminDashboard() {
                       <tbody>
                         {customers.map((cust) => (
                           <tr key={cust.id} className="border-b border-border/30 hover:bg-surface/20 transition-all font-semibold text-sm">
-                            <td className="p-4 font-black">{cust.name}</td>
-                            <td className="p-4 text-left" dir="ltr">{cust.phone}</td>
-                            <td className="p-4 text-left" dir="ltr">{cust.backup_phone || "-"}</td>
-                            <td className="p-4">{cust.city}</td>
-                            <td className="p-4">{cust.street}</td>
+                            <td className="p-4 font-black">{`${cust.first_name || ""} ${cust.last_name || ""}`.trim() || "زبون جديد"}</td>
+                            <td className="p-4 text-left" dir="ltr">{cust.phone_number || "-"}</td>
+                            <td className="p-4 text-left" dir="ltr">-</td>
+                            <td className="p-4">{cust.city || "-"}</td>
+                            <td className="p-4">-</td>
                             <td className="p-4">
                               <span className={`px-2 py-0.5 rounded text-[10px] font-black ${cust.is_admin ? "bg-primary text-black" : "bg-foreground/10 text-foreground/70"}`}>
                                 {cust.is_admin ? "مسؤول (أدمن)" : "زبون مشترك"}

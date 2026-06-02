@@ -721,16 +721,18 @@ export async function getSupabaseUserProfile(userId: string): Promise<any> {
 
 export async function updateSupabaseUserProfile(userId: string, profile: any): Promise<boolean> {
   try {
+    const parts = (profile.name || "").trim().split(" ");
+    const firstName = parts[0] || "زبون";
+    const lastName = parts.slice(1).join(" ") || "جديد";
+
     const { error } = await supabase
       .from('profiles')
       .upsert({
         id: userId,
-        name: profile.name,
-        phone: profile.phone,
-        backup_phone: profile.backup_phone || "",
+        first_name: firstName,
+        last_name: lastName,
+        phone_number: profile.phone,
         city: profile.city,
-        street: profile.street,
-        additional_address: profile.additional_address || "",
         updated_at: new Date().toISOString()
       });
     if (error) throw error;

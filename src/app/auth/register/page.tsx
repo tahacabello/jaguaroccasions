@@ -59,8 +59,11 @@ function RegisterContent() {
         password,
         options: {
           data: {
+            first_name: firstName,
+            last_name: lastName,
             name: fullName,
             phone: phone,
+            phone_number: phone,
             backup_phone: backupPhone,
             city: cityNames[city] || city,
             street: street,
@@ -77,12 +80,10 @@ function RegisterContent() {
           .from("profiles")
           .upsert({
             id: data.user.id,
-            name: fullName,
-            phone: phone,
-            backup_phone: backupPhone || "",
+            first_name: firstName,
+            last_name: lastName,
+            phone_number: phone,
             city: cityNames[city] || city,
-            street: street,
-            additional_address: addressDetail,
             updated_at: new Date().toISOString()
           });
         

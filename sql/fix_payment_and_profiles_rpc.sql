@@ -92,18 +92,16 @@ BEGIN
 END;
 $$;
 
--- 3. إنشاء دالة سحابية آمنة (SECURITY DEFINER) لجلب قائمة العملاء للإدارة وتخطي RLS برمز المرور 9922
+-- 3. إنشاء دالة استعلام آمنة للإدارة لجلب العملاء بناءً على الأعمدة الفعلية الموجودة بالجدول
 CREATE OR REPLACE FUNCTION public.admin_get_customer_profiles(
     p_passcode text
 )
 RETURNS TABLE (
     id uuid,
-    name text,
-    phone text,
-    backup_phone text,
+    first_name text,
+    last_name text,
+    phone_number text,
     city text,
-    street text,
-    additional_address text,
     is_admin boolean,
     created_at timestamptz,
     updated_at timestamptz
@@ -121,12 +119,10 @@ BEGIN
     RETURN QUERY
     SELECT 
         p.id,
-        p.name,
-        p.phone,
-        p.backup_phone,
+        p.first_name,
+        p.last_name,
+        p.phone_number,
         p.city,
-        p.street,
-        p.additional_address,
         p.is_admin,
         p.created_at,
         p.updated_at
@@ -154,28 +150,24 @@ DROP POLICY IF EXISTS "Allow admins complete control over profiles" ON public.pr
 CREATE POLICY "Allow admins complete control over profiles" ON public.profiles
     FOR ALL USING (auth.uid() IS NOT NULL AND public.is_admin(auth.uid()));
 
--- 5. إعادة بناء وضمان عمل زناد إنشاء الحسابات التلقائي (Trigger) عند تسجيل مستخدم جديد
+-- 5. إعادة بناء وضمان عمل زناد إنشاء الحسابات التلقائي (Trigger) عند تسجيل مستخدم جديد ليتطابق مع أعمدة الجدول الفعلية
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.profiles (id, name, phone, backup_phone, city, street, additional_address, is_admin)
+  INSERT INTO public.profiles (id, first_name, last_name, phone_number, city, is_admin)
   VALUES (
     new.id,
-    coalesce(new.raw_user_meta_data ->> 'name', 'زبون جديد'),
-    coalesce(new.raw_user_meta_data ->> 'phone', ''),
-    coalesce(new.raw_user_meta_data ->> 'backup_phone', ''),
+    coalesce(new.raw_user_meta_data ->> 'first_name', split_part(new.raw_user_meta_data ->> 'name', ' ', 1)),
+    coalesce(new.raw_user_meta_data ->> 'last_name', substr(new.raw_user_meta_data ->> 'name', strpos(new.raw_user_meta_data ->> 'name', ' ') + 1)),
+    coalesce(new.raw_user_meta_data ->> 'phone_number', new.raw_user_meta_data ->> 'phone', ''),
     coalesce(new.raw_user_meta_data ->> 'city', 'طرابلس'),
-    coalesce(new.raw_user_meta_data ->> 'street', ''),
-    coalesce(new.raw_user_meta_data ->> 'additional_address', ''),
     coalesce((new.raw_user_meta_data ->> 'is_admin')::boolean, false)
   )
   ON CONFLICT (id) DO UPDATE
-  SET name = EXCLUDED.name,
-      phone = EXCLUDED.phone,
-      backup_phone = EXCLUDED.backup_phone,
-      city = EXCLUDED.city,
-      street = EXCLUDED.street,
-      additional_address = EXCLUDED.additional_address;
+  SET first_name = EXCLUDED.first_name,
+      last_name = EXCLUDED.last_name,
+      phone_number = EXCLUDED.phone_number,
+      city = EXCLUDED.city;
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

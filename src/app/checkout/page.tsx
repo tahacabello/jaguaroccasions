@@ -67,14 +67,14 @@ export default function CheckoutPage() {
           .single()
           .then(({ data: profile, error }) => {
             if (profile && !error) {
-              setName(profile.name || "");
-              setPhone(profile.phone || "");
-              setBackupPhone(profile.backup_phone || "");
+              setName(`${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "");
+              setPhone(profile.phone_number || "");
+              setBackupPhone("");
               // Find matching city key or set to tripoli
               const cityKey = Object.keys(cityNames).find(key => cityNames[key] === profile.city) || "tripoli";
               setCity(cityKey);
-              setStreet(profile.street || "");
-              setAddressDetail(profile.additional_address || "");
+              setStreet("");
+              setAddressDetail("");
             }
           });
       }

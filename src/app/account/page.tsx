@@ -80,13 +80,13 @@ export default function AccountPage() {
       const prof = await getSupabaseUserProfile(user.id);
       if (prof) {
         setProfile(prof);
-        setName(prof.name || "");
-        setPhone(prof.phone || "");
-        setBackupPhone(prof.backup_phone || "");
+        setName(`${prof.first_name || ""} ${prof.last_name || ""}`.trim() || "");
+        setPhone(prof.phone_number || "");
+        setBackupPhone("");
         const cityKey = Object.keys(cityNames).find(key => cityNames[key] === prof.city) || "tripoli";
         setCity(cityKey);
-        setStreet(prof.street || "");
-        setAddressDetail(prof.additional_address || "");
+        setStreet("");
+        setAddressDetail("");
       }
 
       // Fetch Customer Orders
@@ -186,7 +186,7 @@ ${itemsList}
               <h1 className="text-3xl md:text-5xl font-black bg-gradient-to-r from-primary-light to-primary-dark bg-clip-text text-transparent">
                 حسابك
               </h1>
-              <p className="text-foreground/60 text-sm mt-2">مرحباً بك، {profile?.name || "زبون جاغوار"}</p>
+              <p className="text-foreground/60 text-sm mt-2">مرحباً بك، {profile ? `${profile.first_name || ""} ${profile.last_name || ""}`.trim() : "زبون جاغوار"}</p>
             </div>
             
             <button
