@@ -1758,7 +1758,11 @@ ${orderSum}
                                 <div className="flex flex-col items-start gap-1">
                                   <span>{ord.tracking_number}</span>
                                   {changeRequests.some(r => r.order_id === ord.id && r.status === "pending") && (
-                                    <span className="px-1.5 py-0.5 text-[8px] bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded animate-pulse shrink-0 font-bold">
+                                    <span 
+                                      onClick={() => setActiveTab("change_requests")}
+                                      className="px-1.5 py-0.5 text-[8px] bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded animate-pulse shrink-0 font-bold cursor-pointer hover:bg-amber-500/35 hover:scale-105 transition-all"
+                                      title="اضغط هنا للانتقال لطلبات التعديل والموافقة عليها"
+                                    >
                                       ⚠️ طلب تعديل معلق
                                     </span>
                                   )}
