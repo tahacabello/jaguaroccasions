@@ -598,31 +598,7 @@ export async function getSupabaseOrders(): Promise<any[]> {
 
 export async function addSupabaseOrder(order: any, items: any[]): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
-    // 1. Create order
-    const { data: dbOrder, error: orderError } = await supabase
-      .from('orders')
-      .insert([{
-        customer_id: order.customer_id || null,
-        guest_name: order.guest_name,
-        guest_phone: order.guest_phone,
-        guest_backup_phone: order.guest_backup_phone || "",
-        guest_city: order.guest_city,
-        guest_street: order.guest_street,
-        guest_address_detail: order.guest_address_detail || "",
-        customer_notes: order.customer_notes || "",
-        status: order.status || 'new_order',
-        payment_method: order.payment_method || 'cash_on_delivery',
-        total_amount: Number(order.total_amount),
-        tracking_number: order.tracking_number
-      }])
-      .select()
-      .single();
-
-    if (orderError) throw orderError;
-
-    // 2. Insert order items
     const orderItemsPayload = items.map(item => ({
-      order_id: dbOrder.id,
       product_id: item.product_id || item.id || null,
       product_name: item.product_name || item.name,
       product_image: item.product_image || item.image || "",
@@ -631,70 +607,82 @@ export async function addSupabaseOrder(order: any, items: any[]): Promise<{ succ
       item_mode: item.item_mode || item.mode || 'sale'
     }));
 
-    const { error: itemsError } = await supabase
-      .from('order_items')
-      .insert(orderItemsPayload);
+    const { data, error } = await supabase
+      .rpc('create_order_with_items', {
+        p_guest_name: order.guest_name,
+        p_guest_phone: order.guest_phone,
+        p_guest_backup_phone: order.guest_backup_phone || "",
+        p_guest_city: order.guest_city,
+        p_guest_street: order.guest_street,
+        p_guest_address_detail: order.guest_address_detail || "",
+        p_customer_notes: order.customer_notes || "",
+        p_payment_method: order.payment_method || 'cash_on_delivery',
+        p_total_amount: Number(order.total_amount),
+        p_tracking_number: order.tracking_number,
+        p_items: orderItemsPayload
+      });
 
-    if (itemsError) throw itemsError;
+    if (error) throw error;
 
-    return { success: true, data: dbOrder };
+    return { success: true, data: { id: data } };
   } catch (err: any) {
-    console.error("Failed to create order in Supabase:", err);
+    console.error("Failed to create order via RPC in Supabase:", err);
     return { success: false, error: err?.message || String(err) };
   }
 }
 
 export async function updateSupabaseOrderStatus(orderId: string, status: string): Promise<boolean> {
   try {
-    const { error } = await supabase
-      .from('orders')
-      .update({ status })
-      .eq('id', orderId);
+    const { data, error } = await supabase
+      .rpc('admin_update_order_status', {
+        p_order_id: orderId,
+        p_status: status,
+        p_passcode: '9922'
+      });
     if (error) throw error;
-    return true;
+    return !!data;
   } catch (err) {
-    console.error(`Failed to update order status ${orderId}:`, err);
+    console.error(`Failed to update order status ${orderId} via RPC:`, err);
     return false;
   }
 }
 
 export async function updateSupabaseOrderDetails(orderId: string, updates: any): Promise<boolean> {
   try {
-    const dbUpdates: any = {};
-    if (updates.guest_name !== undefined) dbUpdates.guest_name = updates.guest_name;
-    if (updates.guest_phone !== undefined) dbUpdates.guest_phone = updates.guest_phone;
-    if (updates.guest_backup_phone !== undefined) dbUpdates.guest_backup_phone = updates.guest_backup_phone;
-    if (updates.guest_city !== undefined) dbUpdates.guest_city = updates.guest_city;
-    if (updates.guest_street !== undefined) dbUpdates.guest_street = updates.guest_street;
-    if (updates.guest_address_detail !== undefined) dbUpdates.guest_address_detail = updates.guest_address_detail;
-    if (updates.customer_notes !== undefined) dbUpdates.customer_notes = updates.customer_notes;
-    if (updates.status !== undefined) dbUpdates.status = updates.status;
-    if (updates.payment_method !== undefined) dbUpdates.payment_method = updates.payment_method;
-    if (updates.total_amount !== undefined) dbUpdates.total_amount = Number(updates.total_amount);
-
-    const { error } = await supabase
-      .from('orders')
-      .update(dbUpdates)
-      .eq('id', orderId);
+    const { data, error } = await supabase
+      .rpc('admin_update_order_details', {
+        p_order_id: orderId,
+        p_guest_name: updates.guest_name,
+        p_guest_phone: updates.guest_phone,
+        p_guest_backup_phone: updates.guest_backup_phone || "",
+        p_guest_city: updates.guest_city,
+        p_guest_street: updates.guest_street,
+        p_guest_address_detail: updates.guest_address_detail || "",
+        p_customer_notes: updates.customer_notes || "",
+        p_total_amount: Number(updates.total_amount),
+        p_status: updates.status,
+        p_passcode: '9922'
+      });
 
     if (error) throw error;
-    return true;
+    return !!data;
   } catch (err) {
-    console.error(`Failed to update order ${orderId}:`, err);
+    console.error(`Failed to update order ${orderId} details via RPC:`, err);
     return false;
   }
 }
 
 export async function deleteSupabaseOrder(orderId: string): Promise<boolean> {
   try {
-    const { error } = await supabase
-      .from('orders')
-      .delete()
-      .eq('id', orderId);
+    const { data, error } = await supabase
+      .rpc('admin_delete_order', {
+        p_order_id: orderId,
+        p_passcode: '9922'
+      });
     if (error) throw error;
-    return true;
+    return !!data;
   } catch (err) {
-    console.error(`Failed to delete order ${orderId}:`, err);
+    console.error(`Failed to delete order ${orderId} via RPC:`, err);
     return false;
   }
 }
@@ -705,13 +693,13 @@ export async function deleteSupabaseOrder(orderId: string): Promise<boolean> {
 export async function getSupabaseCustomerProfiles(): Promise<any[]> {
   try {
     const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .rpc('admin_get_customer_profiles', {
+        p_passcode: '9922'
+      });
     if (error) throw error;
     return data || [];
   } catch (err) {
-    console.error("Failed to get customer profiles:", err);
+    console.error("Failed to get customer profiles via RPC:", err);
     return [];
   }
 }

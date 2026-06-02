@@ -8,6 +8,7 @@ import { supabase, addSupabaseOrder } from "@/lib/supabase";
 import { ShoppingBag, CreditCard, ShieldCheck, Ticket, Check, MapPin, Phone, Info } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 const cityNames: Record<string, string> = {
   tripoli: "طرابلس",
@@ -99,6 +100,52 @@ export default function CheckoutPage() {
     return null;
   }
 
+  // Enforce mandatory login for checkout
+  const isLoggedIn = !!customerId;
+
+  if (!isLoggedIn && isLoaded) {
+    return (
+      <>
+        <Header />
+        <main className="min-h-[80vh] bg-background pt-24 pb-24 text-right flex items-center justify-center">
+          <div className="container mx-auto px-4 max-w-md">
+            <div className="glass p-8 rounded-3xl border border-border text-center space-y-6 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-transparent to-primary opacity-50"></div>
+              
+              <div className="w-16 h-16 bg-primary/10 rounded-full border border-primary/20 flex items-center justify-center mx-auto text-primary">
+                <ShieldCheck className="w-8 h-8" />
+              </div>
+              
+              <h1 className="text-2xl font-black bg-gradient-to-r from-primary-light to-primary-dark bg-clip-text text-transparent">
+                تسجيل الدخول مطلوب
+              </h1>
+              
+              <p className="text-sm text-foreground/75 leading-relaxed">
+                يرجى تسجيل الدخول أو إنشاء حساب جديد لإتمام الطلب وحجز كابات تخرجك ومتابعة حالتها.
+              </p>
+
+              <div className="flex flex-col gap-3 pt-2">
+                <Link
+                  href={`/auth/login?redirect=/checkout`}
+                  className="btn-premium w-full py-3 text-sm font-black flex items-center justify-center gap-1.5"
+                >
+                  تسجيل الدخول
+                </Link>
+                <Link
+                  href={`/auth/register?redirect=/checkout`}
+                  className="w-full py-3 rounded-xl border border-border hover:border-primary/50 bg-surface hover:bg-surface-hover text-foreground transition-all font-bold text-sm flex items-center justify-center gap-1.5"
+                >
+                  إنشاء حساب جديد
+                </Link>
+              </div>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
   // Handle coupon validation
   const handleApplyCoupon = (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,8 +186,8 @@ export default function CheckoutPage() {
         guest_street: street,
         guest_address_detail: addressDetail,
         customer_notes: notes,
-        status: "new_order",
-        payment_method: paymentMethod,
+        status: "new", // Standardised to 'new' instead of 'new_order'
+        payment_method: "cash_on_delivery", // Enforced CoD only
         total_amount: finalTotal,
         tracking_number: trackingNumber,
       };
@@ -306,44 +353,42 @@ export default function CheckoutPage() {
                   <h3 className="text-lg font-bold text-foreground">طريقة الدفع المختارة</h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
-                      paymentMethod === "cash_on_delivery" ? "border-primary bg-primary/5 text-primary-light font-bold" : "border-border bg-surface hover:bg-surface-hover"
-                    }`}>
+                    <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all border-primary bg-primary/5 text-primary-light font-bold`}>
                       <input
                         type="radio"
                         name="payment"
-                        checked={paymentMethod === "cash_on_delivery"}
-                        onChange={() => setPaymentMethod("cash_on_delivery")}
+                        checked={true}
+                        readOnly
                         className="accent-primary"
                       />
                       <span>الدفع عند الاستلام</span>
                     </label>
 
-                    <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
-                      paymentMethod === "sadad" ? "border-primary bg-primary/5 text-primary-light font-bold" : "border-border bg-surface hover:bg-surface-hover"
-                    }`}>
+                    <div className="flex items-center gap-3 p-4 rounded-xl border border-border bg-surface/30 opacity-50 cursor-not-allowed select-none">
                       <input
                         type="radio"
                         name="payment"
-                        checked={paymentMethod === "sadad"}
-                        onChange={() => setPaymentMethod("sadad")}
+                        disabled
                         className="accent-primary"
                       />
-                      <span>خدمة سداد (Sadad)</span>
-                    </label>
+                      <span className="flex flex-col text-right">
+                        <span>خدمة سداد (Sadad)</span>
+                        <span className="text-[10px] text-primary font-bold">قريباً (Coming Soon)</span>
+                      </span>
+                    </div>
 
-                    <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
-                      paymentMethod === "mobicash" ? "border-primary bg-primary/5 text-primary-light font-bold" : "border-border bg-surface hover:bg-surface-hover"
-                    }`}>
+                    <div className="flex items-center gap-3 p-4 rounded-xl border border-border bg-surface/30 opacity-50 cursor-not-allowed select-none">
                       <input
                         type="radio"
                         name="payment"
-                        checked={paymentMethod === "mobicash"}
-                        onChange={() => setPaymentMethod("mobicash")}
+                        disabled
                         className="accent-primary"
                       />
-                      <span>موبي كاش (MobiCash)</span>
-                    </label>
+                      <span className="flex flex-col text-right">
+                        <span>موبي كاش (MobiCash)</span>
+                        <span className="text-[10px] text-primary font-bold">قريباً (Coming Soon)</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
 

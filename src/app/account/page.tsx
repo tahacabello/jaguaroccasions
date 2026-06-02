@@ -10,7 +10,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 const statusTranslations: Record<string, string> = {
-  new_order: "طلب جديد",
+  new: "طلب جديد",
   waiting_confirmation: "بانتظار التأكيد",
   confirmed: "تم التأكيد",
   preparing: "قيد التجهيز",
@@ -21,7 +21,7 @@ const statusTranslations: Record<string, string> = {
 };
 
 const statusSteps = [
-  { key: "new_order", label: "طلب جديد" },
+  { key: "new", label: "طلب جديد" },
   { key: "waiting_confirmation", label: "بانتظار التأكيد" },
   { key: "confirmed", label: "تم التأكيد" },
   { key: "preparing", label: "قيد التجهيز" },

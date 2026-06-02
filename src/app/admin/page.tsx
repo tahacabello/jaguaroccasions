@@ -24,6 +24,7 @@ import {
   updateSupabaseSubcategory,
   deleteSupabaseSubcategory,
   getSupabaseOrders,
+  updateSupabaseOrderStatus,
   updateSupabaseOrderDetails,
   deleteSupabaseOrder,
   getSupabaseCustomerProfiles,
@@ -50,7 +51,7 @@ import {
 } from "@/lib/supabase";
 
 const statusTranslations: Record<string, string> = {
-  new_order: "طلب جديد",
+  new: "طلب جديد",
   waiting_confirmation: "بانتظار التأكيد",
   confirmed: "تم التأكيد",
   preparing: "قيد التجهيز",
@@ -61,7 +62,7 @@ const statusTranslations: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
-  new_order: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  new: "bg-blue-500/10 text-blue-400 border-blue-500/20",
   waiting_confirmation: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
   confirmed: "bg-purple-500/10 text-purple-400 border-purple-500/20",
   preparing: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
@@ -415,8 +416,8 @@ export default function AdminDashboard() {
     setAuthLoading(true);
 
     try {
-      // Reverted to simple passcode '9999' check as requested by the user
-      if (password === "9999") {
+      // Reverted to simple passcode '9922' check as requested by the user
+      if (password === "9922") {
         sessionStorage.setItem("jaguar_admin_auth", "true");
         setIsAuthenticated(true);
       } else {
@@ -1168,17 +1169,86 @@ export default function AdminDashboard() {
                                   {statusTranslations[ord.status] || ord.status}
                                 </span>
                               </td>
-                              <td className="p-4 flex gap-2">
+                              <td className="p-4 flex flex-wrap gap-1.5 items-center">
+                                {/* Confirm Button */}
+                                {(ord.status === "new" || ord.status === "waiting_confirmation" || ord.status === "new_order") && (
+                                  <button
+                                    onClick={async () => {
+                                      const success = await updateSupabaseOrderStatus(ord.id, "confirmed");
+                                      if (success) refreshAllData();
+                                    }}
+                                    className="px-2 py-1 bg-green-500 hover:bg-green-600 text-black text-[10px] font-black rounded transition-colors"
+                                  >
+                                    تأكيد الطلب
+                                  </button>
+                                )}
+
+                                {/* Preparing Button */}
+                                {ord.status === "confirmed" && (
+                                  <button
+                                    onClick={async () => {
+                                      const success = await updateSupabaseOrderStatus(ord.id, "preparing");
+                                      if (success) refreshAllData();
+                                    }}
+                                    className="px-2 py-1 bg-purple-500 hover:bg-purple-600 text-white text-[10px] font-black rounded transition-colors"
+                                  >
+                                    قيد التجهيز
+                                  </button>
+                                )}
+
+                                {/* Ready Button */}
+                                {ord.status === "preparing" && (
+                                  <button
+                                    onClick={async () => {
+                                      const success = await updateSupabaseOrderStatus(ord.id, "ready");
+                                      if (success) refreshAllData();
+                                    }}
+                                    className="px-2 py-1 bg-teal-500 hover:bg-teal-600 text-black text-[10px] font-black rounded transition-colors"
+                                  >
+                                    جاهز للتسليم
+                                  </button>
+                                )}
+
+                                {/* Completed Button */}
+                                {(ord.status === "ready" || ord.status === "reserved") && (
+                                  <button
+                                    onClick={async () => {
+                                      const success = await updateSupabaseOrderStatus(ord.id, "completed");
+                                      if (success) refreshAllData();
+                                    }}
+                                    className="px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-black text-[10px] font-black rounded transition-colors"
+                                  >
+                                    مكتمل
+                                  </button>
+                                )}
+
+                                {/* Cancel Button */}
+                                {ord.status !== "completed" && ord.status !== "cancelled" && (
+                                  <button
+                                    onClick={async () => {
+                                      if (confirm("هل تود إلغاء هذا الطلب؟")) {
+                                        const success = await updateSupabaseOrderStatus(ord.id, "cancelled");
+                                        if (success) refreshAllData();
+                                      }
+                                    }}
+                                    className="px-2 py-1 bg-red-500/15 hover:bg-red-500/30 text-red-400 text-[10px] font-black rounded transition-colors border border-red-500/20"
+                                  >
+                                    إلغاء الطلب
+                                  </button>
+                                )}
+
+                                <div className="w-px h-4 bg-border/40 mx-1"></div>
+
                                 <button
                                   onClick={() => setEditingOrder(ord)}
-                                  className="p-2 bg-primary/10 hover:bg-primary/20 text-primary-light rounded-lg transition-colors"
+                                  className="p-1.5 bg-primary/10 hover:bg-primary/20 text-primary-light rounded-lg transition-colors"
                                   title="تعديل تفاصيل الطلب بالكامل"
                                 >
                                   <Edit3 className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => handleDeleteOrder(ord.id)}
-                                  className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
+                                  className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
                                   title="حذف الطلب بشكل نهائي"
                                 >
                                   <Trash2 className="w-4 h-4" />

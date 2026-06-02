@@ -56,11 +56,16 @@ function LoginContent() {
         .eq("id", user.id)
         .single();
 
+      const redirectPath = searchParams.get("redirect");
       if (profile && !profileError && profile.is_admin) {
         // Save flag in sessionStorage as additional sync
         sessionStorage.setItem("jaguar_admin_auth", "true");
         setTimeout(() => {
           router.push("/admin");
+        }, 1500);
+      } else if (redirectPath) {
+        setTimeout(() => {
+          router.push(redirectPath);
         }, 1500);
       } else {
         setTimeout(() => {
@@ -146,19 +151,8 @@ function LoginContent() {
 
         <div className="mt-8 flex flex-col items-center gap-4">
           <p className="text-sm text-foreground/60">
-            ليس لديك حساب؟ <Link href="/auth/register" className="text-primary font-bold hover:underline">إنشاء حساب جديد</Link>
+            ليس لديك حساب؟ <Link href={`/auth/register${searchParams.get("redirect") ? `?redirect=${encodeURIComponent(searchParams.get("redirect") || "")}` : ""}`} className="text-primary font-bold hover:underline">إنشاء حساب جديد</Link>
           </p>
-
-          <div className="w-full flex items-center gap-4">
-            <div className="flex-1 h-px bg-border"></div>
-            <span className="text-xs text-foreground/40 font-bold uppercase">أو</span>
-            <div className="flex-1 h-px bg-border"></div>
-          </div>
-
-          <Link href="/checkout" className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl border border-border hover:border-primary/50 bg-surface hover:bg-surface-hover text-foreground/80 transition-all font-bold text-sm group">
-            الاستمرار كضيف (بدون حساب)
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-          </Link>
         </div>
       </div>
     </div>
