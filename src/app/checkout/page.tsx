@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { useCart } from "@/context/CartContext";
-import { supabase, addSupabaseOrder } from "@/lib/supabase";
+import { supabase, addSupabaseOrder, getSupabaseSettings } from "@/lib/supabase";
 import { ShoppingBag, CreditCard, ShieldCheck, Ticket, Check, MapPin, Phone, Info } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -49,6 +49,7 @@ export default function CheckoutPage() {
 
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [settings, setSettings] = useState<Record<string, string>>({});
 
   // Calculations (completely removed shipping fees)
   const discountAmount = Math.round(cartTotal * (discountPercent / 100));
@@ -79,6 +80,11 @@ export default function CheckoutPage() {
           });
       }
     });
+  }, []);
+
+  // Fetch dynamic settings
+  useEffect(() => {
+    getSupabaseSettings().then(setSettings).catch(err => console.error("Error getting settings in Checkout:", err));
   }, []);
 
   // Protect page: redirect to products if cart is empty (unless submitting)
@@ -391,6 +397,18 @@ export default function CheckoutPage() {
                     </div>
                   </div>
                 </div>
+
+                {cartItems.some(item => item.mode === "rent") && settings.rental_policy && (
+                  <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 text-right space-y-2">
+                    <div className="flex items-center gap-2 text-primary font-bold text-sm">
+                      <Info className="w-4 h-4 text-primary" />
+                      <span>شروط وسياسة الإيجار المعتمدة:</span>
+                    </div>
+                    <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-line">
+                      {settings.rental_policy}
+                    </p>
+                  </div>
+                )}
 
                 {/* Submit button */}
                 <div className="pt-6">

@@ -7,7 +7,7 @@ import Image from "next/image";
 import { ShoppingCart, Heart, ShieldCheck, Truck, ChevronRight, Plus, Minus, Check, X } from "lucide-react";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
-import { getSupabaseProducts, resolveAssetPath } from "@/lib/supabase";
+import { getSupabaseProducts, resolveAssetPath, getSupabaseSettings } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Mock products database for details fetching
@@ -106,7 +106,12 @@ export default function ProductDetailClient({ params }: { params: { id: string }
   const [mode, setMode] = useState<"rent" | "sale">("sale");
   const [quantity, setQuantity] = useState(1);
   const [isAdded, setIsAdded] = useState(false);
+  const [settings, setSettings] = useState<Record<string, string>>({});
   const { addToCart } = useCart();
+
+  useEffect(() => {
+    getSupabaseSettings().then(setSettings).catch(err => console.error("Error fetching settings in PD:", err));
+  }, []);
 
   // Gallery state
   const productImages = (product.images && product.images.length > 0 ? product.images : [product.image])
@@ -284,6 +289,18 @@ export default function ProductDetailClient({ params }: { params: { id: string }
                     <div className="text-xs opacity-80 mt-1">{product.priceRent} د.ل</div>
                   </button>
                 </div>
+
+                {mode === "rent" && settings.rental_policy && (
+                  <div className="mt-4 p-4 bg-primary/5 border border-primary/20 rounded-xl space-y-2 text-right">
+                    <div className="flex items-center gap-2 text-primary font-bold text-sm">
+                      <ShieldCheck className="w-4 h-4 text-primary" />
+                      <span>شروط وسياسة الإيجار المعتمدة:</span>
+                    </div>
+                    <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-line">
+                      {settings.rental_policy}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Quantity Selector */}

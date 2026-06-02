@@ -1907,31 +1907,97 @@ export default function AdminDashboard() {
                       />
                     </div>
 
+                    <div className="col-span-1 md:col-span-2 border-t border-border/40 pt-6 mt-6">
+                      <h3 className="text-sm font-black text-primary-light mb-4">بيانات التواصل وعناوين المتجر (Store Contact & Social Links)</h3>
+                    </div>
+
                     <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">رقم الواتساب لاستقبال الفواتير</label>
+                      <label className="block text-xs font-bold text-foreground/80">عنوان المتجر النصي (Address)</label>
                       <input
                         type="text"
-                        value={settings.whatsapp_number || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, whatsapp_number: e.target.value }))}
-                        placeholder="+218XXXXXXXXX"
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left font-semibold"
+                        value={settings.location || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, location: e.target.value }))}
+                        placeholder="مثال: طرابلس، ليبيا"
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">رابط خريطة جوجل (Google Maps Link)</label>
+                      <input
+                        type="text"
+                        value={settings.google_maps_link || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, google_maps_link: e.target.value }))}
+                        placeholder="https://maps.google.com/..."
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
                         dir="ltr"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">رقم هاتف الاتصال</label>
+                      <label className="block text-xs font-bold text-foreground/80">رقم الهاتف للاتصال</label>
                       <input
                         type="text"
                         value={settings.contact_phone || ""}
                         onChange={(e) => setSettings(prev => ({ ...prev, contact_phone: e.target.value }))}
+                        placeholder="091XXXXXXX"
                         className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left font-semibold"
                         dir="ltr"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">رابط انستغرام</label>
+                      <label className="block text-xs font-bold text-foreground/80">البريد الإلكتروني (Email)</label>
+                      <input
+                        type="email"
+                        value={settings.contact_email || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, contact_email: e.target.value }))}
+                        placeholder="info@yourstore.com"
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
+                        dir="ltr"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">رقم الواتساب (WhatsApp Number)</label>
+                      <input
+                        type="text"
+                        value={settings.whatsapp_number || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, whatsapp_number: e.target.value }))}
+                        placeholder="+218921234567"
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left font-semibold"
+                        dir="ltr"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">رابط محادثة الواتساب المباشر (WhatsApp Link)</label>
+                      <input
+                        type="text"
+                        value={settings.whatsapp_link || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, whatsapp_link: e.target.value }))}
+                        placeholder="https://wa.me/..."
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
+                        dir="ltr"
+                      />
+                    </div>
+
+                    <div className="col-span-1 md:col-span-2 space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">ساعات ومواعيد التواصل والعمل (Working Hours)</label>
+                      <input
+                        type="text"
+                        value={settings.working_hours || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, working_hours: e.target.value }))}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                      />
+                    </div>
+
+                    <div className="col-span-1 md:col-span-2 border-t border-border/40 pt-4 mt-4">
+                      <h4 className="text-xs font-black text-primary-light/80 mb-2">روابط منصات التواصل الاجتماعي (Social Links)</h4>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">رابط انستقرام (Instagram Link)</label>
                       <input
                         type="text"
                         value={settings.instagram_link || ""}
@@ -1942,11 +2008,44 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">رابط تيك توك</label>
+                      <label className="block text-xs font-bold text-foreground/80">رابط تيك توك (TikTok Link)</label>
                       <input
                         type="text"
                         value={settings.tiktok_link || ""}
                         onChange={(e) => setSettings(prev => ({ ...prev, tiktok_link: e.target.value }))}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
+                        dir="ltr"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">رابط فيسبوك (Facebook Link)</label>
+                      <input
+                        type="text"
+                        value={settings.facebook_link || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, facebook_link: e.target.value }))}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
+                        dir="ltr"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">رابط تويتر / X (Twitter Link)</label>
+                      <input
+                        type="text"
+                        value={settings.twitter_link || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, twitter_link: e.target.value }))}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
+                        dir="ltr"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/80">رابط سناب شات (Snapchat Link)</label>
+                      <input
+                        type="text"
+                        value={settings.snapchat_link || ""}
+                        onChange={(e) => setSettings(prev => ({ ...prev, snapchat_link: e.target.value }))}
                         className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
                         dir="ltr"
                       />
@@ -2043,13 +2142,18 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
+                  <div className="border-t border-border/40 pt-6 mt-6">
+                    <h3 className="text-sm font-black text-primary-light mb-4">إعدادات سياسة الإيجار (Rental Policy Settings)</h3>
+                  </div>
+
                   <div className="space-y-2">
-                    <label className="block text-xs font-bold text-foreground/80">مقر وعنوان المتجر الرئيسي</label>
-                    <input
-                      type="text"
-                      value={settings.location || ""}
-                      onChange={(e) => setSettings(prev => ({ ...prev, location: e.target.value }))}
-                      className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                    <label className="block text-xs font-bold text-foreground/80">نص سياسة الإيجار بالتفصيل</label>
+                    <textarea
+                      value={settings.rental_policy || ""}
+                      onChange={(e) => setSettings(prev => ({ ...prev, rental_policy: e.target.value }))}
+                      rows={8}
+                      placeholder="اكتب سياسة الإيجار والشروط هنا..."
+                      className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary leading-relaxed"
                     />
                   </div>
 

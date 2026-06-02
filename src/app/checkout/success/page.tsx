@@ -225,6 +225,18 @@ ${itemsList}
               </div>
             </div>
 
+            {currentOrder.items?.some(item => item.mode === "rent") && settings.rental_policy && (
+              <div className="glass p-6 rounded-3xl border border-primary/20 bg-primary/5 space-y-3">
+                <div className="flex items-center gap-2 text-primary font-bold text-sm">
+                  <AlertTriangle className="w-5 h-5 text-primary" />
+                  <span>تذكير هام بخصوص سياسة الاستئجار:</span>
+                </div>
+                <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-line">
+                  {settings.rental_policy}
+                </p>
+              </div>
+            )}
+
             {/* Items List */}
             <div className="glass p-6 rounded-3xl border border-border space-y-4">
               <h3 className="text-lg font-bold border-b border-border pb-3">محتويات الطلبية</h3>
