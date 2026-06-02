@@ -457,13 +457,13 @@ ${itemsList}
                 onClick={() => handleOpenRequestModal(ord)}
                 className="px-3 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary-light border border-primary/20 text-xs font-bold rounded-lg transition-all cursor-pointer"
               >
-                تعديل طلب التعديل
+                تعديل طلب التغيير
               </button>
               <button
                 onClick={() => handleCancelRequest(latest.id)}
                 className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold rounded-lg transition-all cursor-pointer"
               >
-                إلغاء طلب التعديل
+                إلغاء طلب التغيير
               </button>
             </div>
           </div>
