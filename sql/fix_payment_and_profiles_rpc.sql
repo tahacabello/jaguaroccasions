@@ -93,6 +93,9 @@ END;
 $$;
 
 -- 3. إنشاء دالة استعلام آمنة للإدارة لجلب العملاء بناءً على الأعمدة الفعلية الموجودة بالجدول
+-- 3. إسقاط الدالة السابقة أولاً لتجنب خطأ تعارض توقيع الإرجاع في PostgreSQL
+DROP FUNCTION IF EXISTS public.admin_get_customer_profiles(text);
+
 CREATE OR REPLACE FUNCTION public.admin_get_customer_profiles(
     p_passcode text
 )
