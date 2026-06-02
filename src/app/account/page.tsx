@@ -44,6 +44,26 @@ const cityNames: Record<string, string> = {
   other: "مدينة أخرى",
 };
 
+// Helper to format Date cleanly in Arabic (e.g. السبت 2 نوفمبر 2025)
+const formatArabicDate = (dateStr: string | null | undefined) => {
+  if (!dateStr) return "غير محدد";
+  const dateObj = new Date(dateStr);
+  if (isNaN(dateObj.getTime())) return dateStr;
+  
+  const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+  const months = [
+    "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+    "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
+  ];
+  
+  const dayName = days[dateObj.getDay()];
+  const dayNum = dateObj.getDate();
+  const monthName = months[dateObj.getMonth()];
+  const year = dateObj.getFullYear();
+  
+  return `${dayName} ${dayNum} ${monthName} ${year}`;
+};
+
 export default function AccountPage() {
   const router = useRouter();
   
@@ -389,9 +409,9 @@ ${itemsList}
                                       <p className="text-amber-400">⚠️ حجز مبدئي — لم يتم تحديد موعد المناسبة بعد</p>
                                     ) : (
                                       <div className="space-y-0.5 text-foreground/90">
-                                        <p>🎓 المناسبة: <span className="text-primary-light font-bold">{ord.event_date || "غير محدد"}</span></p>
-                                        <p>🚚 الاستلام: {ord.pickup_date || "غير محدد"}</p>
-                                        <p>🔄 الإرجاع: {ord.return_date || "غير محدد"}</p>
+                                        <p>🎓 المناسبة: <span className="text-primary-light font-bold">{formatArabicDate(ord.event_date)}</span></p>
+                                        <p>🚚 الاستلام: {formatArabicDate(ord.pickup_date)}</p>
+                                        <p>🔄 الإرجاع: {formatArabicDate(ord.return_date)}</p>
                                       </div>
                                     )
                                   ) : (

@@ -24,40 +24,24 @@ const cityNames: Record<string, string> = {
   other: "مدينة أخرى",
 };
 
-// Helper for rental dates suggestions based on event date and Friday rule
-const suggestDates = (eventDateStr: string) => {
-  if (!eventDateStr) return { pickup: "", returns: [] };
-  const eventDateObj = new Date(eventDateStr);
-  if (isNaN(eventDateObj.getTime())) return { pickup: "", returns: [] };
-
-  // Calculate suggested pickup: 1 day before, but if that falls on Friday, make it Thursday
-  let pickup = new Date(eventDateObj);
-  pickup.setDate(eventDateObj.getDate() - 1);
-  if (pickup.getDay() === 5) { // Friday
-    pickup.setDate(pickup.getDate() - 1); // Move to Thursday
-  }
-
-  // Calculate return options: Option 1 is event day, Option 2 is day after event
-  let returnA = new Date(eventDateObj);
-  if (returnA.getDay() === 5) {
-    returnA.setDate(returnA.getDate() + 1); // Saturday
-  }
-
-  let returnB = new Date(eventDateObj);
-  returnB.setDate(eventDateObj.getDate() + 1);
-  if (returnB.getDay() === 5) {
-    returnB.setDate(returnB.getDate() + 2); // Sunday
-  }
-
-  const returns = [
-    { label: "يوم المناسبة / التخرج", date: returnA.toISOString().split('T')[0] },
-    { label: "اليوم التالي للمناسبة", date: returnB.toISOString().split('T')[0] }
+// Helper to format Date cleanly in Arabic (e.g. السبت 2 نوفمبر 2025)
+const formatArabicDate = (dateStr: string) => {
+  if (!dateStr) return "غير محدد";
+  const dateObj = new Date(dateStr);
+  if (isNaN(dateObj.getTime())) return dateStr;
+  
+  const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+  const months = [
+    "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+    "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
   ];
-
-  return {
-    pickup: pickup.toISOString().split('T')[0],
-    returns
-  };
+  
+  const dayName = days[dateObj.getDay()];
+  const dayNum = dateObj.getDate();
+  const monthName = months[dateObj.getMonth()];
+  const year = dateObj.getFullYear();
+  
+  return `${dayName} ${dayNum} ${monthName} ${year}`;
 };
 
 export default function CheckoutPage() {
@@ -77,6 +61,7 @@ export default function CheckoutPage() {
   // Rental dates & preliminary reservation state
   const [isPreliminary, setIsPreliminary] = useState(false);
   const [eventDate, setEventDate] = useState("");
+  const [returnOption, setReturnOption] = useState<"same_day" | "next_day">("next_day");
   const [pickupDate, setPickupDate] = useState("");
   const [returnDate, setReturnDate] = useState("");
   
@@ -136,6 +121,41 @@ export default function CheckoutPage() {
       router.push("/products");
     }
   }, [isLoaded, cartItems, router, isSubmitting]);
+
+  // Auto-calculate pickup date and return date based on selected eventDate and returnOption
+  useEffect(() => {
+    if (!eventDate) {
+      setPickupDate("");
+      setReturnDate("");
+      return;
+    }
+
+    const evDate = new Date(eventDate);
+    if (isNaN(evDate.getTime())) return;
+
+    // 1. Calculate Pickup: 1 day before event
+    let pickDate = new Date(evDate);
+    pickDate.setDate(evDate.getDate() - 1);
+    if (pickDate.getDay() === 5) { // Friday is 5
+      pickDate.setDate(pickDate.getDate() - 1); // Move to Thursday
+    }
+
+    // 2. Calculate Return
+    let retDate = new Date(evDate);
+    if (returnOption === "next_day") {
+      retDate.setDate(evDate.getDate() + 1);
+    }
+    if (retDate.getDay() === 5) { // Friday is 5
+      retDate.setDate(retDate.getDate() + 1); // Move to Saturday (the next non-Friday day)
+    }
+
+    const getYYYYMMDD = (d: Date) => {
+      return d.toISOString().split('T')[0];
+    };
+
+    setPickupDate(getYYYYMMDD(pickDate));
+    setReturnDate(getYYYYMMDD(retDate));
+  }, [eventDate, returnOption]);
 
   if (!isLoaded) {
     return (
@@ -456,7 +476,7 @@ export default function CheckoutPage() {
                 </div>
 
                 {cartItems.some(item => item.mode === "rent") && (
-                  <div className="space-y-6 p-6 rounded-2xl bg-primary/5 border border-primary/20 text-right">
+                  <div className="space-y-6 p-6 rounded-2xl bg-primary/5 border border-primary/20 text-right" dir="rtl">
                     <h3 className="text-lg font-bold text-primary-light border-b border-primary/10 pb-2 flex items-center gap-2">
                       <span>🗓️</span>
                       <span>تفاصيل وجدولة الإيجار</span>
@@ -486,69 +506,77 @@ export default function CheckoutPage() {
                         ⚠️ **ملاحظة:** سيتم تسجيل هذا الطلب كـ "حجز مبدئي". يجب عليك تأكيد الموعد النهائي للمناسبة لاحقاً عبر الواتساب مع إدارة المعرض.
                       </div>
                     ) : (
-                      <div className="space-y-4">
+                      <div className="space-y-6">
+                        {/* 1. Select Event Date */}
                         <div className="space-y-2">
                           <label className="block text-sm font-bold text-foreground/80">تاريخ المناسبة / التخرج *</label>
                           <input
                             type="date"
                             required={!isPreliminary}
                             value={eventDate}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setEventDate(val);
-                              const suggs = suggestDates(val);
-                              setPickupDate(suggs.pickup);
-                              if (suggs.returns.length > 0) {
-                                setReturnDate(suggs.returns[1].date); // Default to day after event
-                              }
-                            }}
-                            className="w-full px-4 py-3 rounded-xl border border-border bg-surface hover:border-primary-light/35 focus:border-primary focus:outline-none transition-colors font-semibold text-center"
+                            onChange={(e) => setEventDate(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-border bg-surface hover:border-primary-light/35 focus:border-primary focus:outline-none transition-colors font-semibold"
                           />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <label className="block text-sm font-bold text-foreground/80">تاريخ الاستلام *</label>
-                            <input
-                              type="date"
-                              required={!isPreliminary}
-                              value={pickupDate}
-                              onChange={(e) => setPickupDate(e.target.value)}
-                              className="w-full px-4 py-3 rounded-xl border border-border bg-surface hover:border-primary-light/35 focus:border-primary focus:outline-none transition-colors font-semibold text-center"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <label className="block text-sm font-bold text-foreground/80">تاريخ الإرجاع *</label>
-                            <input
-                              type="date"
-                              required={!isPreliminary}
-                              value={returnDate}
-                              onChange={(e) => setReturnDate(e.target.value)}
-                              className="w-full px-4 py-3 rounded-xl border border-border bg-surface hover:border-primary-light/35 focus:border-primary focus:outline-none transition-colors font-semibold text-center"
-                            />
-                          </div>
-                        </div>
-
+                        {/* 2. Choose Return Option */}
                         {eventDate && (
-                          <div className="space-y-2">
-                            <label className="block text-xs font-bold text-foreground/60">خيارات تاريخ الإرجاع المقترحة (الرجاء الاختيار):</label>
-                            <div className="flex flex-wrap gap-2">
-                              {suggestDates(eventDate).returns.map((opt) => (
-                                <button
-                                  key={opt.date}
-                                  type="button"
-                                  onClick={() => setReturnDate(opt.date)}
-                                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
-                                    returnDate === opt.date
-                                      ? "bg-primary text-black border-primary"
-                                      : "bg-surface hover:bg-surface-hover border-border text-foreground"
-                                  }`}
-                                >
-                                  {opt.label} ({opt.date})
-                                </button>
-                              ))}
+                          <div className="space-y-3">
+                            <label className="block text-sm font-bold text-foreground/80">خيار وتاريخ الإرجاع المفضل *</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <button
+                                type="button"
+                                onClick={() => setReturnOption("same_day")}
+                                className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all text-center gap-1 ${
+                                  returnOption === "same_day"
+                                    ? "border-primary bg-primary/10 text-primary-light font-black"
+                                    : "border-border bg-surface hover:bg-surface-hover text-foreground/80 font-bold"
+                                }`}
+                              >
+                                <span className="text-sm">الإرجاع في نفس يوم المناسبة</span>
+                                <span className="text-[10px] opacity-75">إرجاع كابات تخرجك مساء يوم حفلتك</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setReturnOption("next_day")}
+                                className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all text-center gap-1 ${
+                                  returnOption === "next_day"
+                                    ? "border-primary bg-primary/10 text-primary-light font-black"
+                                    : "border-border bg-surface hover:bg-surface-hover text-foreground/80 font-bold"
+                                }`}
+                              >
+                                <span className="text-sm">الإرجاع في اليوم التالي للمناسبة</span>
+                                <span className="text-[10px] opacity-75">إرجاع كابات تخرجك صباح اليوم التالي للحفلة</span>
+                              </button>
                             </div>
+                          </div>
+                        )}
+
+                        {/* 3. Automatic Dates Summary (No Confusing Inputs!) */}
+                        {eventDate && pickupDate && returnDate && (
+                          <div className="space-y-3 p-5 rounded-2xl bg-surface border border-border/80 text-right mt-4" dir="rtl">
+                            <div className="flex justify-between items-center border-b border-border/40 pb-2 mb-2">
+                              <span className="text-xs font-black text-primary-light">جدول مواعيد الحجز المعتمدة:</span>
+                              <span className="text-[10px] bg-green-500/10 text-green-400 px-2 py-0.5 rounded-full font-black">🗓️ حساب تلقائي</span>
+                            </div>
+                            <div className="space-y-3 text-xs md:text-sm font-semibold">
+                              <div className="flex justify-between items-center gap-4">
+                                <span className="text-foreground/60">🎓 تاريخ المناسبة / التخرج:</span>
+                                <span className="text-primary font-black">{formatArabicDate(eventDate)}</span>
+                              </div>
+                              <div className="flex justify-between items-center gap-4">
+                                <span className="text-foreground/60">🚚 تاريخ الاستلام من المعرض:</span>
+                                <span className="text-foreground/90 font-bold">{formatArabicDate(pickupDate)}</span>
+                              </div>
+                              <div className="flex justify-between items-center gap-4">
+                                <span className="text-foreground/60">🔄 تاريخ الإرجاع للمعرض:</span>
+                                <span className="text-foreground/90 font-bold">{formatArabicDate(returnDate)}</span>
+                              </div>
+                            </div>
+                            <p className="text-[10px] text-foreground/50 border-t border-border/20 pt-2 mt-2 leading-relaxed">
+                              * قمنا بحساب تاريخ الاستلام (قبل المناسبة بيوم، باستثناء أيام الجمعة حيث تم تعديلها للخميس تلقائياً لتجنب العطلة الرسمية). الإرجاع محسوب طبقاً لخيارك المفضل.
+                            </p>
                           </div>
                         )}
                       </div>

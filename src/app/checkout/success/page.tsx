@@ -39,6 +39,26 @@ interface SimulatedOrder {
   is_preliminary?: boolean;
 }
 
+// Helper to format Date cleanly in Arabic (e.g. السبت 2 نوفمبر 2025)
+const formatArabicDate = (dateStr: string | null | undefined) => {
+  if (!dateStr) return "غير محدد";
+  const dateObj = new Date(dateStr);
+  if (isNaN(dateObj.getTime())) return dateStr;
+  
+  const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+  const months = [
+    "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+    "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
+  ];
+  
+  const dayName = days[dateObj.getDay()];
+  const dayNum = dateObj.getDate();
+  const monthName = months[dateObj.getMonth()];
+  const year = dateObj.getFullYear();
+  
+  return `${dayName} ${dayNum} ${monthName} ${year}`;
+};
+
 function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("id");
@@ -134,11 +154,11 @@ function SuccessContent() {
     if (hasRent) {
       message += `*🎓 [تفاصيل وجدولة الإيجار]*\n`;
       if (currentOrder.is_preliminary) {
-        message += `⚠️ *حالة الحجز:* حجز مبدئي — موعد المناسبة غير محدد بعد\n\n`;
+        message += `⚠️ *حالة الحجز:* حجز مبدئي — موعد المناسبة غير حدد بعد\n\n`;
       } else {
-        message += `📅 *تاريخ المناسبة:* ${currentOrder.event_date || "غير محدد"}\n`;
-        message += `🚚 *تاريخ الاستلام:* ${currentOrder.pickup_date || "غير محدد"}\n`;
-        message += `🔄 *تاريخ الإرجاع:* ${currentOrder.return_date || "غير محدد"}\n\n`;
+        message += `📅 *تاريخ المناسبة:* ${formatArabicDate(currentOrder.event_date)}\n`;
+        message += `🚚 *تاريخ الاستلام:* ${formatArabicDate(currentOrder.pickup_date)}\n`;
+        message += `🔄 *تاريخ الإرجاع:* ${formatArabicDate(currentOrder.return_date)}\n\n`;
       }
     }
 
@@ -382,17 +402,17 @@ function SuccessContent() {
                     </div>
                   ) : (
                     <>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center gap-4">
                         <span className="text-foreground/60">تاريخ المناسبة / التخرج:</span>
-                        <span className="text-primary-light font-bold">{currentOrder.event_date || "غير محدد"}</span>
+                        <span className="text-primary-light font-black">{formatArabicDate(currentOrder.event_date)}</span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center gap-4">
                         <span className="text-foreground/60">تاريخ الاستلام:</span>
-                        <span className="font-bold">{currentOrder.pickup_date || "غير محدد"}</span>
+                        <span className="font-bold">{formatArabicDate(currentOrder.pickup_date)}</span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center gap-4">
                         <span className="text-foreground/60">تاريخ الإرجاع:</span>
-                        <span className="font-bold">{currentOrder.return_date || "غير محدد"}</span>
+                        <span className="font-bold">{formatArabicDate(currentOrder.return_date)}</span>
                       </div>
                     </>
                   )}
