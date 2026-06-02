@@ -229,7 +229,7 @@ ${itemsList}
               <div className="glass p-6 rounded-3xl border border-primary/20 bg-primary/5 space-y-3">
                 <div className="flex items-center gap-2 text-primary font-bold text-sm">
                   <AlertTriangle className="w-5 h-5 text-primary" />
-                  <span>تذكير هام بخصوص سياسة الاستئجار:</span>
+                  <span>سياسة الإيجار</span>
                 </div>
                 <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-line">
                   {settings.rental_policy}

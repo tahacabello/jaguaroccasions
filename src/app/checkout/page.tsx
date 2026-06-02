@@ -49,6 +49,7 @@ export default function CheckoutPage() {
 
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [agreeToPolicy, setAgreeToPolicy] = useState(false);
   const [settings, setSettings] = useState<Record<string, string>>({});
 
   // Calculations (completely removed shipping fees)
@@ -174,6 +175,12 @@ export default function CheckoutPage() {
     e.preventDefault();
     if (!name || !phone || !street) {
       alert("الرجاء ملء جميع الحقول المطلوبة للتوصيل");
+      return;
+    }
+
+    const hasRentItems = cartItems.some(item => item.mode === "rent");
+    if (hasRentItems && !agreeToPolicy) {
+      alert("يرجى الموافقة على سياسة الإيجار قبل إتمام الطلب");
       return;
     }
 
@@ -399,14 +406,28 @@ export default function CheckoutPage() {
                 </div>
 
                 {cartItems.some(item => item.mode === "rent") && settings.rental_policy && (
-                  <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 text-right space-y-2">
-                    <div className="flex items-center gap-2 text-primary font-bold text-sm">
-                      <Info className="w-4 h-4 text-primary" />
-                      <span>شروط وسياسة الإيجار المعتمدة:</span>
+                  <div className="space-y-4">
+                    <div className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-right space-y-3 shadow-lg">
+                      <div className="flex items-center gap-2 text-primary font-bold text-base border-b border-amber-500/10 pb-2">
+                        <Info className="w-5 h-5 text-primary" />
+                        <span>سياسة الإيجار</span>
+                      </div>
+                      <p className="text-xs text-foreground/85 leading-relaxed whitespace-pre-line">
+                        {settings.rental_policy}
+                      </p>
                     </div>
-                    <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-line">
-                      {settings.rental_policy}
-                    </p>
+
+                    <label className="flex items-center gap-3 p-4 rounded-xl border border-border bg-surface hover:bg-surface-hover cursor-pointer transition-all select-none">
+                      <input
+                        type="checkbox"
+                        checked={agreeToPolicy}
+                        onChange={(e) => setAgreeToPolicy(e.target.checked)}
+                        className="w-5 h-5 rounded border-border text-primary focus:ring-primary accent-primary shrink-0"
+                      />
+                      <span className="text-xs md:text-sm font-bold text-foreground/90">
+                        أوافق على سياسة الإيجار وشروط الاستلام والإرجاع
+                      </span>
+                    </label>
                   </div>
                 )}
 

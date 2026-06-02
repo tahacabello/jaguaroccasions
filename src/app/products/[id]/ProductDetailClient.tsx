@@ -294,7 +294,7 @@ export default function ProductDetailClient({ params }: { params: { id: string }
                   <div className="mt-4 p-4 bg-primary/5 border border-primary/20 rounded-xl space-y-2 text-right">
                     <div className="flex items-center gap-2 text-primary font-bold text-sm">
                       <ShieldCheck className="w-4 h-4 text-primary" />
-                      <span>شروط وسياسة الإيجار المعتمدة:</span>
+                      <span>سياسة الإيجار</span>
                     </div>
                     <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-line">
                       {settings.rental_policy}
