@@ -31,7 +31,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-foreground/70 leading-relaxed text-sm">
-              جاغوار للمناسبات - وجهتك الأولى في ليبيا للحصول على أرقى كابات وقبعات التخرج بأسعار تنافسية وجودة لا تضاهى.
+              جاغوار Occasions - وجهتك الأولى في ليبيا للحصول على أرقى كابات وقبعات التخرج بأسعار تنافسية وجودة لا تضاهى.
             </p>
             <div className="flex items-center gap-4 flex-wrap">
               {settings.facebook_link && (
@@ -152,7 +152,7 @@ export function Footer() {
         </div>
 
         <div className="pt-8 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-foreground/50">
-          <p>© 2026 جاغوار للمناسبات. جميع الحقوق محفوظة.</p>
+          <p>© 2026 جاغوار Occasions. جميع الحقوق محفوظة.</p>
           <div className="flex gap-4">
             <Link href="/privacy" className="hover:text-primary transition-colors">سياسة الخصوصية</Link>
             <Link href="/terms" className="hover:text-primary transition-colors">الشروط والأحكام</Link>

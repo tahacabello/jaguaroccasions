@@ -110,7 +110,7 @@ export const mockProducts = [
 
 // Resilient Mock Settings Database
 export const defaultSettings: Record<string, string> = {
-  store_name: "جاغوار للمناسبات",
+  store_name: "جاغوار Occasions",
   announcement_text: "تنسيق وتطريز لكافة مستلزمات التخرج 🎓",
   hero_title: "لحظة تخرجك، بأرقى المعايير",
   hero_subtitle: "اكتشف مجموعاتنا الحصرية من كيبان التخرج، القبعات، والشالات المطرزة بالاسم. إيجار وبيع مع خدمة حجز متكاملة.",
@@ -125,8 +125,8 @@ export const defaultSettings: Record<string, string> = {
   snapchat_link: "",
   google_maps_link: "",
   location: "طرابلس، ليبيا",
-  about_text: "جاغوار للمناسبات هو خياركم الأول للتميز والظهور بأرقى إطلالة في حفلات تخرجكم.",
-  footer_text: "جميع الحقوق محفوظة © 2026 جاغوار للمناسبات",
+  about_text: "جاغوار Occasions هو خياركم الأول للتميز والظهور بأرقى إطلالة في حفلات تخرجكم.",
+  footer_text: "جميع الحقوق محفوظة © 2026 جاغوار Occasions",
   categories_title: "الأقسام المميزة",
   categories_subtitle: "اكتشف مجموعاتنا المصنفة بعناية",
   trending_title: "الأكثر طلباً",

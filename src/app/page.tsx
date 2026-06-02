@@ -7,7 +7,7 @@ import { TrustBadges } from "@/components/home/TrustBadges";
 export default function Home() {
   return (
     <>
-      <title>جاغوار للمناسبات | الصفحة الرئيسية</title>
+      <title>جاغوار Occasions | الصفحة الرئيسية</title>
       <Header />
       <main className="flex-1">
         <Hero />
