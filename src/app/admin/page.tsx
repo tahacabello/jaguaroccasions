@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { 
-  BarChart3, ShoppingCart, Package, Users, TrendingUp, Search, Eye, Edit3, Trash2, Plus, Check, RefreshCw, Lock, ArrowRight, LayoutGrid, X, Upload, MessageCircle, Settings, Image as ImageIcon, Star, EyeOff
+  BarChart3, ShoppingCart, Package, Users, TrendingUp, Search, Eye, Edit3, Trash2, Plus, Check, RefreshCw, Lock, ArrowRight, LayoutGrid, X, Upload, MessageCircle, Settings, Image as ImageIcon, Star, EyeOff, UserPlus, FileText
 } from "lucide-react";
 import Image from "next/image";
 import { 
@@ -24,6 +24,9 @@ import {
   updateSupabaseSubcategory,
   deleteSupabaseSubcategory,
   getSupabaseOrders,
+  addSupabaseOrder,
+  adminCreateCustomerAccount,
+  adminResetCustomerPassword,
   updateSupabaseOrderStatus,
   updateSupabaseOrderDetails,
   deleteSupabaseOrder,
@@ -49,7 +52,11 @@ import {
   updateSupabaseHomepageSectionItem,
   deleteSupabaseHomepageSectionItem,
   swapHomepageSectionItemOrderInDb,
-  seedDefaultHomepageSections
+  seedDefaultHomepageSections,
+  getSupabaseAllChangeRequests,
+  getSupabasePendingChangeRequestsCount,
+  adminApproveChangeRequest,
+  adminRejectChangeRequest
 } from "@/lib/supabase";
 
 const cityNames: Record<string, string> = {
@@ -64,6 +71,25 @@ const cityNames: Record<string, string> = {
   zleten: "زليتن",
   msallata: "مسلاتة",
   other: "مدينة أخرى",
+};
+
+// Helper to format Date cleanly in Arabic (e.g. السبت 2 نوفمبر 2025)
+const formatArabicDate = (dateStr: string | null | undefined) => {
+  if (!dateStr) return "غير محدد";
+  const dateObj = new Date(dateStr);
+  if (isNaN(dateObj.getTime())) return dateStr;
+  
+  const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+  const months = [
+    "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+    "وليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
+  ];
+  
+  const dayName = days[dateObj.getDay()];
+  const dayNum = dateObj.getDate();
+  const monthName = months[dateObj.getMonth()];
+  const year = dateObj.getFullYear();
+  return `${dayName} ${dayNum} ${monthName} ${year}`;
 };
 
 const statusTranslations: Record<string, string> = {
@@ -144,7 +170,80 @@ export default function AdminDashboard() {
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<"analytics" | "orders" | "inventory" | "settings" | "categories" | "customers" | "homepage_builder">("analytics");
+  const [activeTab, setActiveTab] = useState<"analytics" | "orders" | "inventory" | "settings" | "categories" | "customers" | "homepage_builder" | "change_requests">("analytics");
+
+  // Customer Creation & Password Reset & Manual Order States
+  const [isCreateCustOpen, setIsCreateCustOpen] = useState(false);
+  const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
+  const [isManualOrderOpen, setIsManualOrderOpen] = useState(false);
+  
+  const [createUsername, setCreateUsername] = useState("");
+  const [createPassword, setCreatePassword] = useState("");
+  const [createFullName, setCreateFullName] = useState("");
+  const [createEmail, setCreateEmail] = useState("");
+  const [createPhone, setCreatePhone] = useState("");
+  const [createBackupPhone, setCreateBackupPhone] = useState("");
+  const [createCity, setCreateCity] = useState("tripoli");
+  const [createStreet, setCreateStreet] = useState("");
+  const [createAddressDetails, setCreateAddressDetails] = useState("");
+  const [createGoogleMapsLink, setCreateGoogleMapsLink] = useState("");
+  const [isCreatingCust, setIsCreatingCust] = useState(false);
+  
+  const [newPasswordVal, setNewPasswordVal] = useState("");
+  const [resetPasscodeVal, setResetPasscodeVal] = useState("9922");
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+
+  // Manual Order Creation Form States
+  const [manualCustType, setManualCustType] = useState<"existing" | "new">("existing");
+  const [manualSelectedCustId, setManualSelectedCustId] = useState("");
+  
+  // New customer creation details if toggled
+  const [manualNewUsername, setManualNewUsername] = useState("");
+  const [manualNewPassword, setManualNewPassword] = useState("");
+  const [manualNewFullName, setManualNewFullName] = useState("");
+  const [manualNewPhone, setManualNewPhone] = useState("");
+  const [manualNewBackupPhone, setManualNewBackupPhone] = useState("");
+  const [manualNewCity, setManualNewCity] = useState("tripoli");
+  const [manualNewStreet, setManualNewStreet] = useState("");
+  const [manualNewAddressDetail, setManualNewAddressDetail] = useState("");
+  const [manualNewGoogleMaps, setManualNewGoogleMaps] = useState("");
+
+  // Existing customer shipping details
+  const [manualName, setManualName] = useState("");
+  const [manualPhone, setManualPhone] = useState("");
+  const [manualBackupPhone, setManualBackupPhone] = useState("");
+  const [manualCity, setManualCity] = useState("tripoli");
+  const [manualStreet, setManualStreet] = useState("");
+  const [manualAddressDetail, setManualAddressDetail] = useState("");
+  const [manualGoogleMaps, setManualGoogleMaps] = useState("");
+  const [manualNotes, setManualNotes] = useState("");
+  const [manualPayment, setManualPayment] = useState<"cash_on_delivery" | "sadad" | "mobicash">("cash_on_delivery");
+
+  // Rental schedule
+  const [manualIsPreliminary, setManualIsPreliminary] = useState(false);
+  const [manualEventDate, setManualEventDate] = useState("");
+  const [manualReturnOption, setManualReturnOption] = useState<"same_day" | "next_day">("next_day");
+  const [manualPickupDate, setManualPickupDate] = useState("");
+  const [manualReturnDate, setManualReturnDate] = useState("");
+
+  // Selected products & quantities
+  const [manualOrderItems, setManualOrderItems] = useState<{ id: string; quantity: number; mode: "sale" | "rent" }[]>([]);
+  const [isSubmittingManualOrder, setIsSubmittingManualOrder] = useState(false);
+
+  // Selector controls inside manual order form
+  const [selectorProductId, setSelectorProductId] = useState("");
+  const [selectorQuantity, setSelectorQuantity] = useState(1);
+  const [selectorMode, setSelectorMode] = useState<"sale" | "rent">("rent");
+ 
+  // Order change request management states
+  const [changeRequests, setChangeRequests] = useState<any[]>([]);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  const [adminPasscode, setAdminPasscode] = useState("");
+  const [passcodeModalOpen, setPasscodeModalOpen] = useState(false);
+  const [selectedRequestForReview, setSelectedRequestForReview] = useState<any>(null);
+  const [reviewAction, setReviewAction] = useState<"approve" | "reject" | null>(null);
+  const [adminNoteInput, setAdminNoteInput] = useState("");
+  const [isProcessingReview, setIsProcessingReview] = useState(false);
 
   // Homepage Sections Builder States
   const [homepageSectionsList, setHomepageSectionsList] = useState<any[]>([]);
@@ -316,6 +415,300 @@ export default function AdminDashboard() {
     }
   };
 
+  // 1. Auto-fill manual order customer shipping details when customer id changes
+  useEffect(() => {
+    if (manualSelectedCustId) {
+      const cust = customers.find(c => c.id === manualSelectedCustId);
+      if (cust) {
+        setManualName(`${cust.first_name || ""} ${cust.last_name || ""}`.trim() || cust.name || "");
+        setManualPhone(cust.phone_number || "");
+        setManualBackupPhone(cust.backup_phone || "");
+        const cityKey = Object.keys(cityNames).find(key => cityNames[key] === cust.city) || "tripoli";
+        setManualCity(cityKey);
+        setManualStreet(cust.street || "");
+        setManualAddressDetail(cust.additional_address || "");
+        setManualGoogleMaps(cust.google_maps_link || "");
+      }
+    }
+  }, [manualSelectedCustId, customers]);
+
+  // 2. Auto-calculate manual order rental dates
+  useEffect(() => {
+    if (!manualEventDate) {
+      setManualPickupDate("");
+      setManualReturnDate("");
+      return;
+    }
+
+    const evDate = new Date(manualEventDate);
+    if (isNaN(evDate.getTime())) return;
+
+    // Pickup calculation: 1 day before event
+    let pickDate = new Date(evDate);
+    pickDate.setDate(evDate.getDate() - 1);
+    if (pickDate.getDay() === 5) { // Friday is 5
+      pickDate.setDate(pickDate.getDate() - 1); // Move to Thursday
+    }
+
+    // Return calculation
+    let retDate = new Date(evDate);
+    if (manualReturnOption === "next_day") {
+      retDate.setDate(evDate.getDate() + 1);
+    }
+    if (retDate.getDay() === 5) { // Friday is 5
+      retDate.setDate(retDate.getDate() + 1); // Move to Saturday
+    }
+
+    const getYYYYMMDD = (d: Date) => {
+      return d.toISOString().split('T')[0];
+    };
+
+    setManualPickupDate(getYYYYMMDD(pickDate));
+    setManualReturnDate(getYYYYMMDD(retDate));
+  }, [manualEventDate, manualReturnOption]);
+
+  // 3. Admin create customer handler
+  const handleCreateCustomerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsCreatingCust(true);
+
+    const cleanUsername = createUsername.trim().toLowerCase();
+    if (!cleanUsername || !createPassword) {
+      alert("اسم المستخدم وكلمة المرور مطلوبان.");
+      setIsCreatingCust(false);
+      return;
+    }
+
+    try {
+      const targetEmail = createEmail ? createEmail.trim() : `${cleanUsername}@jaguar.local`;
+
+      const result = await adminCreateCustomerAccount({
+        username: cleanUsername,
+        password: createPassword,
+        full_name: createFullName || "زبون جديد",
+        email: targetEmail,
+        phone: createPhone,
+        backup_phone: createBackupPhone,
+        city: cityNames[createCity] || createCity,
+        street: createStreet,
+        address_details: createAddressDetails,
+        google_maps_link: createGoogleMapsLink
+      }, "9922");
+
+      if (result.success) {
+        alert("تم إنشاء حساب الزبون بنجاح!");
+        setIsCreateCustOpen(false);
+        setCreateUsername("");
+        setCreatePassword("");
+        setCreateFullName("");
+        setCreateEmail("");
+        setCreatePhone("");
+        setCreateBackupPhone("");
+        setCreateStreet("");
+        setCreateAddressDetails("");
+        setCreateGoogleMapsLink("");
+        refreshAllData();
+      } else {
+        alert("فشل إنشاء الحساب: " + result.error);
+      }
+    } catch (err: any) {
+      alert("حدث خطأ أثناء إنشاء الحساب: " + err.message);
+    } finally {
+      setIsCreatingCust(false);
+    }
+  };
+
+  // 4. Admin reset password handler
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCust) return;
+    setIsResettingPassword(true);
+
+    try {
+      const result = await adminResetCustomerPassword(selectedCust.id, newPasswordVal, resetPasscodeVal);
+
+      if (result.success) {
+        alert("تم تحديث كلمة مرور الزبون بنجاح!");
+        setIsResetPasswordOpen(false);
+        setNewPasswordVal("");
+      } else {
+        alert("فشل تحديث كلمة المرور: " + result.error);
+      }
+    } catch (err: any) {
+      alert("حدث خطأ أثناء تغيير كلمة المرور: " + err.message);
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
+  // 5. Admin manual order creation submit
+  const handleManualOrderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (manualOrderItems.length === 0) {
+      alert("الرجاء اختيار منتج واحد على الأقل للطلب اليدوي.");
+      return;
+    }
+    setIsSubmittingManualOrder(true);
+
+    try {
+      let targetCustomerId = null;
+
+      // Handle inline new customer creation if toggled
+      if (manualCustType === "new") {
+        const cleanUsername = manualNewUsername.trim().toLowerCase();
+        if (!cleanUsername || !manualNewPassword) {
+          alert("الرجاء إدخال اسم مستخدم وكلمة مرور للزبون الجديد.");
+          setIsSubmittingManualOrder(false);
+          return;
+        }
+
+        const mockEmail = `${cleanUsername}@jaguar.local`;
+        const result = await adminCreateCustomerAccount({
+          username: cleanUsername,
+          password: manualNewPassword,
+          full_name: manualNewFullName || "زبون جديد",
+          email: mockEmail,
+          phone: manualNewPhone,
+          backup_phone: manualNewBackupPhone,
+          city: cityNames[manualNewCity] || manualNewCity,
+          street: manualNewStreet,
+          address_details: manualNewAddressDetail,
+          google_maps_link: manualNewGoogleMaps
+        }, "9922");
+
+        if (!result.success) {
+          throw new Error("فشل إنشاء الحساب الجديد: " + result.error);
+        }
+        targetCustomerId = result.data.id;
+      } else {
+        targetCustomerId = manualSelectedCustId || null;
+      }
+
+      // Map selected items and sum up total
+      let calculatedTotal = 0;
+      const orderItems = manualOrderItems.map(item => {
+        const prod = products.find(p => p.id === item.id);
+        const price = item.mode === "rent" ? (prod?.priceRent || 0) : (prod?.priceSale || 0);
+        calculatedTotal += price * item.quantity;
+        return {
+          product_id: item.id,
+          product_name: prod?.name || "منتج يدوي",
+          product_image: prod?.image || "",
+          quantity: item.quantity,
+          price_at_purchase: price,
+          item_mode: item.mode
+        };
+      });
+
+      const trackingNumber = `JG-MANUAL-${Math.floor(100000 + Math.random() * 900000)}`;
+
+      const payload = {
+        customer_id: targetCustomerId,
+        guest_name: manualCustType === "new" ? (manualNewFullName || "زبون جديد") : manualName,
+        guest_phone: manualCustType === "new" ? manualNewPhone : manualPhone,
+        guest_backup_phone: manualCustType === "new" ? manualNewBackupPhone : manualBackupPhone,
+        guest_city: manualCustType === "new" ? (cityNames[manualNewCity] || manualNewCity) : (cityNames[manualCity] || manualCity),
+        guest_street: manualCustType === "new" ? manualNewStreet : manualStreet,
+        guest_address_detail: manualCustType === "new" ? manualNewAddressDetail : manualAddressDetail,
+        customer_notes: manualNotes,
+        status: "confirmed",
+        payment_method: manualPayment,
+        total_amount: calculatedTotal,
+        tracking_number: trackingNumber,
+        event_date: manualIsPreliminary ? null : (manualEventDate || null),
+        pickup_date: manualIsPreliminary ? null : (manualPickupDate || null),
+        return_date: manualIsPreliminary ? null : (manualReturnDate || null),
+        is_preliminary: manualIsPreliminary,
+        google_maps_link: manualCustType === "new" ? manualNewGoogleMaps : manualGoogleMaps
+      };
+
+      const result = await addSupabaseOrder(payload, orderItems);
+      if (!result.success) {
+        throw new Error(result.error || "فشل تسجيل الفاتورة اليدوية.");
+      }
+
+      alert(`تم إضافة الطلب اليدوي بنجاح! رقم الفاتورة: ${trackingNumber}`);
+
+      // WhatsApp account credentials message
+      if (manualCustType === "new") {
+        const usernameVal = manualNewUsername.trim().toLowerCase();
+        const passwordVal = manualNewPassword;
+        const loginLink = `${window.location.origin}/auth/login`;
+        
+        let messageText = `مرحباً ${manualNewFullName || "زبوننا الكريم"}، تم إنشاء حساب خاص بك لمتابعة طلبياتك في متجر Jaguar Occasions.\n\n`;
+        messageText += `اسم المستخدم: ${usernameVal}\n`;
+        messageText += `كلمة المرور: ${passwordVal}\n`;
+        messageText += `رابط تسجيل الدخول: ${loginLink}\n\n`;
+        messageText += `رقم طلبك: ${trackingNumber}\n`;
+        messageText += `إجمالي الفاتورة: ${calculatedTotal} د.ل\n\n`;
+        messageText += `يمكنك تسجيل الدخول في أي وقت لمتابعة طلبك وتعديل تفاصيل حجزك. شكراً لثقتك بنا!`;
+
+        const phoneClean = (manualNewPhone || "").replace(/\s+/g, "").replace(/^0/, "+218");
+        const link = `https://api.whatsapp.com/send?phone=${phoneClean}&text=${encodeURIComponent(messageText)}`;
+        window.open(link, "_blank");
+      } else if (targetCustomerId) {
+        // Send WhatsApp for existing customer
+        const cust = customers.find(c => c.id === targetCustomerId);
+        if (cust) {
+          const usernameVal = cust.username || "غير محدد";
+          const loginLink = `${window.location.origin}/auth/login`;
+          
+          let messageText = `مرحباً ${cust.name || "زبوننا الكريم"}، تم تسجيل طلبية يدوية جديدة لك في حسابك لدى Jaguar Occasions.\n\n`;
+          messageText += `اسم المستخدم الخاص بك: ${usernameVal}\n`;
+          messageText += `رابط تسجيل الدخول للمتابعة: ${loginLink}\n\n`;
+          messageText += `رقم الطلب الجديد: ${trackingNumber}\n`;
+          messageText += `إجمالي الفاتورة: ${calculatedTotal} د.ل\n\n`;
+          messageText += `يمكنك الدخول لحسابك لمتابعة تفاصيل الطلب وتأكيد مواعيد الاستلام والارجاع.`;
+
+          const phoneClean = (cust.phone_number || "").replace(/\s+/g, "").replace(/^0/, "+218");
+          const link = `https://api.whatsapp.com/send?phone=${phoneClean}&text=${encodeURIComponent(messageText)}`;
+          window.open(link, "_blank");
+        }
+      }
+
+      // Clear states
+      setManualSelectedCustId("");
+      setManualOrderItems([]);
+      setManualNotes("");
+      setManualEventDate("");
+      setManualNewUsername("");
+      setManualNewPassword("");
+      setManualNewFullName("");
+      setManualNewPhone("");
+      setManualNewBackupPhone("");
+      setManualNewStreet("");
+      setManualNewAddressDetail("");
+      setManualNewGoogleMaps("");
+      setManualGoogleMaps("");
+      setIsManualOrderOpen(false);
+
+      refreshAllData();
+    } catch (err: any) {
+      alert("خطأ أثناء حفظ الطلب اليدوي: " + err.message);
+    } finally {
+      setIsSubmittingManualOrder(false);
+    }
+  };
+
+  // Helper to open WhatsApp to send login info & order details
+  const handleSendWhatsAppAccountDetails = (cust: any, order?: any) => {
+    const usernameVal = cust.username || "غير محدد";
+    const loginLink = `${window.location.origin}/auth/login`;
+    const orderNum = order ? order.tracking_number : "لا يوجد طلبية حالياً";
+    const orderSum = order ? `إجمالي الفاتورة: ${order.total_amount} د.ل` : "";
+
+    const messageText = `مرحباً، تم إنشاء حساب خاص بك لمتابعة طلبك في متجر Jaguar Occasions.
+اسم المستخدم: ${usernameVal}
+رابط تسجيل الدخول: ${loginLink}
+رقم الطلب: ${orderNum}
+${orderSum}
+يمكنك تسجيل الدخول باستخدام اسم المستخدم أو رقم الهاتف أو البريد الإلكتروني لمتابعة حالة الطلب وتحديث بياناتك عند الحاجة.`;
+
+    const phoneClean = (cust.phone_number || "").replace(/\s+/g, "").replace(/^0/, "+218");
+    const link = `https://api.whatsapp.com/send?phone=${phoneClean}&text=${encodeURIComponent(messageText)}`;
+    window.open(link, "_blank");
+  };
+
   // Check auth session on mount
   useEffect(() => {
     const sessionAuth = sessionStorage.getItem("jaguar_admin_auth");
@@ -328,7 +721,18 @@ export default function AdminDashboard() {
   const refreshAllData = async () => {
     setIsLoading(true);
     try {
-      const [dbProducts, dbSettings, dbCategories, dbSubcategories, dbOrders, dbCustomers, dbFeaturedCards, dbSections] = await Promise.all([
+      const [
+        dbProducts,
+        dbSettings,
+        dbCategories,
+        dbSubcategories,
+        dbOrders,
+        dbCustomers,
+        dbFeaturedCards,
+        dbSections,
+        dbChangeRequests,
+        dbPendingCount
+      ] = await Promise.all([
         getSupabaseProducts(),
         getSupabaseSettings(),
         getSupabaseCategories(),
@@ -336,7 +740,9 @@ export default function AdminDashboard() {
         getSupabaseOrders(),
         getSupabaseCustomerProfiles(),
         getSupabaseFeaturedCards(),
-        getSupabaseHomepageSections()
+        getSupabaseHomepageSections(),
+        getSupabaseAllChangeRequests(),
+        getSupabasePendingChangeRequestsCount()
       ]);
       
       setProducts(dbProducts);
@@ -347,6 +753,8 @@ export default function AdminDashboard() {
       setCustomers(dbCustomers);
       setFeaturedCardsList(dbFeaturedCards);
       setHomepageSectionsList(dbSections);
+      setChangeRequests(dbChangeRequests || []);
+      setPendingRequestsCount(dbPendingCount || 0);
     } catch (err) {
       console.error("Error refreshing database tables in admin:", err);
     } finally {
@@ -787,6 +1195,57 @@ export default function AdminDashboard() {
     }
   };
 
+  // Change Request Handlers
+  const handleReviewRequest = (request: any, action: "approve" | "reject") => {
+    setSelectedRequestForReview(request);
+    setReviewAction(action);
+    setAdminNoteInput("");
+    setAdminPasscode("");
+    setPasscodeModalOpen(true);
+  };
+
+  const handleSubmitPasscodeReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRequestForReview || !reviewAction) return;
+    
+    if (adminPasscode !== "9922") {
+      alert("رمز مرور المسؤول غير صحيح! يرجى إدخال الرمز الصحيح للموافقة أو الرفض.");
+      return;
+    }
+
+    setIsProcessingReview(true);
+    try {
+      let res;
+      if (reviewAction === "approve") {
+        res = await adminApproveChangeRequest(
+          selectedRequestForReview.id,
+          adminNoteInput,
+          adminPasscode
+        );
+      } else {
+        res = await adminRejectChangeRequest(
+          selectedRequestForReview.id,
+          adminNoteInput,
+          adminPasscode
+        );
+      }
+
+      if (res.success) {
+        alert(reviewAction === "approve" ? "تم قبول واعتماد التعديل وتحديث الفاتورة بنجاح!" : "تم رفض التعديل وحفظ السبب بنجاح.");
+        setPasscodeModalOpen(false);
+        setSelectedRequestForReview(null);
+        setReviewAction(null);
+        await refreshAllData();
+      } else {
+        alert("فشل تنفيذ الإجراء: " + res.error);
+      }
+    } catch (err: any) {
+      alert("خطأ غير متوقع: " + err?.message);
+    } finally {
+      setIsProcessingReview(false);
+    }
+  };
+
   // Categories CRUD
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1180,6 +1639,21 @@ export default function AdminDashboard() {
               <LayoutGrid className="w-4 h-4 inline-block ml-2" />
               بناء الصفحة الرئيسية
             </button>
+
+            <button
+              onClick={() => setActiveTab("change_requests")}
+              className={`px-5 py-3 rounded-xl font-bold text-xs shrink-0 transition-all flex items-center gap-1.5 relative ${
+                activeTab === "change_requests" ? "bg-primary text-black" : "bg-surface hover:bg-surface-hover text-foreground/75"
+              }`}
+            >
+              <RefreshCw className="w-4 h-4 inline-block ml-2" />
+              طلبات تعديل بانتظار الموافقة
+              {pendingRequestsCount > 0 && (
+                <span className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black animate-pulse">
+                  {pendingRequestsCount}
+                </span>
+              )}
+            </button>
           </div>
 
           {isLoading ? (
@@ -1240,8 +1714,22 @@ export default function AdminDashboard() {
               {/* Tab: Orders */}
               {activeTab === "orders" && (
                 <div className="glass rounded-3xl border border-border overflow-hidden">
-                  <div className="p-6 border-b border-border/60">
+                  <div className="p-6 border-b border-border/60 flex justify-between items-center flex-wrap gap-4">
                     <h2 className="text-lg font-bold">جدول إدارة وحفظ وتتبع الطلبيات</h2>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setManualSelectedCustId("");
+                        setManualOrderItems([]);
+                        setManualNotes("");
+                        setManualEventDate("");
+                        setIsManualOrderOpen(true);
+                      }}
+                      className="px-4 py-2 bg-primary hover:bg-primary/95 text-black font-black text-xs rounded-xl hover:scale-105 transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>إضافة طلب يدوي جديد</span>
+                    </button>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-right border-collapse">
@@ -1266,7 +1754,16 @@ export default function AdminDashboard() {
                         ) : (
                           orders.map((ord) => (
                             <tr key={ord.id} className="border-b border-border/30 hover:bg-surface/20 transition-all font-semibold text-sm">
-                              <td className="p-4 font-black text-primary-light">{ord.tracking_number}</td>
+                              <td className="p-4 font-black text-primary-light">
+                                <div className="flex flex-col items-start gap-1">
+                                  <span>{ord.tracking_number}</span>
+                                  {changeRequests.some(r => r.order_id === ord.id && r.status === "pending") && (
+                                    <span className="px-1.5 py-0.5 text-[8px] bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded animate-pulse shrink-0 font-bold">
+                                      ⚠️ طلب تعديل معلق
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
                               <td className="p-4 flex flex-col items-start gap-0.5 mt-2">
                                 <span>{ord.guest_name}</span>
                                 <span className={`text-[9px] font-black ${ord.customer_id ? "text-primary-light" : "text-foreground/40"}`}>
@@ -1753,8 +2250,16 @@ export default function AdminDashboard() {
               {/* Tab: Customers */}
               {activeTab === "customers" && (
                 <div className="glass rounded-3xl border border-border overflow-hidden">
-                  <div className="p-6 border-b border-border/60">
+                  <div className="p-6 border-b border-border/60 flex justify-between items-center flex-wrap gap-4">
                     <h2 className="text-lg font-bold">قائمة الأعضاء والزبائن المسجلين</h2>
+                    <button
+                      type="button"
+                      onClick={() => setIsCreateCustOpen(true)}
+                      className="px-4 py-2 bg-primary hover:bg-primary/95 text-black font-black text-xs rounded-xl hover:scale-105 transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>إنشاء حساب زبون جديد</span>
+                    </button>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-right border-collapse">
@@ -1794,6 +2299,24 @@ export default function AdminDashboard() {
                               >
                                 <Eye className="w-3 h-3 text-primary" />
                                 عرض التفاصيل
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSelectedCust(cust);
+                                  setNewPasswordVal("");
+                                  setIsResetPasswordOpen(true);
+                                }}
+                                className="px-2 py-1 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 text-[10px] font-black rounded transition-all flex items-center gap-1 cursor-pointer"
+                              >
+                                <Lock className="w-3 h-3" />
+                                تغيير كلمة المرور
+                              </button>
+                              <button
+                                onClick={() => handleSendWhatsAppAccountDetails(cust, orders.find(o => o.customer_id === cust.id))}
+                                className="px-2 py-1 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 text-[10px] font-black rounded transition-all flex items-center gap-1 cursor-pointer"
+                              >
+                                <MessageCircle className="w-3 h-3" />
+                                إرسال الحساب (واتساب)
                               </button>
                               <button
                                 onClick={() => handleOpenEditCustomer(cust)}
@@ -2500,6 +3023,180 @@ export default function AdminDashboard() {
                           </div>
                         );
                       })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab: Change Requests Review Panel */}
+              {activeTab === "change_requests" && (
+                <div className="space-y-8 text-right">
+                  <div className="glass p-8 rounded-3xl border border-border">
+                    <h2 className="text-xl font-bold">طلبات تعديل البيانات المحجوزة بانتظار الموافقة</h2>
+                    <p className="text-xs text-foreground/60 mt-1">
+                      هنا تظهر طلبات تعديل التواريخ، أرقام الهواتف أو العناوين التي يقدمها الزبائن. يمكنك مقارنة البيانات الحالية بالجديدة والموافقة عليها.
+                    </p>
+                  </div>
+
+                  {changeRequests.filter(r => r.status === "pending").length === 0 ? (
+                    <div className="text-center py-20 glass rounded-3xl border border-border">
+                      <div className="w-16 h-16 bg-primary/10 rounded-full border border-primary/20 flex items-center justify-center mx-auto mb-4 text-primary">
+                        <RefreshCw className="w-8 h-8" />
+                      </div>
+                      <p className="text-foreground/60 text-base font-bold">لا توجد طلبات تعديل معلقة بانتظار الموافقة حالياً.</p>
+                      <p className="text-xs text-foreground/45 mt-1">ستظهر الطلبات الجديدة هنا فور تقديمها من قبل الزبائن.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {changeRequests
+                        .filter(r => r.status === "pending")
+                        .map((req) => {
+                          const ord = req.order;
+                          const changes = req.requested_changes;
+                          
+                          if (!ord) return null;
+
+                          return (
+                            <div key={req.id} className="glass p-6 rounded-2xl border border-amber-500/20 hover:border-amber-500/30 transition-all space-y-6">
+                              
+                              {/* Request Header */}
+                              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-border/40">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-black animate-pulse">طلب تعديل معلق</span>
+                                    <span className="font-black text-sm text-foreground">الرقم المرجعي للطلب: <span className="text-primary-light font-black">{ord.tracking_number}</span></span>
+                                  </div>
+                                  <p className="text-xs text-foreground/50 mt-1 flex items-center gap-1.5 font-semibold">
+                                    👤 العميل: {ord.guest_name} · رقم العميل: {req.user_id.substring(0, 8)}...
+                                    · تاريخ الطلب: {new Date(req.created_at).toLocaleString("ar-LY")}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReviewRequest(req, "approve")}
+                                    className="px-4 py-2 bg-green-500 hover:bg-green-600 text-black text-xs font-black rounded-xl transition-all cursor-pointer hover:scale-105"
+                                  >
+                                    قبول التعديل
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReviewRequest(req, "reject")}
+                                    className="px-4 py-2 bg-red-500 hover:bg-red-600 text-black text-xs font-black rounded-xl transition-all cursor-pointer hover:scale-105"
+                                  >
+                                    رفض التعديل
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Comparison Layout */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+                                
+                                {/* Current Order State */}
+                                <div className="p-4 rounded-xl bg-surface/30 border border-border/50 space-y-3">
+                                  <h4 className="font-bold text-foreground/50 border-b border-border/30 pb-1.5 flex items-center gap-1">
+                                    <span>🔴</span>
+                                    <span>البيانات الحالية للطلب</span>
+                                  </h4>
+                                  <div className="space-y-1.5 font-semibold text-foreground/80">
+                                    <p>🛡️ نوع الحجز: {ord.is_preliminary ? <span className="text-amber-400 font-bold">⚠️ حجز مبدئي (التواريخ غير محددة)</span> : <span className="text-green-400 font-bold">حجز مؤكد التاريخ</span>}</p>
+                                    {!ord.is_preliminary && (
+                                      <>
+                                        <p>📅 تاريخ المناسبة: <span className="text-foreground/90 font-bold">{formatArabicDate(ord.event_date)}</span></p>
+                                        <p>🚚 تاريخ الاستلام: <span className="text-foreground/60">{formatArabicDate(ord.pickup_date)}</span></p>
+                                        <p>🔄 تاريخ الإرجاع: <span className="text-foreground/60">{formatArabicDate(ord.return_date)}</span></p>
+                                      </>
+                                    )}
+                                    <p>📞 رقم الهاتف الأساسي: <span className="text-foreground/80 font-bold">{ord.guest_phone || "غير متوفر"}</span></p>
+                                    {ord.guest_backup_phone && <p>📞 الهاتف الاحتياطي: {ord.guest_backup_phone}</p>}
+                                    <p>📍 العنوان الحالي: {ord.guest_city} · {ord.guest_street} {ord.guest_address_detail ? `· ${ord.guest_address_detail}` : ""}</p>
+                                    <p className="text-primary-light">💬 ملاحظات مقاس التطريز: {ord.customer_notes || "لا يوجد"}</p>
+                                  </div>
+                                </div>
+
+                                {/* Requested Changes State */}
+                                <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-3">
+                                  <h4 className="font-bold text-amber-400 border-b border-amber-500/20 pb-1.5 flex items-center gap-1">
+                                    <span>🟡</span>
+                                    <span>التعديلات الجديدة المطلوبة</span>
+                                  </h4>
+                                  <div className="space-y-1.5 font-bold text-foreground">
+                                    
+                                    {/* Preliminary vs Dated */}
+                                    {changes.is_preliminary_reservation !== undefined && changes.is_preliminary_reservation !== ord.is_preliminary ? (
+                                      <p className="text-amber-400">🛡️ تعديل نوع الحجز: {changes.is_preliminary_reservation ? "تحويل إلى حجز مبدئي" : "تحويل إلى حجز مؤكد التاريخ"}</p>
+                                    ) : null}
+
+                                    {/* Event Date */}
+                                    {changes.is_preliminary_reservation ? (
+                                      <p className="text-amber-400">⚠️ سيتم تأجيل تحديد موعد المناسبة لوقت لاحق.</p>
+                                    ) : (
+                                      <>
+                                        {changes.event_date && (
+                                          <p className={changes.event_date !== ord.event_date ? "text-amber-400" : ""}>
+                                            📅 تاريخ المناسبة: {formatArabicDate(changes.event_date)}
+                                            {changes.event_date !== ord.event_date && <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded mr-1 font-bold">معدل</span>}
+                                          </p>
+                                        )}
+                                        {changes.pickup_date && (
+                                          <p className={changes.pickup_date !== ord.pickup_date ? "text-amber-400" : ""}>
+                                            🚚 تاريخ الاستلام: {formatArabicDate(changes.pickup_date)}
+                                            {changes.pickup_date !== ord.pickup_date && <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded mr-1 font-bold">معدل</span>}
+                                          </p>
+                                        )}
+                                        {changes.return_date && (
+                                          <p className={changes.return_date !== ord.return_date ? "text-amber-400" : ""}>
+                                            🔄 تاريخ الإرجاع: {formatArabicDate(changes.return_date)}
+                                            {changes.return_date !== ord.return_date && <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded mr-1 font-bold">معدل</span>}
+                                          </p>
+                                        )}
+                                      </>
+                                    )}
+
+                                    {/* Phone Changes */}
+                                    {changes.customer_phone && (
+                                      <p className={changes.customer_phone !== ord.guest_phone ? "text-amber-400" : ""}>
+                                        📞 رقم الهاتف الأساسي: {changes.customer_phone}
+                                        {changes.customer_phone !== ord.guest_phone && <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded mr-1 font-bold">معدل</span>}
+                                      </p>
+                                    )}
+                                    {changes.customer_backup_phone !== undefined && (
+                                      <p className={changes.customer_backup_phone !== ord.guest_backup_phone ? "text-amber-400" : ""}>
+                                        📞 الهاتف الاحتياطي: {changes.customer_backup_phone || "ملغي/فارغ"}
+                                        {changes.customer_backup_phone !== ord.guest_backup_phone && <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded mr-1 font-bold">معدل</span>}
+                                      </p>
+                                    )}
+
+                                    {/* Address Changes */}
+                                    {(changes.customer_city || changes.customer_street || changes.customer_address_details) && (
+                                      <p className="text-amber-400">
+                                        📍 العنوان الجديد: {changes.customer_city || ord.guest_city} · {changes.customer_street || ord.guest_street} {changes.customer_address_details !== undefined ? `· ${changes.customer_address_details}` : (ord.guest_address_detail ? `· ${ord.guest_address_detail}` : "")}
+                                        <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded mr-1 font-bold">معدل العنوان</span>
+                                      </p>
+                                    )}
+
+                                    {/* Customer Notes */}
+                                    {changes.customer_notes !== undefined && (
+                                      <p className={changes.customer_notes !== ord.customer_notes ? "text-primary-light" : ""}>
+                                        💬 ملاحظات مقاس التطريز: {changes.customer_notes || "ملغية/فارغة"}
+                                        {changes.customer_notes !== ord.customer_notes && <span className="text-[10px] bg-primary/10 text-primary-light px-1.5 py-0.5 rounded mr-1 font-bold">معدل</span>}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Customer request note */}
+                              {req.customer_note && (
+                                <div className="p-4 rounded-xl bg-black/35 border border-border/80 text-xs">
+                                  <p className="text-foreground/50 font-bold mb-1">💬 رسالة وتوضيح الزبون للطلب:</p>
+                                  <p className="text-amber-400 font-bold italic">"{req.customer_note}"</p>
+                                </div>
+                              )}
+
+                            </div>
+                          );
+                        })}
                     </div>
                   )}
                 </div>
@@ -4133,7 +4830,817 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
+          {/* Change Request Passcode Verification Dialog Modal */}
+          {passcodeModalOpen && selectedRequestForReview && (
+            <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[9999] flex items-center justify-center p-4" dir="rtl">
+              <div className="glass rounded-3xl border border-primary/20 w-full max-w-md p-6 md:p-8 text-right space-y-6 relative">
+                
+                <button
+                  onClick={() => setPasscodeModalOpen(false)}
+                  className="absolute top-6 left-6 w-8 h-8 rounded-full border border-border/80 flex items-center justify-center text-foreground/60 hover:text-foreground hover:bg-surface transition-all text-sm font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
+
+                <div className="text-center space-y-2">
+                  <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto border ${
+                    reviewAction === "approve" 
+                      ? "bg-green-500/10 text-green-400 border-green-500/25" 
+                      : "bg-red-500/10 text-red-400 border-red-500/25"
+                  }`}>
+                    <Lock className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-lg font-black">
+                    {reviewAction === "approve" ? "اعتماد وقبول طلب التعديل" : "رفض وإلغاء طلب التعديل"}
+                  </h3>
+                  <p className="text-xs text-foreground/55 max-w-xs mx-auto">
+                    {reviewAction === "approve" 
+                      ? "سيتم تطبيق التعديلات الموثوقة فقط وتحديث تفاصيل الفاتورة وتوقيت الإيجار فورياً."
+                      : "لن يتم تغيير أي بيانات في الطلبية وسيتم حفظ قرار الرفض وسبب الرفض للزبون."}
+                  </p>
+                </div>
+
+                <form onSubmit={handleSubmitPasscodeReview} className="space-y-4">
+                  {/* Admin feedback note */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-foreground/80">
+                      {reviewAction === "approve" ? "ملاحظة أو تعليق الإدارة للزبون (اختياري)" : "سبب وتوضيح الرفض للزبون *"}
+                    </label>
+                    <input
+                      type="text"
+                      required={reviewAction === "reject"}
+                      placeholder={reviewAction === "approve" ? "مثال: تم قبول وتعديل الموعد بنجاح" : "مثال: هذا الموعد محجوز بالكامل أو يرجى اختيار تاريخ آخر"}
+                      value={adminNoteInput}
+                      onChange={(e) => setAdminNoteInput(e.target.value)}
+                      className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                    />
+                  </div>
+
+                  {/* Passcode input */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-foreground/80">رمز مرور المسؤول لتأكيد العملية *</label>
+                    <input
+                      type="password"
+                      required
+                      value={adminPasscode}
+                      onChange={(e) => setAdminPasscode(e.target.value)}
+                      placeholder="إدخال رمز المرور الإداري المكون من 4 أرقام"
+                      className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground text-center tracking-widest font-black"
+                      dir="ltr"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isProcessingReview}
+                    className={`w-full py-3.5 rounded-xl font-black text-sm transition-all hover:scale-[1.02] cursor-pointer flex justify-center items-center gap-1.5 ${
+                      reviewAction === "approve"
+                        ? "bg-green-500 text-black hover:bg-green-600"
+                        : "bg-red-500 text-black hover:bg-red-600"
+                    }`}
+                  >
+                    {isProcessingReview ? (
+                      <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        <Check className="w-4.5 h-4.5" />
+                        تأكيد وإتمام العملية الآن
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
           
+          {/* ======================================= */}
+          {/* Modal: Create Customer Account */}
+          {/* ======================================= */}
+          {isCreateCustOpen && (
+            <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[999] flex items-center justify-center p-4 overflow-y-auto" dir="rtl">
+              <div className="glass rounded-3xl border border-primary/20 w-full max-w-2xl my-8 p-6 md:p-8 text-right space-y-6 relative max-h-[90vh] overflow-y-auto">
+                <button
+                  onClick={() => setIsCreateCustOpen(false)}
+                  className="absolute top-6 left-6 w-8 h-8 rounded-full border border-border/80 flex items-center justify-center text-foreground/60 hover:text-foreground hover:bg-surface transition-all text-sm font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
+
+                <div className="space-y-2 border-b border-border/60 pb-4">
+                  <h3 className="text-xl font-black text-primary flex items-center gap-2">
+                    <UserPlus className="w-6 h-6" />
+                    <span>إنشاء حساب زبون جديد</span>
+                  </h3>
+                  <p className="text-xs text-foreground/75">قم بملء البيانات التالية لتسجيل الزبون تلقائياً في Supabase Auth وقاعدة البيانات.</p>
+                </div>
+
+                <form onSubmit={handleCreateCustomerSubmit} className="space-y-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-foreground/80">اسم المستخدم (بالأحرف الإنجليزية والأرقام فقط) *</label>
+                      <input
+                        type="text"
+                        required
+                        pattern="^[a-zA-Z0-9_]+$"
+                        value={createUsername}
+                        onChange={(e) => setCreateUsername(e.target.value)}
+                        placeholder="مثال: ali_99"
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-foreground/80">كلمة المرور للحساب *</label>
+                      <input
+                        type="password"
+                        required
+                        minLength={6}
+                        value={createPassword}
+                        onChange={(e) => setCreatePassword(e.target.value)}
+                        placeholder="كلمة مرور الحساب"
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-foreground/80">الاسم الكامل للزبون</label>
+                      <input
+                        type="text"
+                        value={createFullName}
+                        onChange={(e) => setCreateFullName(e.target.value)}
+                        placeholder="الاسم الكامل"
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-foreground/80">البريد الإلكتروني (اختياري)</label>
+                      <input
+                        type="email"
+                        value={createEmail}
+                        onChange={(e) => setCreateEmail(e.target.value)}
+                        placeholder="ali@example.com"
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-foreground/80">رقم الهاتف الأساسي</label>
+                      <input
+                        type="tel"
+                        value={createPhone}
+                        onChange={(e) => setCreatePhone(e.target.value)}
+                        placeholder="091XXXXXXX"
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-foreground/80">رقم الهاتف الاحتياطي</label>
+                      <input
+                        type="tel"
+                        value={createBackupPhone}
+                        onChange={(e) => setCreateBackupPhone(e.target.value)}
+                        placeholder="092XXXXXXX"
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-foreground/80">المدينة</label>
+                      <select
+                        value={createCity}
+                        onChange={(e) => setCreateCity(e.target.value)}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                      >
+                        {Object.keys(cityNames).map((key) => (
+                          <option key={key} value={key}>{cityNames[key]}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-foreground/80">الشارع والحي</label>
+                      <input
+                        type="text"
+                        value={createStreet}
+                        onChange={(e) => setCreateStreet(e.target.value)}
+                        placeholder="مثال: شارع النصر"
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-foreground/80">تفاصيل إضافية للعنوان</label>
+                    <textarea
+                      value={createAddressDetails}
+                      onChange={(e) => setCreateAddressDetails(e.target.value)}
+                      placeholder="بجوار مدرسة النور أو مسجد التوبة"
+                      className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground h-20"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-foreground/80">رابط الموقع على Google Maps — اختياري</label>
+                    <input
+                      type="url"
+                      value={createGoogleMapsLink}
+                      onChange={(e) => setCreateGoogleMapsLink(e.target.value)}
+                      placeholder="https://maps.app.goo.gl/..."
+                      className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground text-left"
+                      dir="ltr"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isCreatingCust}
+                    className="w-full py-3.5 bg-primary text-black hover:bg-primary/90 font-black text-sm rounded-xl transition-all hover:scale-[1.02] cursor-pointer flex justify-center items-center gap-1.5"
+                  >
+                    {isCreatingCust ? (
+                      <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        <UserPlus className="w-5 h-5" />
+                        <span>إنشاء الحساب وتفعيل العضوية</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ======================================= */}
+          {/* Modal: Admin Password Reset */}
+          {/* ======================================= */}
+          {isResetPasswordOpen && selectedCust && (
+            <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[999] flex items-center justify-center p-4" dir="rtl">
+              <div className="glass rounded-3xl border border-primary/20 w-full max-w-md p-6 md:p-8 text-right space-y-6 relative">
+                <button
+                  onClick={() => setIsResetPasswordOpen(false)}
+                  className="absolute top-6 left-6 w-8 h-8 rounded-full border border-border/80 flex items-center justify-center text-foreground/60 hover:text-foreground hover:bg-surface transition-all text-sm font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
+
+                <div className="space-y-2 border-b border-border/60 pb-3">
+                  <h3 className="text-lg font-black text-yellow-500 flex items-center gap-2">
+                    <Lock className="w-5 h-5" />
+                    <span>تغيير كلمة المرور للزبون</span>
+                  </h3>
+                  <p className="text-xs text-foreground/75">
+                    تعديل كلمة مرور الحساب للزبون: <strong className="text-primary">{selectedCust.name || selectedCust.username}</strong>
+                  </p>
+                </div>
+
+                <form onSubmit={handleResetPasswordSubmit} className="space-y-5">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-foreground/80">كلمة المرور الجديدة (6 خانات على الأقل) *</label>
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      value={newPasswordVal}
+                      onChange={(e) => setNewPasswordVal(e.target.value)}
+                      placeholder="أدخل كلمة المرور الجديدة"
+                      className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-foreground/80">رمز تأكيد المسؤول لـ Supabase Auth API *</label>
+                    <input
+                      type="password"
+                      required
+                      value={resetPasscodeVal}
+                      onChange={(e) => setResetPasscodeVal(e.target.value)}
+                      placeholder="9922"
+                      className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground text-center tracking-widest font-black"
+                      dir="ltr"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isResettingPassword}
+                    className="w-full py-3.5 bg-yellow-500 text-black hover:bg-yellow-600 font-black text-sm rounded-xl transition-all hover:scale-[1.02] cursor-pointer flex justify-center items-center gap-1.5"
+                  >
+                    {isResettingPassword ? (
+                      <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        <Check className="w-4.5 h-4.5" />
+                        <span>تحديث كلمة المرور آمنياً</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ======================================= */}
+          {/* Modal: Admin Manual Order Creation */}
+          {/* ======================================= */}
+          {isManualOrderOpen && (
+            <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[999] flex items-center justify-center p-4 overflow-y-auto" dir="rtl">
+              <div className="glass rounded-3xl border border-primary/20 w-full max-w-3xl my-8 p-6 md:p-8 text-right space-y-6 relative max-h-[90vh] overflow-y-auto">
+                <button
+                  onClick={() => setIsManualOrderOpen(false)}
+                  className="absolute top-6 left-6 w-8 h-8 rounded-full border border-border/80 flex items-center justify-center text-foreground/60 hover:text-foreground hover:bg-surface transition-all text-sm font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
+
+                <div className="space-y-2 border-b border-border/60 pb-4">
+                  <h3 className="text-xl font-black text-primary flex items-center gap-2">
+                    <FileText className="w-6 h-6" />
+                    <span>إضافة طلب يدوي جديد</span>
+                  </h3>
+                  <p className="text-xs text-foreground/75">قم بإنشاء طلبية يدوية وربطها بحساب زبون مسجل أو إنشاء حساب زبون جديد وتوصيله بالطلبية فوراً.</p>
+                </div>
+
+                <form onSubmit={handleManualOrderSubmit} className="space-y-6">
+                  
+                  {/* Customer Type Choice */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-foreground/80">ربط الطلبية بحساب زبون</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setManualCustType("existing")}
+                        className={`py-2.5 rounded-xl border text-xs font-black transition-all cursor-pointer ${
+                          manualCustType === "existing"
+                            ? "bg-primary text-black border-primary"
+                            : "bg-surface border-border text-foreground/70"
+                        }`}
+                      >
+                        حساب زبون مسجل مسبقاً
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setManualCustType("new")}
+                        className={`py-2.5 rounded-xl border text-xs font-black transition-all cursor-pointer ${
+                          manualCustType === "new"
+                            ? "bg-primary text-black border-primary"
+                            : "bg-surface border-border text-foreground/70"
+                        }`}
+                      >
+                        إنشاء حساب زبون جديد فوراً
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Customer Block Fields */}
+                  {manualCustType === "existing" ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-surface/30 p-4 rounded-2xl border border-border/60">
+                      <div className="space-y-1.5 md:col-span-2">
+                        <label className="block text-xs font-bold text-foreground/80">اختر حساب الزبون المسجل *</label>
+                        <select
+                          value={manualSelectedCustId}
+                          onChange={(e) => setManualSelectedCustId(e.target.value)}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                        >
+                          <option value="">-- يرجى اختيار زبون مسجل --</option>
+                          {customers.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.username} ({c.phone_number || "بدون هاتف"})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-foreground/80">اسم المستلم</label>
+                        <input
+                          type="text"
+                          value={manualName}
+                          onChange={(e) => setManualName(e.target.value)}
+                          placeholder="اسم المستلم"
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-foreground/80">رقم الهاتف للطلب</label>
+                        <input
+                          type="tel"
+                          value={manualPhone}
+                          onChange={(e) => setManualPhone(e.target.value)}
+                          placeholder="رقم الهاتف"
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                        />
+                      </div>
+                      
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-foreground/80">الهاتف الاحتياطي للطلب</label>
+                        <input
+                          type="tel"
+                          value={manualBackupPhone}
+                          onChange={(e) => setManualBackupPhone(e.target.value)}
+                          placeholder="رقم احتياطي"
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-foreground/80">المدينة للطلب</label>
+                        <select
+                          value={manualCity}
+                          onChange={(e) => setManualCity(e.target.value)}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                        >
+                          {Object.keys(cityNames).map((key) => (
+                            <option key={key} value={key}>{cityNames[key]}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-foreground/80">الشارع والحي للطلب</label>
+                        <input
+                          type="text"
+                          value={manualStreet}
+                          onChange={(e) => setManualStreet(e.target.value)}
+                          placeholder="الشارع"
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-foreground/80">تفاصيل العنوان</label>
+                        <input
+                          type="text"
+                          value={manualAddressDetail}
+                          onChange={(e) => setManualAddressDetail(e.target.value)}
+                          placeholder="مثال: بالقرب من.."
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5 md:col-span-2">
+                        <label className="block text-xs font-bold text-foreground/80">رابط الموقع على Google Maps — اختياري</label>
+                        <input
+                          type="url"
+                          value={manualGoogleMaps}
+                          onChange={(e) => setManualGoogleMaps(e.target.value)}
+                          placeholder="https://maps.app.goo.gl/..."
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground text-left"
+                          dir="ltr"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-primary/5 p-4 rounded-2xl border border-primary/20">
+                      <div className="md:col-span-2 border-b border-border/40 pb-2">
+                        <h4 className="text-xs font-black text-primary">بيانات حساب الزبون الجديد لتسجيله تلقائياً في Supabase</h4>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-foreground/80">اسم المستخدم (إنجليزي وأرقام فقط) *</label>
+                        <input
+                          type="text"
+                          required
+                          pattern="^[a-zA-Z0-9_]+$"
+                          value={manualNewUsername}
+                          onChange={(e) => setManualNewUsername(e.target.value)}
+                          placeholder="مثال: sameh_8"
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-foreground/80">كلمة المرور للزبون *</label>
+                        <input
+                          type="text"
+                          required
+                          minLength={6}
+                          value={manualNewPassword}
+                          onChange={(e) => setManualNewPassword(e.target.value)}
+                          placeholder="كلمة مرور الحساب"
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-foreground/80">الاسم الكامل للزبون *</label>
+                        <input
+                          type="text"
+                          required
+                          value={manualNewFullName}
+                          onChange={(e) => setManualNewFullName(e.target.value)}
+                          placeholder="الاسم الثلاثي"
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-foreground/80">رقم الهاتف للزبون الجديد *</label>
+                        <input
+                          type="tel"
+                          required
+                          value={manualNewPhone}
+                          onChange={(e) => setManualNewPhone(e.target.value)}
+                          placeholder="091XXXXXXX"
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-foreground/80">الهاتف الاحتياطي</label>
+                        <input
+                          type="tel"
+                          value={manualNewBackupPhone}
+                          onChange={(e) => setManualNewBackupPhone(e.target.value)}
+                          placeholder="رقم هاتف احتياطي"
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-foreground/80">المدينة</label>
+                        <select
+                          value={manualNewCity}
+                          onChange={(e) => setManualNewCity(e.target.value)}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                        >
+                          {Object.keys(cityNames).map((key) => (
+                            <option key={key} value={key}>{cityNames[key]}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-foreground/80">الشارع والحي</label>
+                        <input
+                          type="text"
+                          value={manualNewStreet}
+                          onChange={(e) => setManualNewStreet(e.target.value)}
+                          placeholder="اسم الشارع"
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-foreground/80">تفاصيل إضافية للعنوان</label>
+                        <input
+                          type="text"
+                          value={manualNewAddressDetail}
+                          onChange={(e) => setManualNewAddressDetail(e.target.value)}
+                          placeholder="توجيهات العنوان"
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5 md:col-span-2">
+                        <label className="block text-xs font-bold text-foreground/80">رابط الموقع على Google Maps — اختياري</label>
+                        <input
+                          type="url"
+                          value={manualNewGoogleMaps}
+                          onChange={(e) => setManualNewGoogleMaps(e.target.value)}
+                          placeholder="https://maps.app.goo.gl/..."
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground text-left"
+                          dir="ltr"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Date selection section */}
+                  <div className="space-y-4 bg-surface/20 p-4 rounded-2xl border border-border/60">
+                    <h4 className="text-xs font-black text-primary border-b border-border/30 pb-1.5">مواعيد المناسبة وحجز الفستان</h4>
+                    
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        id="manualIsPreliminary"
+                        checked={manualIsPreliminary}
+                        onChange={(e) => setManualIsPreliminary(e.target.checked)}
+                        className="w-4 h-4 text-primary bg-surface border-border rounded accent-primary cursor-pointer"
+                      />
+                      <label htmlFor="manualIsPreliminary" className="text-xs font-bold text-foreground cursor-pointer">
+                        حجز مبدئي — لم يتم تحديد موعد المناسبة بعد
+                      </label>
+                    </div>
+
+                    {!manualIsPreliminary && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="block text-xs font-bold text-foreground/80">تاريخ المناسبة / التخرج *</label>
+                          <input
+                            type="date"
+                            required={!manualIsPreliminary}
+                            value={manualEventDate}
+                            onChange={(e) => setManualEventDate(e.target.value)}
+                            className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground text-center"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-xs font-bold text-foreground/80">خيار الإرجاع</label>
+                          <select
+                            value={manualReturnOption}
+                            onChange={(e) => setManualReturnOption(e.target.value as any)}
+                            className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                          >
+                            <option value="same_day">يوم المناسبة (إرجاع في نفس اليوم)</option>
+                            <option value="next_day">اليوم التالي للمناسبة (إرجاع اليوم التالي)</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-xs font-bold text-foreground/60">تاريخ الاستلام المحسوب تلقائياً (تجنب الجمعة)</label>
+                          <input
+                            type="date"
+                            readOnly
+                            value={manualPickupDate}
+                            className="w-full bg-surface/50 border border-border/40 rounded-xl px-4 py-2.5 text-sm text-foreground/70 text-center cursor-not-allowed"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-xs font-bold text-foreground/60">تاريخ الإرجاع المحسوب تلقائياً (تجنب الجمعة)</label>
+                          <input
+                            type="date"
+                            readOnly
+                            value={manualReturnDate}
+                            className="w-full bg-surface/50 border border-border/40 rounded-xl px-4 py-2.5 text-sm text-foreground/70 text-center cursor-not-allowed"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Add Product Items picker */}
+                  <div className="space-y-3 bg-surface/20 p-4 rounded-2xl border border-border/60">
+                    <h4 className="text-xs font-black text-primary border-b border-border/30 pb-1.5">اختر المنتجات المطلوبة</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                      <div className="space-y-1.5 md:col-span-2">
+                        <label className="block text-xs font-bold text-foreground/80">المنتج</label>
+                        <select
+                          value={selectorProductId}
+                          onChange={(e) => setSelectorProductId(e.target.value)}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                        >
+                          <option value="">-- اختر المنتج --</option>
+                          {products.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} (بيع: {p.priceSale} د.ل | إيجار: {p.priceRent} د.ل)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-foreground/80">الكمية</label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={selectorQuantity}
+                          onChange={(e) => setSelectorQuantity(parseInt(e.target.value) || 1)}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground text-center"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-foreground/80">نوع الطلب</label>
+                        <select
+                          value={selectorMode}
+                          onChange={(e) => setSelectorMode(e.target.value as any)}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                        >
+                          <option value="rent">إيجار</option>
+                          <option value="sale">شراء (بيع)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!selectorProductId) return;
+                        const exists = manualOrderItems.find(item => item.id === selectorProductId && item.mode === selectorMode);
+                        if (exists) {
+                          exists.quantity += selectorQuantity;
+                          setManualOrderItems([...manualOrderItems]);
+                        } else {
+                          setManualOrderItems([...manualOrderItems, { id: selectorProductId, quantity: selectorQuantity, mode: selectorMode }]);
+                        }
+                        setSelectorProductId("");
+                        setSelectorQuantity(1);
+                      }}
+                      className="px-4 py-2 bg-foreground text-background font-bold text-xs rounded-lg hover:scale-105 transition-all flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      إضافة المنتج لقائمة الفاتورة
+                    </button>
+
+                    {/* Added Products Table */}
+                    {manualOrderItems.length > 0 && (
+                      <div className="mt-4 border border-border/40 rounded-xl overflow-hidden text-xs">
+                        <table className="w-full text-right border-collapse">
+                          <thead>
+                            <tr className="bg-surface/50 border-b border-border/40 font-bold text-foreground/60">
+                              <th className="p-3">اسم المنتج</th>
+                              <th className="p-3">النوع</th>
+                              <th className="p-3">السعر الفردي</th>
+                              <th className="p-3">الكمية</th>
+                              <th className="p-3">المجموع</th>
+                              <th className="p-3 text-center">التحكم</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {manualOrderItems.map((item, idx) => {
+                              const prod = products.find(p => p.id === item.id);
+                              const price = item.mode === "rent" ? (prod?.priceRent || 0) : (prod?.priceSale || 0);
+                              const subtotal = price * item.quantity;
+                              return (
+                                <tr key={idx} className="border-b border-border/20 bg-surface/10">
+                                  <td className="p-3 font-bold">{prod?.name || "منتج غير معروف"}</td>
+                                  <td className="p-3">{item.mode === "rent" ? "إيجار" : "بيع (شراء)"}</td>
+                                  <td className="p-3 font-mono">{price} د.ل</td>
+                                  <td className="p-3 font-mono">{item.quantity}</td>
+                                  <td className="p-3 font-mono font-bold text-primary">{subtotal} د.ل</td>
+                                  <td className="p-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const copy = [...manualOrderItems];
+                                        copy.splice(idx, 1);
+                                        setManualOrderItems(copy);
+                                      }}
+                                      className="px-2 py-1 bg-red-600/10 hover:bg-red-600/25 text-red-500 rounded font-black cursor-pointer"
+                                    >
+                                      حذف
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                        <div className="bg-surface/60 p-4 flex justify-between items-center border-t border-border/30 font-black text-sm">
+                          <span>إجمالي الفاتورة المطلوب سداده:</span>
+                          <span className="text-primary font-mono text-base">
+                            {manualOrderItems.reduce((acc, item) => {
+                              const prod = products.find(p => p.id === item.id);
+                              const price = item.mode === "rent" ? (prod?.priceRent || 0) : (prod?.priceSale || 0);
+                              return acc + (price * item.quantity);
+                            }, 0)} د.ل
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* General order fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-foreground/80">طريقة الدفع للطلب اليدوي</label>
+                      <select
+                        value={manualPayment}
+                        onChange={(e) => setManualPayment(e.target.value as any)}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                      >
+                        <option value="cash_on_delivery">الدفع عند الاستلام (كاش)</option>
+                        <option value="sadad">سداد (Sadad)</option>
+                        <option value="mobicash">موبي كاش (MobiCash)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-foreground/80">ملاحظات إضافية للطلبية اليدوية</label>
+                      <input
+                        type="text"
+                        value={manualNotes}
+                        onChange={(e) => setManualNotes(e.target.value)}
+                        placeholder="مثال: يرجى تنظيف الفستان بعناية"
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmittingManualOrder}
+                    className="w-full py-4 bg-primary text-black hover:bg-primary/90 font-black text-sm rounded-xl transition-all hover:scale-[1.02] cursor-pointer flex justify-center items-center gap-1.5"
+                  >
+                    {isSubmittingManualOrder ? (
+                      <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        <Check className="w-5 h-5" />
+                        <span>تسجيل وحفظ الفاتورة اليدوية وإرسال تفاصيل الحساب</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       </main>
       <Footer />

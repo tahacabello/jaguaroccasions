@@ -94,7 +94,11 @@ BEGIN
             item_mode
         ) VALUES (
             v_order_id,
-            (v_item->>'product_id')::uuid,
+            CASE 
+                WHEN v_item->>'product_id' ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' 
+                THEN (v_item->>'product_id')::uuid 
+                ELSE NULL 
+            END,
             v_item->>'product_name',
             coalesce(v_item->>'product_image', ''),
             (v_item->>'quantity')::integer,

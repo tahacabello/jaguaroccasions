@@ -5,14 +5,14 @@ import Link from "next/link";
 import { ArrowLeft, User } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { supabase } from "@/lib/supabase";
+import { supabase, resolveAuthEmail } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
 
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   
   const [errorMsg, setErrorMsg] = useState("");
@@ -22,7 +22,7 @@ function LoginContent() {
   // Check if they just registered
   useEffect(() => {
     if (searchParams.get("registered") === "true") {
-      setSuccessMsg("تم تسجيل حسابك بنجاح! يرجى إدخال البريد الإلكتروني وكلمة المرور لتسجيل الدخول.");
+      setSuccessMsg("تم تسجيل حسابك بنجاح! يرجى إدخال اسم المستخدم أو رقم الهاتف أو البريد الإلكتروني لتسجيل الدخول.");
     }
   }, [searchParams]);
 
@@ -32,15 +32,18 @@ function LoginContent() {
     setSuccessMsg("");
     setLoading(true);
 
-    if (!email || !password) {
+    if (!identifier || !password) {
       setErrorMsg("يرجى ملء جميع الحقول المطلوبة");
       setLoading(false);
       return;
     }
 
     try {
+      // Resolve auth email from username/phone/email identifier
+      const resolvedEmail = await resolveAuthEmail(identifier);
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: resolvedEmail,
         password
       });
 
@@ -111,12 +114,12 @@ function LoginContent() {
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-sm font-bold mb-2 text-foreground/80">البريد الإلكتروني</label>
+            <label className="block text-sm font-bold mb-2 text-foreground/80">اسم المستخدم / رقم الهاتف / البريد الإلكتروني</label>
             <input 
-              type="email" 
-              placeholder="example@email.com" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text" 
+              placeholder="username / 091XXXXXXX / email@domain.com" 
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-primary/50 transition-colors font-semibold text-left"
               required
               dir="ltr"

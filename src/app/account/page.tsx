@@ -3,7 +3,16 @@
 import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { supabase, getSupabaseUserProfile, updateSupabaseUserProfile, resolveAssetPath } from "@/lib/supabase";
+import {
+  supabase,
+  getSupabaseUserProfile,
+  updateSupabaseUserProfile,
+  resolveAssetPath,
+  getSupabaseOrderChangeRequestsForUser,
+  submitSupabaseOrderChangeRequest,
+  cancelSupabaseOrderChangeRequest,
+  OrderChangeRequest
+} from "@/lib/supabase";
 import { User, ShoppingBag, MapPin, Phone, LogOut, Package, RefreshCw, Calendar, CreditCard, ChevronDown, ChevronUp, MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -75,17 +84,191 @@ export default function AccountPage() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Order change request state
+  const [changeRequests, setChangeRequests] = useState<OrderChangeRequest[]>([]);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [selectedOrderForRequest, setSelectedOrderForRequest] = useState<any>(null);
+
+  // Modal fields
+  const [requestEventDate, setRequestEventDate] = useState("");
+  const [requestIsPreliminary, setRequestIsPreliminary] = useState(false);
+  const [requestReturnOption, setRequestReturnOption] = useState<"same_day" | "next_day">("next_day");
+  const [requestCustomerNotes, setRequestCustomerNotes] = useState("");
+  const [requestPhone, setRequestPhone] = useState("");
+  const [requestBackupPhone, setRequestBackupPhone] = useState("");
+  const [requestCity, setRequestCity] = useState("tripoli");
+  const [requestStreet, setRequestStreet] = useState("");
+  const [requestAddressDetails, setRequestAddressDetails] = useState("");
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [requestCustomerNote, setRequestCustomerNote] = useState("");
+  const [calculatedPickup, setCalculatedPickup] = useState("");
+  const [calculatedReturn, setCalculatedReturn] = useState("");
+
   // Profile Edit fields
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [initialUsername, setInitialUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [backupPhone, setBackupPhone] = useState("");
   const [city, setCity] = useState("tripoli");
   const [street, setStreet] = useState("");
   const [addressDetail, setAddressDetail] = useState("");
+  const [googleMapsLink, setGoogleMapsLink] = useState("");
 
   // UI state
   const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<"orders" | "profile">("orders");
+
+  // Reload change requests
+  const reloadChangeRequests = async (userId: string) => {
+    try {
+      const reqs = await getSupabaseOrderChangeRequestsForUser(userId);
+      setChangeRequests(reqs || []);
+    } catch (err) {
+      console.error("Error reloading change requests:", err);
+    }
+  };
+
+  // Open modal with prefilled data (either existing pending request or current order data)
+  const handleOpenRequestModal = (order: any) => {
+    setSelectedOrderForRequest(order);
+    
+    // Check if there is an existing pending request
+    const pending = changeRequests.find(r => r.order_id === order.id && r.status === "pending");
+    
+    if (pending) {
+      // Edit mode: pre-fill with pending request data
+      const changes = pending.requested_changes || {};
+      setRequestEventDate(changes.event_date || "");
+      setRequestIsPreliminary(changes.is_preliminary_reservation || changes.is_preliminary || false);
+      setRequestReturnOption(changes.return_option || "next_day");
+      setRequestCustomerNotes(changes.customer_notes || "");
+      setRequestPhone(changes.customer_phone || order.guest_phone || "");
+      setRequestBackupPhone(changes.customer_backup_phone || order.guest_backup_phone || "");
+      
+      const cityVal = changes.customer_city || order.guest_city || "Tripoli";
+      const cityKey = Object.keys(cityNames).find(key => cityNames[key] === cityVal || key === cityVal.toLowerCase()) || "tripoli";
+      setRequestCity(cityKey);
+      
+      setRequestStreet(changes.customer_street || order.guest_street || "");
+      setRequestAddressDetails(changes.customer_address_details || order.guest_address_detail || "");
+      setRequestCustomerNote(pending.customer_note || "");
+    } else {
+      // New request mode: pre-fill with current order data
+      setRequestEventDate(order.event_date || "");
+      setRequestIsPreliminary(order.is_preliminary || false);
+      setRequestReturnOption("next_day");
+      setRequestCustomerNotes(order.customer_notes || "");
+      setRequestPhone(order.guest_phone || "");
+      setRequestBackupPhone(order.guest_backup_phone || "");
+      
+      const cityVal = order.guest_city || "Tripoli";
+      const cityKey = Object.keys(cityNames).find(key => cityNames[key] === cityVal || key === cityVal.toLowerCase()) || "tripoli";
+      setRequestCity(cityKey);
+      
+      setRequestStreet(order.guest_street || "");
+      setRequestAddressDetails(order.guest_address_detail || "");
+      setRequestCustomerNote("");
+    }
+    
+    setShowRequestModal(true);
+  };
+
+  // Dynamically calculate pickup/return dates based on event date & option
+  useEffect(() => {
+    if (requestIsPreliminary || !requestEventDate) {
+      setCalculatedPickup("");
+      setCalculatedReturn("");
+      return;
+    }
+
+    const evDate = new Date(requestEventDate);
+    if (isNaN(evDate.getTime())) return;
+
+    // Pickup calculation: 1 day before event
+    let pickDate = new Date(evDate);
+    pickDate.setDate(evDate.getDate() - 1);
+    if (pickDate.getDay() === 5) { // Friday is 5
+      pickDate.setDate(pickDate.getDate() - 1); // Move to Thursday
+    }
+
+    // Return calculation
+    let retDate = new Date(evDate);
+    if (requestReturnOption === "next_day") {
+      retDate.setDate(evDate.getDate() + 1);
+    }
+    if (retDate.getDay() === 5) { // Friday is 5
+      retDate.setDate(retDate.getDate() + 1); // Move to Saturday (the next non-Friday day)
+    }
+
+    const getYYYYMMDD = (d: Date) => {
+      return d.toISOString().split('T')[0];
+    };
+
+    setCalculatedPickup(getYYYYMMDD(pickDate));
+    setCalculatedReturn(getYYYYMMDD(retDate));
+  }, [requestEventDate, requestReturnOption, requestIsPreliminary]);
+
+  // Submit request
+  const handleSubmitRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedOrderForRequest || !user) return;
+    setSubmittingRequest(true);
+
+    try {
+      const changesPayload: any = {
+        event_date: requestIsPreliminary ? null : requestEventDate,
+        pickup_date: requestIsPreliminary ? null : calculatedPickup,
+        return_date: requestIsPreliminary ? null : calculatedReturn,
+        return_option: requestReturnOption,
+        is_preliminary_reservation: requestIsPreliminary,
+        customer_notes: requestCustomerNotes,
+        customer_phone: requestPhone,
+        customer_backup_phone: requestBackupPhone,
+        customer_city: cityNames[requestCity] || requestCity,
+        customer_street: requestStreet,
+        customer_address_details: requestAddressDetails
+      };
+
+      const res = await submitSupabaseOrderChangeRequest(
+        selectedOrderForRequest.id,
+        user.id,
+        changesPayload,
+        requestCustomerNote
+      );
+
+      if (res.success) {
+        alert("تم تقديم طلب التعديل بنجاح وبانتظار موافقة الإدارة.");
+        setShowRequestModal(false);
+        await reloadChangeRequests(user.id);
+      } else {
+        alert("فشل تقديم الطلب: " + res.error);
+      }
+    } catch (err: any) {
+      alert("خطأ أثناء تقديم الطلب: " + err?.message);
+    } finally {
+      setSubmittingRequest(false);
+    }
+  };
+
+  // Cancel pending request
+  const handleCancelRequest = async (requestId: string) => {
+    if (!confirm("هل أنت متأكد من إلغاء طلب التعديل المعلق؟")) return;
+    try {
+      const success = await cancelSupabaseOrderChangeRequest(requestId);
+      if (success) {
+        alert("تم إلغاء طلب التعديل بنجاح.");
+        if (user) {
+          await reloadChangeRequests(user.id);
+        }
+      } else {
+        alert("فشل إلغاء الطلب.");
+      }
+    } catch (err: any) {
+      alert("خطأ أثناء إلغاء الطلب: " + err?.message);
+    }
+  };
 
   useEffect(() => {
     const checkUser = async () => {
@@ -101,12 +284,16 @@ export default function AccountPage() {
       if (prof) {
         setProfile(prof);
         setName(`${prof.first_name || ""} ${prof.last_name || ""}`.trim() || "");
+        setUsername(prof.username || "");
+        setInitialUsername(prof.username || "");
+        setEmail(prof.email || "");
         setPhone(prof.phone_number || "");
         setBackupPhone(prof.backup_phone || "");
         const cityKey = Object.keys(cityNames).find(key => cityNames[key] === prof.city) || "tripoli";
         setCity(cityKey);
         setStreet(prof.street || "");
         setAddressDetail(prof.additional_address || "");
+        setGoogleMapsLink(prof.google_maps_link || "");
       }
 
       // Fetch Customer Orders
@@ -118,6 +305,14 @@ export default function AccountPage() {
 
       if (dbOrders && !error) {
         setOrders(dbOrders);
+      }
+
+      // Fetch Customer Change Requests
+      try {
+        const reqs = await getSupabaseOrderChangeRequestsForUser(user.id);
+        setChangeRequests(reqs || []);
+      } catch (err) {
+        console.error("Error fetching change requests:", err);
       }
 
       setLoading(false);
@@ -132,6 +327,32 @@ export default function AccountPage() {
     setSaveLoading(true);
     setSaveSuccess(false);
 
+    const cleanUsername = username.trim().toLowerCase();
+
+    // 1. If username was changed, verify uniqueness
+    if (cleanUsername !== initialUsername) {
+      if (!cleanUsername) {
+        alert("اسم المستخدم مطلوب.");
+        setSaveLoading(false);
+        return;
+      }
+      const { data: existingUser, error: checkError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("username", cleanUsername)
+        .maybeSingle();
+
+      if (checkError && checkError.code !== "PGRST116") {
+        console.error("Checking username error:", checkError);
+      }
+
+      if (existingUser) {
+        alert("اسم المستخدم مستخدم بالفعل، يرجى اختيار اسم آخر");
+        setSaveLoading(false);
+        return;
+      }
+    }
+
     try {
       const success = await updateSupabaseUserProfile(user.id, {
         name,
@@ -139,10 +360,14 @@ export default function AccountPage() {
         backup_phone: backupPhone,
         city: cityNames[city] || city,
         street,
-        additional_address: addressDetail
+        additional_address: addressDetail,
+        username: cleanUsername,
+        email: email.trim(),
+        google_maps_link: googleMapsLink.trim()
       });
 
       if (success) {
+        setInitialUsername(cleanUsername);
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 3000);
       } else {
@@ -184,6 +409,175 @@ ${itemsList}
 المجموع: ${order.total_amount} د.ل`;
 
     return `https://wa.me/218921234567?text=${encodeURIComponent(message)}`;
+  };
+
+  const renderChangeRequestStatus = (ord: any) => {
+    const latest = changeRequests
+      .filter(r => r.order_id === ord.id)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+    if (!latest) {
+      return (
+        <div className="mt-4 p-4 rounded-xl border border-border bg-surface/35 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <p className="text-xs text-foreground/50">طلب التعديل:</p>
+            <p className="text-sm font-bold text-foreground/80 flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-foreground/35 text-xs"></span>
+              لا يوجد طلب تعديل
+            </p>
+          </div>
+          {ord.status !== "completed" && ord.status !== "cancelled" && (
+            <button
+              onClick={() => handleOpenRequestModal(ord)}
+              className="px-4 py-2 bg-primary hover:bg-primary-light text-black text-xs font-black rounded-lg transition-all cursor-pointer"
+            >
+              طلب تعديل على الطلب
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    if (latest.status === "pending") {
+      return (
+        <div className="mt-4 p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <p className="text-[10px] text-amber-500 font-bold uppercase tracking-wider">طلب تعديل معلق</p>
+              <p className="text-sm font-black text-amber-400 flex items-center gap-1.5 mt-0.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                طلب تعديل بانتظار موافقة الإدارة
+              </p>
+              <p className="text-xs text-foreground/70 font-semibold mt-1">
+                لن يتم تطبيق التعديل إلا بعد موافقة الإدارة.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleOpenRequestModal(ord)}
+                className="px-3 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary-light border border-primary/20 text-xs font-bold rounded-lg transition-all cursor-pointer"
+              >
+                تعديل طلب التعديل
+              </button>
+              <button
+                onClick={() => handleCancelRequest(latest.id)}
+                className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold rounded-lg transition-all cursor-pointer"
+              >
+                إلغاء طلب التعديل
+              </button>
+            </div>
+          </div>
+
+          {/* Requested changes preview */}
+          <div className="p-3 bg-black/25 rounded-lg text-xs space-y-2 border border-border/40 font-medium">
+            <h5 className="font-bold text-foreground/80">التعديلات المطلوبة بانتظار الموافقة:</h5>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 text-foreground/90">
+              {latest.requested_changes.is_preliminary_reservation ? (
+                <p className="col-span-2 text-amber-400 font-semibold">⚠️ تحويل إلى حجز مبدئي (تأجيل تحديد الموعد)</p>
+              ) : (
+                <>
+                  {latest.requested_changes.event_date && (
+                    <p>📅 تاريخ المناسبة الجديد: <span className="text-primary-light font-bold">{formatArabicDate(latest.requested_changes.event_date)}</span></p>
+                  )}
+                  {latest.requested_changes.pickup_date && (
+                    <p>🚚 تاريخ الاستلام الجديد: <span className="text-foreground/80">{formatArabicDate(latest.requested_changes.pickup_date)}</span></p>
+                  )}
+                  {latest.requested_changes.return_date && (
+                    <p>🔄 تاريخ الإرجاع الجديد: <span className="text-foreground/80">{formatArabicDate(latest.requested_changes.return_date)}</span></p>
+                  )}
+                </>
+              )}
+              {latest.requested_changes.customer_phone && latest.requested_changes.customer_phone !== ord.guest_phone && (
+                <p>📞 رقم الهاتف الجديد: {latest.requested_changes.customer_phone}</p>
+              )}
+              {latest.requested_changes.customer_city && latest.requested_changes.customer_city !== ord.guest_city && (
+                <p>📍 المدينة الجديدة: {latest.requested_changes.customer_city}</p>
+              )}
+              {latest.requested_changes.customer_street && latest.requested_changes.customer_street !== ord.guest_street && (
+                <p>📍 الشارع الجديد: {latest.requested_changes.customer_street}</p>
+              )}
+            </div>
+            {latest.customer_note && (
+              <p className="text-foreground/60 border-t border-border/30 pt-1.5 mt-1.5">
+                💬 سبب التعديل: <span className="text-foreground/80 italic">"{latest.customer_note}"</span>
+              </p>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    if (latest.status === "approved") {
+      return (
+        <div className="mt-4 p-4 rounded-xl border border-green-500/20 bg-green-500/5 space-y-2">
+          <p className="text-xs font-black text-green-400 flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+            تم قبول التعديل
+          </p>
+          <p className="text-xs text-foreground/75 leading-relaxed font-semibold">
+            تمت الموافقة على طلب التعديل وتحديث بيانات الطلبية الحالية بنجاح.
+          </p>
+          {latest.admin_note && (
+            <p className="text-xs text-foreground/60 italic">
+              💬 رد الإدارة: "{latest.admin_note}"
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    if (latest.status === "rejected") {
+      return (
+        <div className="mt-4 p-4 rounded-xl border border-red-500/20 bg-red-500/5 space-y-2">
+          <div className="flex justify-between items-center">
+            <p className="text-xs font-black text-red-400 flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+              تم رفض التعديل
+            </p>
+            {ord.status !== "completed" && ord.status !== "cancelled" && (
+              <button
+                onClick={() => handleOpenRequestModal(ord)}
+                className="px-3 py-1 bg-primary hover:bg-primary-light text-black text-[10px] font-black rounded-lg transition-all cursor-pointer"
+              >
+                تقديم طلب جديد
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-foreground/75 leading-relaxed font-semibold">
+            عذراً، لم توافق الإدارة على طلب التعديل. يرجى التواصل عبر الواتساب للمساعدة.
+          </p>
+          {latest.admin_note && (
+            <p className="text-xs text-red-400/80 font-bold">
+              💬 سبب الرفض: "{latest.admin_note}"
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    if (latest.status === "cancelled") {
+      return (
+        <div className="mt-4 p-4 rounded-xl border border-border bg-surface/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <p className="text-xs text-foreground/50">طلب التعديل:</p>
+            <p className="text-sm font-bold text-foreground/60 flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-foreground/35"></span>
+              تم إلغاء طلب التعديل
+            </p>
+          </div>
+          {ord.status !== "completed" && ord.status !== "cancelled" && (
+            <button
+              onClick={() => handleOpenRequestModal(ord)}
+              className="px-4 py-2 bg-primary hover:bg-primary-light text-black text-xs font-black rounded-lg transition-all cursor-pointer"
+            >
+              طلب تعديل على الطلب
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    return null;
   };
 
   if (loading) {
@@ -294,6 +688,11 @@ ${itemsList}
                                   <Calendar className="w-3.5 h-3.5" />
                                   {new Date(ord.created_at).toLocaleDateString("ar-LY")}
                                 </span>
+                                {changeRequests.some(r => r.order_id === ord.id && r.status === "pending") && (
+                                  <span className="px-2 py-0.5 text-[9px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded flex items-center gap-0.5 animate-pulse">
+                                    ⚠️ طلب تعديل معلق
+                                  </span>
+                                )}
                               </div>
                               <p className="text-xs text-foreground/60 font-semibold flex items-center gap-1">
                                 <CreditCard className="w-3.5 h-3.5 text-primary" />
@@ -401,6 +800,18 @@ ${itemsList}
                                 <div className="space-y-1">
                                   <p className="text-foreground/50 text-[10px]">العنوان وتفاصيل التوصيل:</p>
                                   <p>{ord.guest_city} · {ord.guest_street} {ord.guest_address_detail ? `· ${ord.guest_address_detail}` : ""}</p>
+                                  {ord.google_maps_link && (
+                                    <div className="mt-1.5">
+                                      <a
+                                        href={ord.google_maps_link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 text-primary-light hover:bg-amber-500/20 px-2 py-0.5 rounded text-[10px] font-bold transition-all"
+                                      >
+                                        <span>📍 عرض موقع التوصيل على الخريطة</span>
+                                      </a>
+                                    </div>
+                                  )}
                                 </div>
                                 <div className="space-y-1">
                                   <p className="text-foreground/50 text-[10px]">جدولة وتواريخ الإيجار:</p>
@@ -423,6 +834,8 @@ ${itemsList}
                                   <p className="text-primary-light">{ord.customer_notes || "لا يوجد ملاحظات مضافة"}</p>
                                 </div>
                               </div>
+
+                              {renderChangeRequestStatus(ord)}
 
                               <div className="pt-4 flex justify-start border-t border-border/20 mt-2">
                                 <a
@@ -454,6 +867,31 @@ ${itemsList}
                       🎉 تم حفظ التعديلات بنجاح! سيتم تطبيقها تلقائياً على كافة طلبياتك القادمة.
                     </div>
                   )}
+
+                  {/* Username & Email */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-bold text-foreground/80">اسم المستخدم (للدخول) *</label>
+                      <input
+                        type="text"
+                        required
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ""))}
+                        className="w-full px-4 py-3 rounded-xl border border-border bg-surface hover:border-primary-light/35 focus:border-primary focus:outline-none transition-colors font-semibold text-left"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-bold text-foreground/80">البريد الإلكتروني</label>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-border bg-surface hover:border-primary-light/35 focus:border-primary focus:outline-none transition-colors font-semibold text-left"
+                        dir="ltr"
+                      />
+                    </div>
+                  </div>
 
                   {/* Name */}
                   <div className="space-y-2">
@@ -531,6 +969,19 @@ ${itemsList}
                     />
                   </div>
 
+                  {/* Google Maps link */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-bold text-foreground/80">رابط الموقع على Google Maps — اختياري</label>
+                    <input
+                      type="url"
+                      placeholder="https://maps.app.goo.gl/..."
+                      value={googleMapsLink}
+                      onChange={(e) => setGoogleMapsLink(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border border-border bg-surface hover:border-primary-light/35 focus:border-primary focus:outline-none transition-colors font-semibold text-left"
+                      dir="ltr"
+                    />
+                  </div>
+
                   {/* Save Changes button */}
                   <div className="pt-6">
                     <button
@@ -553,6 +1004,231 @@ ${itemsList}
 
         </div>
       </main>
+
+      {/* modern gold/black modal for change requests */}
+      {showRequestModal && selectedOrderForRequest && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[999] flex items-center justify-center p-4 overflow-y-auto" dir="rtl">
+          <div className="glass rounded-3xl border border-primary/20 w-full max-w-xl max-h-[90vh] overflow-y-auto text-right p-6 md:p-8 space-y-6 relative">
+            
+            {/* Modal header */}
+            <div className="flex justify-between items-start border-b border-border/60 pb-4">
+              <div>
+                <h3 className="text-xl font-black bg-gradient-to-r from-primary-light to-primary-dark bg-clip-text text-transparent">
+                  طلب تعديل على الطلب
+                </h3>
+                <p className="text-xs text-foreground/50 mt-1">الطلبية رقم: <span className="text-primary font-bold">{selectedOrderForRequest.tracking_number}</span></p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRequestModal(false)}
+                className="w-8 h-8 rounded-full border border-border/80 flex items-center justify-center text-foreground/60 hover:text-foreground hover:bg-surface transition-all text-sm font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitRequest} className="space-y-5 text-sm">
+              
+              {/* Event Schedule Section */}
+              <div className="space-y-4 p-4 rounded-2xl bg-primary/5 border border-primary/10">
+                <h4 className="font-bold text-xs text-primary-light">جدولة وتواريخ الإيجار</h4>
+                
+                {/* Preliminary Reservation switch */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="req_preliminary"
+                    checked={requestIsPreliminary}
+                    onChange={(e) => setRequestIsPreliminary(e.target.checked)}
+                    className="w-4 h-4 accent-primary cursor-pointer"
+                  />
+                  <label htmlFor="req_preliminary" className="font-bold text-xs text-foreground/80 cursor-pointer select-none">
+                    حجز مبدئي (تأجيل تحديد موعد المناسبة لاحقاً)
+                  </label>
+                </div>
+
+                {requestIsPreliminary ? (
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 text-xs font-semibold leading-relaxed">
+                    يمكنك تحديد موعد المناسبة لاحقاً، ولن يتم تطبيق أي تعديل إلا بعد موافقة الإدارة.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Event Date Input */}
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-foreground/80">تاريخ المناسبة / التخرج *</label>
+                      <input
+                        type="date"
+                        required={!requestIsPreliminary}
+                        value={requestEventDate}
+                        onChange={(e) => setRequestEventDate(e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl border border-border bg-surface text-foreground font-semibold"
+                        dir="ltr"
+                      />
+                    </div>
+
+                    {/* Return Option */}
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-foreground/80">خيار الإرجاع *</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setRequestReturnOption("same_day")}
+                          className={`py-2 px-3 rounded-xl border font-bold text-xs transition-all cursor-pointer ${
+                            requestReturnOption === "same_day"
+                              ? "bg-primary text-black border-primary"
+                              : "bg-surface border-border text-foreground/75 hover:bg-surface-hover"
+                          }`}
+                        >
+                          الإرجاع في نفس يوم المناسبة
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRequestReturnOption("next_day")}
+                          className={`py-2 px-3 rounded-xl border font-bold text-xs transition-all cursor-pointer ${
+                            requestReturnOption === "next_day"
+                              ? "bg-primary text-black border-primary"
+                              : "bg-surface border-border text-foreground/75 hover:bg-surface-hover"
+                          }`}
+                        >
+                          الإرجاع في اليوم التالي للمناسبة
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Calculated pickup/return dates */}
+                    {requestEventDate && (
+                      <div className="p-3 bg-black/35 rounded-xl border border-border/50 text-xs space-y-1 font-semibold leading-relaxed">
+                        <div className="flex justify-between items-center">
+                          <span className="text-foreground/50">تاريخ الاستلام:</span>
+                          <span className="text-primary-light font-bold">{formatArabicDate(calculatedPickup)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-foreground/50">تاريخ الإرجاع:</span>
+                          <span className="text-primary-light font-bold">{formatArabicDate(calculatedReturn)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Delivery and Phone Section */}
+              <div className="space-y-4">
+                <h4 className="font-bold text-xs text-foreground/60 border-b border-border/40 pb-1">بيانات التواصل والتسليم</h4>
+                
+                {/* Phone & Backup */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-foreground/80">رقم الهاتف *</label>
+                    <input
+                      type="tel"
+                      required
+                      value={requestPhone}
+                      onChange={(e) => setRequestPhone(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-border bg-surface text-foreground font-semibold text-left"
+                      dir="ltr"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-foreground/80">الهاتف الاحتياطي</label>
+                    <input
+                      type="tel"
+                      value={requestBackupPhone}
+                      onChange={(e) => setRequestBackupPhone(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-border bg-surface text-foreground font-semibold text-left"
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+
+                {/* City & Street */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-foreground/80">المدينة *</label>
+                    <select
+                      value={requestCity}
+                      onChange={(e) => setRequestCity(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-border bg-surface text-foreground font-bold"
+                    >
+                      {Object.entries(cityNames).map(([key, name]) => (
+                        <option key={key} value={key}>{name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-foreground/80">الشارع *</label>
+                    <input
+                      type="text"
+                      required
+                      value={requestStreet}
+                      onChange={(e) => setRequestStreet(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-border bg-surface text-foreground font-semibold"
+                    />
+                  </div>
+                </div>
+
+                {/* Address Details */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-foreground/80">تفاصيل العنوان</label>
+                  <input
+                    type="text"
+                    value={requestAddressDetails}
+                    onChange={(e) => setRequestAddressDetails(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-surface text-foreground font-semibold"
+                  />
+                </div>
+              </div>
+
+              {/* Notes Sections */}
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-foreground/80">ملاحظات ومواصفات الطلبية (تطريز، الاسم..)</label>
+                  <textarea
+                    value={requestCustomerNotes}
+                    onChange={(e) => setRequestCustomerNotes(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-surface text-foreground font-semibold min-h-[60px]"
+                  />
+                </div>
+
+                <div className="space-y-1.5 p-3.5 bg-amber-500/5 border border-amber-500/10 rounded-2xl">
+                  <label className="block text-xs font-black text-amber-400">💬 سبب طلب التعديل (رسالة موجهة للإدارة) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="مثال: تغيير موعد حفل التخرج من الكلية أو تعديل رقم الهاتف للتسليم"
+                    value={requestCustomerNote}
+                    onChange={(e) => setRequestCustomerNote(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-surface text-foreground font-semibold mt-1.5"
+                  />
+                </div>
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="pt-4 flex gap-4">
+                <button
+                  type="submit"
+                  disabled={submittingRequest}
+                  className="btn-premium flex-1 py-3 text-sm font-black flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {submittingRequest ? (
+                    <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                  ) : "إرسال طلب التعديل للإدارة"}
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => setShowRequestModal(false)}
+                  className="px-6 py-3 rounded-xl border border-border bg-surface hover:bg-surface-hover text-foreground font-bold text-sm cursor-pointer"
+                >
+                  إلغاء
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
       <Footer />
     </>
   );

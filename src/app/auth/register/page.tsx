@@ -28,6 +28,7 @@ function RegisterContent() {
   
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
@@ -35,6 +36,7 @@ function RegisterContent() {
   const [city, setCity] = useState("tripoli");
   const [street, setStreet] = useState("");
   const [addressDetail, setAddressDetail] = useState("");
+  const [googleMapsLink, setGoogleMapsLink] = useState("");
   
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -46,16 +48,39 @@ function RegisterContent() {
     setSuccessMsg("");
     setLoading(true);
 
-    if (!firstName || !lastName || !email || !password || !phone || !street) {
-      setErrorMsg("الرجاء ملء جميع الحقول المطلوبة");
+    const cleanUsername = username.trim().toLowerCase();
+    if (!firstName || !lastName || !cleanUsername || !password || !street) {
+      setErrorMsg("الرجاء ملء جميع الحقول المطلوبة (الاسم، اسم المستخدم، كلمة المرور، والشارع)");
+      setLoading(false);
+      return;
+    }
+
+    if (!phone && !email) {
+      setErrorMsg("يرجى إدخال طريقة اتصال واحدة على الأقل (رقم الهاتف أو البريد الإلكتروني)");
       setLoading(false);
       return;
     }
 
     try {
+      // 1. Verify that the username is unique in profiles
+      const { data: existingUser } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("username", cleanUsername)
+        .maybeSingle();
+
+      if (existingUser) {
+        setErrorMsg("اسم المستخدم مستخدم بالفعل، يرجى اختيار اسم آخر");
+        setLoading(false);
+        return;
+      }
+
+      // 2. Generate a hidden internal email if email is missing
+      const targetEmail = email ? email.trim() : `${cleanUsername}@jaguar.local`;
+
       const fullName = `${firstName} ${lastName}`;
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: targetEmail,
         password,
         options: {
           data: {
@@ -67,28 +92,63 @@ function RegisterContent() {
             backup_phone: backupPhone,
             city: cityNames[city] || city,
             street: street,
-            additional_address: addressDetail
+            additional_address: addressDetail,
+            username: cleanUsername,
+            google_maps_link: googleMapsLink
           }
         }
       });
 
       if (error) throw error;
 
-      // Insert/upsert profile explicitly in profiles table to be absolutely certain it exists
+      // 3. Upsert profile explicitly to guarantee fields are written
       if (data?.user) {
+        const user = data.user;
         const { error: profileError } = await supabase
           .from("profiles")
           .upsert({
-            id: data.user.id,
+            id: user.id,
+            name: fullName,
             first_name: firstName,
             last_name: lastName,
             phone_number: phone,
+            backup_phone: backupPhone,
             city: cityNames[city] || city,
+            street: street,
+            additional_address: addressDetail,
+            username: cleanUsername,
+            email: targetEmail,
+            google_maps_link: googleMapsLink,
+            is_admin: false,
             updated_at: new Date().toISOString()
           });
         
         if (profileError) {
           console.warn("Client-side profile upsert warning (trigger might handle it):", profileError.message);
+        }
+
+        // Sync to mock profiles localStorage for robust fallback testing
+        if (typeof window !== "undefined") {
+          const mockProfiles = JSON.parse(localStorage.getItem("jaguar_mock_profiles") || "[]");
+          if (!mockProfiles.some((p: any) => p.id === user.id)) {
+            mockProfiles.push({
+              id: user.id,
+              username: cleanUsername,
+              email: targetEmail,
+              name: fullName,
+              first_name: firstName,
+              last_name: lastName,
+              phone_number: phone,
+              backup_phone: backupPhone,
+              city: cityNames[city] || city,
+              street: street,
+              additional_address: addressDetail,
+              google_maps_link: googleMapsLink,
+              is_admin: false,
+              password: password
+            });
+            localStorage.setItem("jaguar_mock_profiles", JSON.stringify(mockProfiles));
+          }
         }
       }
 
@@ -162,13 +222,26 @@ function RegisterContent() {
             </div>
           </div>
 
+          {/* Username Input */}
+          <div>
+            <label className="block text-xs font-bold mb-1 text-foreground/80">اسم المستخدم (مطلوب وفريد للدخول) *</label>
+            <input 
+              type="text" 
+              required
+              placeholder="e.g. ahmad99" 
+              value={username}
+              onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ""))}
+              className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 transition-colors font-semibold text-left"
+              dir="ltr"
+            />
+          </div>
+
           {/* Email & Password */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold mb-1 text-foreground/80">البريد الإلكتروني *</label>
+              <label className="block text-xs font-bold mb-1 text-foreground/80">البريد الإلكتروني (اختياري)</label>
               <input 
                 type="email" 
-                required
                 placeholder="example@email.com" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -256,6 +329,19 @@ function RegisterContent() {
               value={addressDetail}
               onChange={(e) => setAddressDetail(e.target.value)}
               className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 transition-colors font-semibold"
+            />
+          </div>
+
+          {/* Optional Google Maps location link */}
+          <div>
+            <label className="block text-xs font-bold mb-1 text-foreground/80">رابط الموقع على Google Maps — اختياري</label>
+            <input 
+              type="url" 
+              placeholder="https://maps.app.goo.gl/..." 
+              value={googleMapsLink}
+              onChange={(e) => setGoogleMapsLink(e.target.value)}
+              className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 transition-colors font-semibold text-left"
+              dir="ltr"
             />
           </div>
 

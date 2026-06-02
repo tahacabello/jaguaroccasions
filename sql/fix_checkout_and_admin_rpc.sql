@@ -140,7 +140,7 @@ BEGIN
         coalesce(p_guest_address_detail, ''),
         coalesce(p_customer_notes, ''),
         'new', -- الحالة الافتراضية المستقرة الجديدة
-        coalesce(p_payment_method, 'cash_on_delivery'),
+        coalesce(p_payment_method, 'cash_on_delivery')::payment_method,
         p_total_amount,
         p_tracking_number
     )
@@ -159,7 +159,11 @@ BEGIN
             item_mode
         ) VALUES (
             v_order_id,
-            (v_item->>'product_id')::uuid,
+            CASE 
+                WHEN v_item->>'product_id' ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' 
+                THEN (v_item->>'product_id')::uuid 
+                ELSE NULL 
+            END,
             v_item->>'product_name',
             coalesce(v_item->>'product_image', ''),
             (v_item->>'quantity')::integer,

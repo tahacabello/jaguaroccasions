@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { useCart } from "@/context/CartContext";
-import { supabase, addSupabaseOrder, getSupabaseSettings } from "@/lib/supabase";
+import { supabase, addSupabaseOrder, getSupabaseSettings, getSupabaseUserProfile } from "@/lib/supabase";
 import { ShoppingBag, CreditCard, ShieldCheck, Ticket, Check, MapPin, Phone, Info } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -56,6 +56,7 @@ export default function CheckoutPage() {
   const [street, setStreet] = useState("");
   const [addressDetail, setAddressDetail] = useState("");
   const [notes, setNotes] = useState("");
+  const [googleMapsLink, setGoogleMapsLink] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cash_on_delivery" | "sadad" | "mobicash">("cash_on_delivery");
   
   // Rental dates & preliminary reservation state
@@ -88,24 +89,18 @@ export default function CheckoutPage() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         setCustomerId(user.id);
-        // Query their profile shipping details
-        supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single()
-          .then(({ data: profile, error }) => {
-            if (profile && !error) {
-              setName(`${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "");
-              setPhone(profile.phone_number || "");
-              setBackupPhone(profile.backup_phone || "");
-              // Find matching city key or set to tripoli
-              const cityKey = Object.keys(cityNames).find(key => cityNames[key] === profile.city) || "tripoli";
-              setCity(cityKey);
-              setStreet(profile.street || "");
-              setAddressDetail(profile.additional_address || "");
-            }
-          });
+        getSupabaseUserProfile(user.id).then((profile) => {
+          if (profile) {
+            setName(profile.name || `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || "");
+            setPhone(profile.phone_number || "");
+            setBackupPhone(profile.backup_phone || "");
+            const cityKey = Object.keys(cityNames).find(key => cityNames[key] === profile.city) || "tripoli";
+            setCity(cityKey);
+            setStreet(profile.street || "");
+            setAddressDetail(profile.additional_address || "");
+            setGoogleMapsLink(profile.google_maps_link || "");
+          }
+        });
       }
     });
   }, []);
@@ -273,6 +268,7 @@ export default function CheckoutPage() {
         pickup_date: isPreliminary ? null : pickupDate,
         return_date: isPreliminary ? null : returnDate,
         is_preliminary: isPreliminary,
+        google_maps_link: googleMapsLink.trim(),
       };
 
       // 2. Insert into Supabase
@@ -419,6 +415,19 @@ export default function CheckoutPage() {
                   />
                 </div>
 
+                {/* Google Maps Link */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-foreground/80">رابط الموقع على Google Maps — اختياري</label>
+                  <input
+                    type="url"
+                    value={googleMapsLink}
+                    onChange={(e) => setGoogleMapsLink(e.target.value)}
+                    placeholder="https://maps.app.goo.gl/..."
+                    className="w-full px-4 py-3 rounded-xl border border-border bg-surface hover:border-primary-light/35 focus:border-primary focus:outline-none transition-colors font-semibold text-left font-sans"
+                    dir="ltr"
+                  />
+                </div>
+
                 {/* Notes */}
                 <div className="space-y-2">
                   <label className="block text-sm font-bold text-foreground/80">ملاحظات الزبون (مثل مقاس التطريز، الكتابة المخصصة)</label>
@@ -534,7 +543,6 @@ export default function CheckoutPage() {
                                 }`}
                               >
                                 <span className="text-sm">الإرجاع في نفس يوم المناسبة</span>
-                                <span className="text-[10px] opacity-75">إرجاع كابات تخرجك مساء يوم حفلتك</span>
                               </button>
 
                               <button
@@ -547,7 +555,6 @@ export default function CheckoutPage() {
                                 }`}
                               >
                                 <span className="text-sm">الإرجاع في اليوم التالي للمناسبة</span>
-                                <span className="text-[10px] opacity-75">إرجاع كابات تخرجك صباح اليوم التالي للحفلة</span>
                               </button>
                             </div>
                           </div>
@@ -558,7 +565,6 @@ export default function CheckoutPage() {
                           <div className="space-y-3 p-5 rounded-2xl bg-surface border border-border/80 text-right mt-4" dir="rtl">
                             <div className="flex justify-between items-center border-b border-border/40 pb-2 mb-2">
                               <span className="text-xs font-black text-primary-light">جدول مواعيد الحجز المعتمدة:</span>
-                              <span className="text-[10px] bg-green-500/10 text-green-400 px-2 py-0.5 rounded-full font-black">🗓️ حساب تلقائي</span>
                             </div>
                             <div className="space-y-3 text-xs md:text-sm font-semibold">
                               <div className="flex justify-between items-center gap-4">
@@ -566,11 +572,11 @@ export default function CheckoutPage() {
                                 <span className="text-primary font-black">{formatArabicDate(eventDate)}</span>
                               </div>
                               <div className="flex justify-between items-center gap-4">
-                                <span className="text-foreground/60">🚚 تاريخ الاستلام من المعرض:</span>
+                                <span className="text-foreground/60">🚚 تاريخ الاستلام:</span>
                                 <span className="text-foreground/90 font-bold">{formatArabicDate(pickupDate)}</span>
                               </div>
                               <div className="flex justify-between items-center gap-4">
-                                <span className="text-foreground/60">🔄 تاريخ الإرجاع للمعرض:</span>
+                                <span className="text-foreground/60">🔄 تاريخ الإرجاع:</span>
                                 <span className="text-foreground/90 font-bold">{formatArabicDate(returnDate)}</span>
                               </div>
                             </div>
