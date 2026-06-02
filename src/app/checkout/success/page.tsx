@@ -26,12 +26,17 @@ interface SimulatedOrder {
   guest_city: string;
   guest_street: string;
   guest_address_detail?: string;
+  customer_notes?: string;
   status: string;
   payment_method: string;
   total_amount: number;
   tracking_number: string;
   created_at: string;
   items: OrderItem[];
+  event_date?: string | null;
+  pickup_date?: string | null;
+  return_date?: string | null;
+  is_preliminary?: boolean;
 }
 
 function SuccessContent() {
@@ -109,23 +114,45 @@ function SuccessContent() {
     const cleanNumber = rawNumber.replace(/\+/g, "").replace(/\s/g, "");
     
     const itemsList = currentOrder.items
-      ? currentOrder.items.map(item => `- ${item.name} (${item.mode === "rent" ? "إيجار" : "شراء"}) [الكمية: ${item.quantity}]`).join("\n")
+      ? currentOrder.items.map(item => `📦 *${item.name}* (${item.mode === "rent" ? "إيجار" : "شراء"}) × ${item.quantity}`).join("\n")
       : "";
 
-    const message = `السلام عليكم ورحمة الله،
-أود تأكيد طلبي رقم (${currentOrder.tracking_number}) من متجر جاغوار للمناسبات.
+    // Build the sections cleanly with bold titles and emojis
+    let message = `*✨ تأكيد طلب جديد - متجر جاغوار للمناسبات ✨*\n\n`;
+    message += `*📋 [بيانات الطلب]*\n`;
+    message += `🏷️ *رقم الطلب:* ${currentOrder.tracking_number}\n`;
+    message += `👤 *اسم الزبون:* ${currentOrder.guest_name}\n`;
+    message += `📞 *رقم الهاتف:* ${currentOrder.guest_phone}\n`;
+    if (currentOrder.guest_backup_phone) {
+      message += `📱 *الهاتف الاحتياطي:* ${currentOrder.guest_backup_phone}\n`;
+    }
+    message += `📍 *المدينة:* ${currentOrder.guest_city}\n`;
+    message += `🏠 *العنوان:* ${currentOrder.guest_street} ${currentOrder.guest_address_detail || ""}\n\n`;
 
-تفاصيل الطلب:
-- اسم الزبون: ${currentOrder.guest_name}
-- رقم الهاتف: ${currentOrder.guest_phone}
-${currentOrder.guest_backup_phone ? `- هاتف احتياطي: ${currentOrder.guest_backup_phone}\n` : ""}- المدينة: ${currentOrder.guest_city}
-- الشارع والعنوان: ${currentOrder.guest_street} ${currentOrder.guest_address_detail || ""}
+    // Add rental dates section if applicable
+    const hasRent = currentOrder.items?.some(item => item.mode === "rent");
+    if (hasRent) {
+      message += `*🎓 [تفاصيل وجدولة الإيجار]*\n`;
+      if (currentOrder.is_preliminary) {
+        message += `⚠️ *حالة الحجز:* حجز مبدئي — موعد المناسبة غير محدد بعد\n\n`;
+      } else {
+        message += `📅 *تاريخ المناسبة:* ${currentOrder.event_date || "غير محدد"}\n`;
+        message += `🚚 *تاريخ الاستلام:* ${currentOrder.pickup_date || "غير محدد"}\n`;
+        message += `🔄 *تاريخ الإرجاع:* ${currentOrder.return_date || "غير محدد"}\n\n`;
+      }
+    }
 
-المنتجات المحجوزة:
-${itemsList}
+    message += `*🛍️ [المنتجات والكمية]*\n${itemsList}\n\n`;
+    
+    message += `*💰 [تفاصيل الدفع]*\n`;
+    message += `💳 *طريقة الدفع:* ${paymentLabels[currentOrder.payment_method] || currentOrder.payment_method}\n`;
+    message += `💵 *إجمالي الحساب:* ${currentOrder.total_amount} د.ل\n\n`;
 
-إجمالي القيمة: ${currentOrder.total_amount} د.ل
-طريقة الدفع: ${paymentLabels[currentOrder.payment_method] || currentOrder.payment_method}`;
+    if (currentOrder.customer_notes) {
+      message += `*📝 [ملاحظات الزبون]*\n${currentOrder.customer_notes}`;
+    } else {
+      message += `*📝 [ملاحظات الزبون]:* لا توجد ملاحظات`;
+    }
 
     return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`;
   };
@@ -339,6 +366,39 @@ ${itemsList}
                 </div>
               </div>
             </div>
+
+            {/* Rental Scheduling Details */}
+            {currentOrder.items?.some(item => item.mode === "rent") && (
+              <div className="glass p-6 rounded-3xl border border-border space-y-4">
+                <h3 className="text-lg font-bold border-b border-border pb-3 flex items-center gap-2">
+                  <span>🗓️</span>
+                  <span>بيانات وجدولة الإيجار</span>
+                </h3>
+
+                <div className="space-y-3 text-sm font-semibold">
+                  {currentOrder.is_preliminary ? (
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-300 rounded-xl text-xs leading-relaxed">
+                      💡 **حجز مبدئي:** لم يتم تحديد موعد المناسبة والتخرج بعد. يرجى التنسيق مع المعرض عبر الواتساب لاحقاً لتأكيد التواريخ النهائية.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-foreground/60">تاريخ المناسبة / التخرج:</span>
+                        <span className="text-primary-light font-bold">{currentOrder.event_date || "غير محدد"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-foreground/60">تاريخ الاستلام:</span>
+                        <span className="font-bold">{currentOrder.pickup_date || "غير محدد"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-foreground/60">تاريخ الإرجاع:</span>
+                        <span className="font-bold">{currentOrder.return_date || "غير محدد"}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Action buttons */}
             <div className="space-y-4 pt-4">

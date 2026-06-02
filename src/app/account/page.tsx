@@ -377,15 +377,43 @@ ${itemsList}
                                 ))}
                               </div>
 
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border/40 text-xs font-semibold text-foreground/80 leading-relaxed">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-border/40 text-xs font-semibold text-foreground/80 leading-relaxed">
                                 <div className="space-y-1">
                                   <p className="text-foreground/50 text-[10px]">العنوان وتفاصيل التوصيل:</p>
                                   <p>{ord.guest_city} · {ord.guest_street} {ord.guest_address_detail ? `· ${ord.guest_address_detail}` : ""}</p>
                                 </div>
                                 <div className="space-y-1">
+                                  <p className="text-foreground/50 text-[10px]">جدولة وتواريخ الإيجار:</p>
+                                  {ord.order_items?.some((i: any) => i.item_mode === "rent") ? (
+                                    ord.is_preliminary ? (
+                                      <p className="text-amber-400">⚠️ حجز مبدئي — لم يتم تحديد موعد المناسبة بعد</p>
+                                    ) : (
+                                      <div className="space-y-0.5 text-foreground/90">
+                                        <p>🎓 المناسبة: <span className="text-primary-light font-bold">{ord.event_date || "غير محدد"}</span></p>
+                                        <p>🚚 الاستلام: {ord.pickup_date || "غير محدد"}</p>
+                                        <p>🔄 الإرجاع: {ord.return_date || "غير محدد"}</p>
+                                      </div>
+                                    )
+                                  ) : (
+                                    <p className="text-foreground/40">شراء كامل (لا يوجد إيجار)</p>
+                                  )}
+                                </div>
+                                <div className="space-y-1">
                                   <p className="text-foreground/50 text-[10px]">ملاحظات ومواصفات خاصة:</p>
                                   <p className="text-primary-light">{ord.customer_notes || "لا يوجد ملاحظات مضافة"}</p>
                                 </div>
+                              </div>
+
+                              <div className="pt-4 flex justify-start border-t border-border/20 mt-2">
+                                <a
+                                  href={getWhatsAppLink(ord)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-4 py-2 bg-green-500 hover:bg-green-600 text-black rounded-lg font-black text-xs transition-all flex items-center gap-1.5 hover:scale-105"
+                                >
+                                  <MessageCircle className="w-4.5 h-4.5" />
+                                  استفسار ومساعدة فورية بالواتساب عن هذا الطلب
+                                </a>
                               </div>
                             </div>
                           )}

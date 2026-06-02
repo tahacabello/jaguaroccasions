@@ -179,6 +179,7 @@ export default function AdminDashboard() {
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [settingsSubTab, setSettingsSubTab] = useState<"site_texts" | "contact_links" | "rental_policy" | "order_payment">("site_texts");
 
   // Modal Editing States
   const [editingOrder, setEditingOrder] = useState<any | null>(null);
@@ -569,6 +570,7 @@ export default function AdminDashboard() {
         updateSupabaseSetting(key, value)
       );
       await Promise.all(promises);
+      await refreshAllData();
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
@@ -760,7 +762,11 @@ export default function AdminDashboard() {
       guest_address_detail: editingOrder.guest_address_detail,
       customer_notes: editingOrder.customer_notes,
       status: editingOrder.status,
-      total_amount: editingOrder.total_amount
+      total_amount: editingOrder.total_amount,
+      event_date: editingOrder.event_date || null,
+      pickup_date: editingOrder.pickup_date || null,
+      return_date: editingOrder.return_date || null,
+      is_preliminary: editingOrder.is_preliminary || false
     });
 
     if (success) {
@@ -1066,11 +1072,19 @@ export default function AdminDashboard() {
           
           {/* Admin Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-border pb-6 mb-10">
-            <div>
-              <h1 className="text-3xl font-black bg-gradient-to-r from-primary-light to-primary-dark bg-clip-text text-transparent">
-                لوحة تحكم المسؤول (جاغوار)
-              </h1>
-              <p className="text-xs text-foreground/60 mt-1">إدارة الأقسام، المنتجات، المعارض، الفواتير، الحسابات والطلبيات بالكامل</p>
+            <div className="flex flex-col md:flex-row md:items-start md:items-center gap-4">
+              <div>
+                <h1 className="text-3xl font-black bg-gradient-to-r from-primary-light to-primary-dark bg-clip-text text-transparent">
+                  لوحة تحكم المسؤول (جاغوار)
+                </h1>
+                <p className="text-xs text-foreground/60 mt-1">إدارة الأقسام، المنتجات، المعارض، الفواتير، الحسابات والطلبيات بالكامل</p>
+              </div>
+              
+              {/* Security Active Badge */}
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 text-green-400 border border-green-500/20 rounded-full text-[10px] font-black self-start md:self-center">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-ping"></span>
+                <span>🔒 لوحة التحكم نشطة ومفتوحة حالياً</span>
+              </div>
             </div>
 
             <div className="flex gap-4">
@@ -1084,9 +1098,10 @@ export default function AdminDashboard() {
 
               <button
                 onClick={handleAdminSignOut}
-                className="px-5 py-3 rounded-xl border border-red-500/20 bg-red-950/5 hover:bg-red-500/10 text-red-400 font-bold text-xs transition-all"
+                className="px-5 py-3 rounded-xl border border-red-500/20 bg-red-950/5 hover:bg-red-500/10 text-red-400 font-bold text-xs transition-all flex items-center gap-2 hover:scale-105"
               >
-                تسجيل الخروج
+                <Lock className="w-3.5 h-3.5" />
+                تسجيل الخروج وقفل اللوحة
               </button>
             </div>
           </div>
@@ -1806,15 +1821,19 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              {/* Tab: Settings */}
               {activeTab === "settings" && (
                 <form onSubmit={handleSaveSettings} className="glass p-8 rounded-3xl border border-border space-y-6">
-                  <div className="flex justify-between items-center border-b border-border pb-4 mb-4">
-                    <h2 className="text-lg font-bold">تعديل نصوص وتفاصيل محتوى الموقع</h2>
+                  
+                  {/* Tab Title & Floating Save Button */}
+                  <div className="flex justify-between items-center border-b border-border pb-4 mb-4 flex-wrap gap-4">
+                    <div>
+                      <h2 className="text-lg font-bold">تعديل نصوص وتفاصيل محتوى الموقع</h2>
+                      <p className="text-xs text-foreground/50 mt-1">التحكم في كافة نصوص المتجر، قنوات التواصل، وسياسات التأجير</p>
+                    </div>
                     <button
                       type="submit"
                       disabled={isSavingSettings}
-                      className="px-6 py-2.5 bg-primary text-black hover:bg-primary-light rounded-xl font-black text-xs transition-all"
+                      className="px-6 py-2.5 bg-primary text-black hover:bg-primary-light rounded-xl font-black text-xs transition-all hover:scale-105"
                     >
                       {isSavingSettings ? "جاري الحفظ..." : "حفظ التعديلات"}
                     </button>
@@ -1826,363 +1845,441 @@ export default function AdminDashboard() {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">اسم المتجر</label>
-                      <input
-                        type="text"
-                        value={settings.store_name || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, store_name: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">شريط الإعلانات العلوي</label>
-                      <input
-                        type="text"
-                        value={settings.announcement_text || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, announcement_text: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">عنوان الهيرو الرئيسي</label>
-                      <input
-                        type="text"
-                        value={settings.hero_title || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, hero_title: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">عنوان الهيرو الفرعي</label>
-                      <input
-                        type="text"
-                        value={settings.hero_subtitle || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, hero_subtitle: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">عنوان قسم الأقسام المميزة</label>
-                      <input
-                        type="text"
-                        value={settings.categories_title || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, categories_title: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">وصف قسم الأقسام المميزة</label>
-                      <input
-                        type="text"
-                        value={settings.categories_subtitle || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, categories_subtitle: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">عنوان قسم الأكثر طلباً</label>
-                      <input
-                        type="text"
-                        value={settings.trending_title || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, trending_title: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">وصف قسم الأكثر طلباً</label>
-                      <input
-                        type="text"
-                        value={settings.trending_subtitle || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, trending_subtitle: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-
-                    <div className="col-span-1 md:col-span-2 border-t border-border/40 pt-6 mt-6">
-                      <h3 className="text-sm font-black text-primary-light mb-4">بيانات التواصل وعناوين المتجر (Store Contact & Social Links)</h3>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">عنوان المتجر النصي (Address)</label>
-                      <input
-                        type="text"
-                        value={settings.location || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, location: e.target.value }))}
-                        placeholder="مثال: طرابلس، ليبيا"
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">رابط خريطة جوجل (Google Maps Link)</label>
-                      <input
-                        type="text"
-                        value={settings.google_maps_link || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, google_maps_link: e.target.value }))}
-                        placeholder="https://maps.google.com/..."
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
-                        dir="ltr"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">رقم الهاتف للاتصال</label>
-                      <input
-                        type="text"
-                        value={settings.contact_phone || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, contact_phone: e.target.value }))}
-                        placeholder="091XXXXXXX"
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left font-semibold"
-                        dir="ltr"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">البريد الإلكتروني (Email)</label>
-                      <input
-                        type="email"
-                        value={settings.contact_email || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, contact_email: e.target.value }))}
-                        placeholder="info@yourstore.com"
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
-                        dir="ltr"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">رقم الواتساب (WhatsApp Number)</label>
-                      <input
-                        type="text"
-                        value={settings.whatsapp_number || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, whatsapp_number: e.target.value }))}
-                        placeholder="+218921234567"
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left font-semibold"
-                        dir="ltr"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">رابط محادثة الواتساب المباشر (WhatsApp Link)</label>
-                      <input
-                        type="text"
-                        value={settings.whatsapp_link || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, whatsapp_link: e.target.value }))}
-                        placeholder="https://wa.me/..."
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
-                        dir="ltr"
-                      />
-                    </div>
-
-                    <div className="col-span-1 md:col-span-2 space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">ساعات ومواعيد التواصل والعمل (Working Hours)</label>
-                      <input
-                        type="text"
-                        value={settings.working_hours || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, working_hours: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-
-                    <div className="col-span-1 md:col-span-2 border-t border-border/40 pt-4 mt-4">
-                      <h4 className="text-xs font-black text-primary-light/80 mb-2">روابط منصات التواصل الاجتماعي (Social Links)</h4>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">رابط انستقرام (Instagram Link)</label>
-                      <input
-                        type="text"
-                        value={settings.instagram_link || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, instagram_link: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
-                        dir="ltr"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">رابط تيك توك (TikTok Link)</label>
-                      <input
-                        type="text"
-                        value={settings.tiktok_link || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, tiktok_link: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
-                        dir="ltr"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">رابط فيسبوك (Facebook Link)</label>
-                      <input
-                        type="text"
-                        value={settings.facebook_link || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, facebook_link: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
-                        dir="ltr"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">رابط تويتر / X (Twitter Link)</label>
-                      <input
-                        type="text"
-                        value={settings.twitter_link || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, twitter_link: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
-                        dir="ltr"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">رابط سناب شات (Snapchat Link)</label>
-                      <input
-                        type="text"
-                        value={settings.snapchat_link || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, snapchat_link: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
-                        dir="ltr"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">شعار قسم الهيرو الصغير (Kicker Badge)</label>
-                      <input
-                        type="text"
-                        value={settings.hero_badge || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, hero_badge: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-
-                    <div className="col-span-1 md:col-span-2 border-t border-border/40 pt-6 mt-4">
-                      <h3 className="text-sm font-black text-primary-light mb-4">قسم مميزات المتجر الأربعة (Trust Badges)</h3>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">الميزة الأولى - العنوان الرئيسي (مثال: ضمان الجودة)</label>
-                      <input
-                        type="text"
-                        value={settings.trust_badge_1_title || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_1_title: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">الميزة الأولى - الوصف الفرعي</label>
-                      <input
-                        type="text"
-                        value={settings.trust_badge_1_desc || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_1_desc: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">الميزة الثانية - العنوان الرئيسي (مثال: توصيل آمن)</label>
-                      <input
-                        type="text"
-                        value={settings.trust_badge_2_title || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_2_title: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">الميزة الثانية - الوصف الفرعي</label>
-                      <input
-                        type="text"
-                        value={settings.trust_badge_2_desc || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_2_desc: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">الميزة الثالثة - العنوان الرئيسي (مثال: دعم 24/7)</label>
-                      <input
-                        type="text"
-                        value={settings.trust_badge_3_title || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_3_title: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">الميزة الثالثة - الوصف الفرعي</label>
-                      <input
-                        type="text"
-                        value={settings.trust_badge_3_desc || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_3_desc: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">الميزة الرابعة - العنوان الرئيسي (مثال: تصاميم حصرية)</label>
-                      <input
-                        type="text"
-                        value={settings.trust_badge_4_title || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_4_title: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-xs font-bold text-foreground/80">الميزة الرابعة - الوصف الفرعي</label>
-                      <input
-                        type="text"
-                        value={settings.trust_badge_4_desc || ""}
-                        onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_4_desc: e.target.value }))}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                      />
-                    </div>
+                  {/* Sub-Tabs Nav */}
+                  <div className="flex gap-2 border-b border-border/40 pb-4 overflow-x-auto snap-x hide-scrollbar">
+                    <button
+                      type="button"
+                      onClick={() => setSettingsSubTab("site_texts")}
+                      className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all shrink-0 snap-start ${
+                        settingsSubTab === "site_texts" ? "bg-primary text-black" : "bg-surface hover:bg-surface-hover text-foreground/75"
+                      }`}
+                    >
+                      نصوص الموقع
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSettingsSubTab("contact_links")}
+                      className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all shrink-0 snap-start ${
+                        settingsSubTab === "contact_links" ? "bg-primary text-black" : "bg-surface hover:bg-surface-hover text-foreground/75"
+                      }`}
+                    >
+                      بيانات التواصل والشبكات
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSettingsSubTab("rental_policy")}
+                      className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all shrink-0 snap-start ${
+                        settingsSubTab === "rental_policy" ? "bg-primary text-black" : "bg-surface hover:bg-surface-hover text-foreground/75"
+                      }`}
+                    >
+                      سياسة الإيجار
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSettingsSubTab("order_payment")}
+                      className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all shrink-0 snap-start ${
+                        settingsSubTab === "order_payment" ? "bg-primary text-black" : "bg-surface hover:bg-surface-hover text-foreground/75"
+                      }`}
+                    >
+                      إعدادات الطلبات والدفع
+                    </button>
                   </div>
 
-                  <div className="border-t border-border/40 pt-6 mt-6">
-                    <h3 className="text-sm font-black text-primary-light mb-4">إعدادات سياسة الإيجار (Rental Policy Settings)</h3>
-                  </div>
+                  {/* SUBTAB CONTENT 1: SITE TEXTS */}
+                  {settingsSubTab === "site_texts" && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">اسم المتجر</label>
+                        <input
+                          type="text"
+                          value={settings.store_name || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, store_name: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
 
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold text-foreground/80">نص سياسة الإيجار بالتفصيل</label>
-                    <textarea
-                      value={settings.rental_policy || ""}
-                      onChange={(e) => setSettings(prev => ({ ...prev, rental_policy: e.target.value }))}
-                      rows={8}
-                      placeholder="اكتب سياسة الإيجار والشروط هنا..."
-                      className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary leading-relaxed"
-                    />
-                  </div>
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">شريط الإعلانات العلوي</label>
+                        <input
+                          type="text"
+                          value={settings.announcement_text || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, announcement_text: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
 
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold text-foreground/80">من نحن (النص التعريفي بالفوتر)</label>
-                    <textarea
-                      value={settings.about_text || ""}
-                      onChange={(e) => setSettings(prev => ({ ...prev, about_text: e.target.value }))}
-                      rows={3}
-                      className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                    />
-                  </div>
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">عنوان الهيرو الرئيسي</label>
+                        <input
+                          type="text"
+                          value={settings.hero_title || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, hero_title: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
 
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold text-foreground/80">حقوق الفوتر السفلي للموقع</label>
-                    <input
-                      type="text"
-                      value={settings.footer_text || ""}
-                      onChange={(e) => setSettings(prev => ({ ...prev, footer_text: e.target.value }))}
-                      className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
-                    />
-                  </div>
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">عنوان الهيرو الفرعي</label>
+                        <input
+                          type="text"
+                          value={settings.hero_subtitle || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, hero_subtitle: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
 
-                  {/* Redundant lower button as requested */}
-                  <div className="flex justify-end pt-4 border-t border-border/40">
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">عنوان قسم الأقسام المميزة</label>
+                        <input
+                          type="text"
+                          value={settings.categories_title || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, categories_title: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">وصف قسم الأقسام المميزة</label>
+                        <input
+                          type="text"
+                          value={settings.categories_subtitle || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, categories_subtitle: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">عنوان قسم الأكثر طلباً</label>
+                        <input
+                          type="text"
+                          value={settings.trending_title || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, trending_title: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">وصف قسم الأكثر طلباً</label>
+                        <input
+                          type="text"
+                          value={settings.trending_subtitle || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, trending_subtitle: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+
+                      <div className="col-span-1 md:col-span-2 space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">من نحن (النص التعريفي بالفوتر)</label>
+                        <textarea
+                          value={settings.about_text || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, about_text: e.target.value }))}
+                          rows={3}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+
+                      <div className="col-span-1 md:col-span-2 space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">حقوق الفوتر السفلي للموقع</label>
+                        <input
+                          type="text"
+                          value={settings.footer_text || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, footer_text: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+
+                      <div className="col-span-1 md:col-span-2 border-t border-border/40 pt-6 mt-4">
+                        <h3 className="text-sm font-black text-primary-light mb-4">قسم مميزات المتجر الأربعة (Trust Badges)</h3>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">الميزة الأولى - العنوان الرئيسي (مثال: ضمان الجودة)</label>
+                        <input
+                          type="text"
+                          value={settings.trust_badge_1_title || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_1_title: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">الميزة الأولى - الوصف الفرعي</label>
+                        <input
+                          type="text"
+                          value={settings.trust_badge_1_desc || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_1_desc: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">الميزة الثانية - العنوان الرئيسي (مثال: توصيل آمن)</label>
+                        <input
+                          type="text"
+                          value={settings.trust_badge_2_title || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_2_title: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">الميزة الثانية - الوصف الفرعي</label>
+                        <input
+                          type="text"
+                          value={settings.trust_badge_2_desc || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_2_desc: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">الميزة الثالثة - العنوان الرئيسي (مثال: دعم 24/7)</label>
+                        <input
+                          type="text"
+                          value={settings.trust_badge_3_title || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_3_title: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">الميزة الثالثة - الوصف الفرعي</label>
+                        <input
+                          type="text"
+                          value={settings.trust_badge_3_desc || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_3_desc: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">الميزة الرابعة - العنوان الرئيسي (مثال: تصاميم حصرية)</label>
+                        <input
+                          type="text"
+                          value={settings.trust_badge_4_title || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_4_title: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">الميزة الرابعة - الوصف الفرعي</label>
+                        <input
+                          type="text"
+                          value={settings.trust_badge_4_desc || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, trust_badge_4_desc: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUBTAB CONTENT 2: CONTACT & SOCIALS */}
+                  {settingsSubTab === "contact_links" && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">عنوان المتجر النصي (Address)</label>
+                        <input
+                          type="text"
+                          value={settings.location || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, location: e.target.value }))}
+                          placeholder="مثال: طرابلس، ليبيا"
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">رابط خريطة جوجل (Google Maps Link)</label>
+                        <input
+                          type="text"
+                          value={settings.google_maps_link || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, google_maps_link: e.target.value }))}
+                          placeholder="https://maps.google.com/..."
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
+                          dir="ltr"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">رقم الهاتف للاتصال</label>
+                        <input
+                          type="text"
+                          value={settings.contact_phone || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, contact_phone: e.target.value }))}
+                          placeholder="091XXXXXXX"
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left font-semibold"
+                          dir="ltr"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">البريد الإلكتروني (Email)</label>
+                        <input
+                          type="email"
+                          value={settings.contact_email || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, contact_email: e.target.value }))}
+                          placeholder="info@yourstore.com"
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
+                          dir="ltr"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">رقم الواتساب (WhatsApp Number)</label>
+                        <input
+                          type="text"
+                          value={settings.whatsapp_number || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, whatsapp_number: e.target.value }))}
+                          placeholder="+218921234567"
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left font-semibold"
+                          dir="ltr"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">رابط محادثة الواتساب المباشر (WhatsApp Link)</label>
+                        <input
+                          type="text"
+                          value={settings.whatsapp_link || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, whatsapp_link: e.target.value }))}
+                          placeholder="https://wa.me/..."
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
+                          dir="ltr"
+                        />
+                      </div>
+
+                      <div className="col-span-1 md:col-span-2 space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">ساعات ومواعيد التواصل والعمل (Working Hours)</label>
+                        <input
+                          type="text"
+                          value={settings.working_hours || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, working_hours: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+
+                      <div className="col-span-1 md:col-span-2 border-t border-border/40 pt-4 mt-4">
+                        <h4 className="text-xs font-black text-primary-light/80 mb-2">روابط منصات التواصل الاجتماعي (Social Links)</h4>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">رابط انستقرام (Instagram Link)</label>
+                        <input
+                          type="text"
+                          value={settings.instagram_link || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, instagram_link: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
+                          dir="ltr"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">رابط تيك توك (TikTok Link)</label>
+                        <input
+                          type="text"
+                          value={settings.tiktok_link || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, tiktok_link: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
+                          dir="ltr"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">رابط فيسبوك (Facebook Link)</label>
+                        <input
+                          type="text"
+                          value={settings.facebook_link || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, facebook_link: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
+                          dir="ltr"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">رابط تويتر / X (Twitter Link)</label>
+                        <input
+                          type="text"
+                          value={settings.twitter_link || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, twitter_link: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
+                          dir="ltr"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">رابط سناب شات (Snapchat Link)</label>
+                        <input
+                          type="text"
+                          value={settings.snapchat_link || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, snapchat_link: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary text-left"
+                          dir="ltr"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">شعار قسم الهيرو الصغير (Kicker Badge)</label>
+                        <input
+                          type="text"
+                          value={settings.hero_badge || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, hero_badge: e.target.value }))}
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUBTAB CONTENT 3: RENTAL POLICY */}
+                  {settingsSubTab === "rental_policy" && (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-foreground/80">نص سياسة الإيجار بالتفصيل</label>
+                        <textarea
+                          value={settings.rental_policy || ""}
+                          onChange={(e) => setSettings(prev => ({ ...prev, rental_policy: e.target.value }))}
+                          rows={12}
+                          placeholder="اكتب سياسة الإيجار والشروط هنا..."
+                          className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary leading-relaxed"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUBTAB CONTENT 4: ORDER & PAYMENT */}
+                  {settingsSubTab === "order_payment" && (
+                    <div className="space-y-6">
+                      <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 text-xs md:text-sm leading-relaxed text-primary-light">
+                        💡 **معلومات تنظيمية للطلبات والدفع:** الدفع الإلكتروني المباشر (سداد / موبي كاش) معطل حالياً وسيتوفر قريباً. الدفع المفعل في نظام الفوترة الآن هو الدفع عند الاستلام كاش.
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="block text-xs font-bold text-foreground/80">تعليمات الدفع المخصصة (تظهر عند الدفع)</label>
+                          <input
+                            type="text"
+                            value={settings.payment_instructions || "الدفع نقداً كاش أو بالتحويل عند الاستلام"}
+                            onChange={(e) => setSettings(prev => ({ ...prev, payment_instructions: e.target.value }))}
+                            className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="block text-xs font-bold text-foreground/80">الحد الأدنى لقيمة الطلب (د.ل)</label>
+                          <input
+                            type="text"
+                            value={settings.min_order_amount || "0"}
+                            onChange={(e) => setSettings(prev => ({ ...prev, min_order_amount: e.target.value }))}
+                            className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Floating/Bottom Action Bar */}
+                  <div className="flex justify-between items-center pt-6 border-t border-border/40 mt-6 flex-wrap gap-4">
+                    <span className="text-xs text-foreground/50">
+                      * اضغط على حفظ لتطبيق التغييرات وتحديث المتجر بالكامل فورياً.
+                    </span>
                     <button
                       type="submit"
                       disabled={isSavingSettings}
-                      className="px-8 py-3 bg-primary text-black hover:bg-primary-light rounded-xl font-black text-xs transition-all"
+                      className="px-8 py-3 bg-primary text-black hover:bg-primary-light rounded-xl font-black text-xs transition-all hover:scale-105"
                     >
                       {isSavingSettings ? "جاري الحفظ..." : "حفظ التعديلات"}
                     </button>
@@ -2746,6 +2843,62 @@ export default function AdminDashboard() {
                       rows={2}
                       className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm"
                     />
+                  </div>
+
+                  {/* Rental Scheduling Controls for Admin */}
+                  <div className="space-y-4 p-4 rounded-2xl bg-surface border border-border">
+                    <h4 className="text-xs font-black text-primary-light border-b border-border/40 pb-2 flex items-center gap-1.5">
+                      <span>🗓️</span>
+                      <span>جدولة وتواريخ الإيجار (خاص بالإدارة)</span>
+                    </h4>
+                    
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={editingOrder.is_preliminary || false}
+                        onChange={(e) => setEditingOrder({
+                          ...editingOrder,
+                          is_preliminary: e.target.checked,
+                          event_date: e.target.checked ? null : editingOrder.event_date,
+                          pickup_date: e.target.checked ? null : editingOrder.pickup_date,
+                          return_date: e.target.checked ? null : editingOrder.return_date
+                        })}
+                        className="w-4.5 h-4.5 rounded border-border text-primary focus:ring-primary accent-primary"
+                      />
+                      <span className="text-xs font-bold">حجز مبدئي (تاريخ المناسبة والتسليم غير محدد حالياً)</span>
+                    </label>
+
+                    {!editingOrder.is_preliminary && (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-foreground/50">تاريخ المناسبة</label>
+                          <input
+                            type="date"
+                            value={editingOrder.event_date || ""}
+                            onChange={(e) => setEditingOrder({ ...editingOrder, event_date: e.target.value })}
+                            className="w-full bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs text-center"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-foreground/50">تاريخ الاستلام</label>
+                          <input
+                            type="date"
+                            value={editingOrder.pickup_date || ""}
+                            onChange={(e) => setEditingOrder({ ...editingOrder, pickup_date: e.target.value })}
+                            className="w-full bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs text-center"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-foreground/50">تاريخ الإرجاع</label>
+                          <input
+                            type="date"
+                            value={editingOrder.return_date || ""}
+                            onChange={(e) => setEditingOrder({ ...editingOrder, return_date: e.target.value })}
+                            className="w-full bg-background border border-border rounded-lg px-2.5 py-1.5 text-xs text-center"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-1">

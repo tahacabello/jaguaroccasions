@@ -24,6 +24,42 @@ const cityNames: Record<string, string> = {
   other: "مدينة أخرى",
 };
 
+// Helper for rental dates suggestions based on event date and Friday rule
+const suggestDates = (eventDateStr: string) => {
+  if (!eventDateStr) return { pickup: "", returns: [] };
+  const eventDateObj = new Date(eventDateStr);
+  if (isNaN(eventDateObj.getTime())) return { pickup: "", returns: [] };
+
+  // Calculate suggested pickup: 1 day before, but if that falls on Friday, make it Thursday
+  let pickup = new Date(eventDateObj);
+  pickup.setDate(eventDateObj.getDate() - 1);
+  if (pickup.getDay() === 5) { // Friday
+    pickup.setDate(pickup.getDate() - 1); // Move to Thursday
+  }
+
+  // Calculate return options: Option 1 is event day, Option 2 is day after event
+  let returnA = new Date(eventDateObj);
+  if (returnA.getDay() === 5) {
+    returnA.setDate(returnA.getDate() + 1); // Saturday
+  }
+
+  let returnB = new Date(eventDateObj);
+  returnB.setDate(eventDateObj.getDate() + 1);
+  if (returnB.getDay() === 5) {
+    returnB.setDate(returnB.getDate() + 2); // Sunday
+  }
+
+  const returns = [
+    { label: "يوم المناسبة / التخرج", date: returnA.toISOString().split('T')[0] },
+    { label: "اليوم التالي للمناسبة", date: returnB.toISOString().split('T')[0] }
+  ];
+
+  return {
+    pickup: pickup.toISOString().split('T')[0],
+    returns
+  };
+};
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { cartItems, cartTotal, clearCart, isLoaded } = useCart();
@@ -37,6 +73,12 @@ export default function CheckoutPage() {
   const [addressDetail, setAddressDetail] = useState("");
   const [notes, setNotes] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cash_on_delivery" | "sadad" | "mobicash">("cash_on_delivery");
+  
+  // Rental dates & preliminary reservation state
+  const [isPreliminary, setIsPreliminary] = useState(false);
+  const [eventDate, setEventDate] = useState("");
+  const [pickupDate, setPickupDate] = useState("");
+  const [returnDate, setReturnDate] = useState("");
   
   // Auth state
   const [customerId, setCustomerId] = useState<string | null>(null);
@@ -179,6 +221,10 @@ export default function CheckoutPage() {
     }
 
     const hasRentItems = cartItems.some(item => item.mode === "rent");
+    if (hasRentItems && !isPreliminary && (!eventDate || !pickupDate || !returnDate)) {
+      alert("يرجى تحديد تاريخ المناسبة، وتاريخ الاستلام والإرجاع، أو اختيار حجز مبدئي.");
+      return;
+    }
     if (hasRentItems && !agreeToPolicy) {
       alert("يرجى الموافقة على سياسة الإيجار قبل إتمام الطلب");
       return;
@@ -203,6 +249,10 @@ export default function CheckoutPage() {
         payment_method: "cash_on_delivery", // Enforced CoD only
         total_amount: finalTotal,
         tracking_number: trackingNumber,
+        event_date: isPreliminary ? null : eventDate,
+        pickup_date: isPreliminary ? null : pickupDate,
+        return_date: isPreliminary ? null : returnDate,
+        is_preliminary: isPreliminary,
       };
 
       // 2. Insert into Supabase
@@ -404,6 +454,107 @@ export default function CheckoutPage() {
                     </div>
                   </div>
                 </div>
+
+                {cartItems.some(item => item.mode === "rent") && (
+                  <div className="space-y-6 p-6 rounded-2xl bg-primary/5 border border-primary/20 text-right">
+                    <h3 className="text-lg font-bold text-primary-light border-b border-primary/10 pb-2 flex items-center gap-2">
+                      <span>🗓️</span>
+                      <span>تفاصيل وجدولة الإيجار</span>
+                    </h3>
+                    
+                    <label className="flex items-center gap-3 p-4 rounded-xl border border-border bg-surface hover:bg-surface-hover cursor-pointer transition-all select-none">
+                      <input
+                        type="checkbox"
+                        checked={isPreliminary}
+                        onChange={(e) => {
+                          setIsPreliminary(e.target.checked);
+                          if (e.target.checked) {
+                            setEventDate("");
+                            setPickupDate("");
+                            setReturnDate("");
+                          }
+                        }}
+                        className="w-5 h-5 rounded border-border text-primary focus:ring-primary accent-primary shrink-0"
+                      />
+                      <span className="text-sm font-bold text-foreground/90">
+                        حجز مبدئي — لم يتم تحديد موعد المناسبة بعد
+                      </span>
+                    </label>
+
+                    {isPreliminary ? (
+                      <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 leading-relaxed font-bold">
+                        ⚠️ **ملاحظة:** سيتم تسجيل هذا الطلب كـ "حجز مبدئي". يجب عليك تأكيد الموعد النهائي للمناسبة لاحقاً عبر الواتساب مع إدارة المعرض.
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="block text-sm font-bold text-foreground/80">تاريخ المناسبة / التخرج *</label>
+                          <input
+                            type="date"
+                            required={!isPreliminary}
+                            value={eventDate}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEventDate(val);
+                              const suggs = suggestDates(val);
+                              setPickupDate(suggs.pickup);
+                              if (suggs.returns.length > 0) {
+                                setReturnDate(suggs.returns[1].date); // Default to day after event
+                              }
+                            }}
+                            className="w-full px-4 py-3 rounded-xl border border-border bg-surface hover:border-primary-light/35 focus:border-primary focus:outline-none transition-colors font-semibold text-center"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="block text-sm font-bold text-foreground/80">تاريخ الاستلام *</label>
+                            <input
+                              type="date"
+                              required={!isPreliminary}
+                              value={pickupDate}
+                              onChange={(e) => setPickupDate(e.target.value)}
+                              className="w-full px-4 py-3 rounded-xl border border-border bg-surface hover:border-primary-light/35 focus:border-primary focus:outline-none transition-colors font-semibold text-center"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="block text-sm font-bold text-foreground/80">تاريخ الإرجاع *</label>
+                            <input
+                              type="date"
+                              required={!isPreliminary}
+                              value={returnDate}
+                              onChange={(e) => setReturnDate(e.target.value)}
+                              className="w-full px-4 py-3 rounded-xl border border-border bg-surface hover:border-primary-light/35 focus:border-primary focus:outline-none transition-colors font-semibold text-center"
+                            />
+                          </div>
+                        </div>
+
+                        {eventDate && (
+                          <div className="space-y-2">
+                            <label className="block text-xs font-bold text-foreground/60">خيارات تاريخ الإرجاع المقترحة (الرجاء الاختيار):</label>
+                            <div className="flex flex-wrap gap-2">
+                              {suggestDates(eventDate).returns.map((opt) => (
+                                <button
+                                  key={opt.date}
+                                  type="button"
+                                  onClick={() => setReturnDate(opt.date)}
+                                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
+                                    returnDate === opt.date
+                                      ? "bg-primary text-black border-primary"
+                                      : "bg-surface hover:bg-surface-hover border-border text-foreground"
+                                  }`}
+                                >
+                                  {opt.label} ({opt.date})
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {cartItems.some(item => item.mode === "rent") && settings.rental_policy && (
                   <div className="space-y-4">

@@ -627,7 +627,11 @@ export async function addSupabaseOrder(order: any, items: any[]): Promise<{ succ
         p_payment_method: order.payment_method || 'cash_on_delivery',
         p_total_amount: Number(order.total_amount),
         p_tracking_number: order.tracking_number,
-        p_items: orderItemsPayload
+        p_items: orderItemsPayload,
+        p_event_date: order.event_date || null,
+        p_pickup_date: order.pickup_date || null,
+        p_return_date: order.return_date || null,
+        p_is_preliminary: order.is_preliminary || false
       });
 
     if (error) throw error;
@@ -669,7 +673,11 @@ export async function updateSupabaseOrderDetails(orderId: string, updates: any):
         p_customer_notes: updates.customer_notes || "",
         p_total_amount: Number(updates.total_amount),
         p_status: updates.status,
-        p_passcode: '9922'
+        p_passcode: '9922',
+        p_event_date: updates.event_date || null,
+        p_pickup_date: updates.pickup_date || null,
+        p_return_date: updates.return_date || null,
+        p_is_preliminary: updates.is_preliminary || false
       });
 
     if (error) throw error;

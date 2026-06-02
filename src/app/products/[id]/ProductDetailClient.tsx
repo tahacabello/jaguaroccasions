@@ -118,6 +118,11 @@ export default function ProductDetailClient({ params }: { params: { id: string }
     .map((img: string) => resolveAssetPath(img));
   const [activeImage, setActiveImage] = useState(productImages[0]);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+
+  useEffect(() => {
+    setImageLoading(true);
+  }, [activeImage]);
 
   useEffect(() => {
     getSupabaseProducts().then(dbProducts => {
@@ -195,7 +200,13 @@ export default function ProductDetailClient({ params }: { params: { id: string }
                       fill
                       className="object-cover transition-transform duration-700 group-hover:scale-110"
                       priority
+                      onLoad={() => setImageLoading(false)}
                     />
+                    {imageLoading && (
+                      <div className="absolute inset-0 bg-surface-hover animate-pulse flex items-center justify-center">
+                        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    )}
                   </motion.div>
                 </AnimatePresence>
                 {/* Overlay hint for Lightbox */}
