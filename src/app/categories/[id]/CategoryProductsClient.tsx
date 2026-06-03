@@ -35,10 +35,18 @@ export default function CategoryProductsClient({ params }: { params: { id: strin
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isCurrent = true;
+    setLoading(true);
+    setProducts([]);
+    setSubcategories([]);
+    setSelectedSubcategory(null);
+
     async function loadAll() {
       try {
         const decodedParamId = decodeURIComponent(params.id);
         const cats = await getSupabaseCategories();
+        if (!isCurrent) return;
+
         const found = cats.find((c: any) => 
           c.id === params.id || 
           c.slug === params.id || 
@@ -56,6 +64,7 @@ export default function CategoryProductsClient({ params }: { params: { id: strin
             getSupabaseSubcategories(found.id),
             getSupabaseProducts()
           ]);
+          if (!isCurrent) return;
 
           // Handle subcategories
           const activeSubs = subs.filter((s: any) => s.is_active);
@@ -97,17 +106,23 @@ export default function CategoryProductsClient({ params }: { params: { id: strin
           });
 
           setProducts(filtered);
+          setLoading(false);
         } else {
           setIsValidCategory(false);
+          setLoading(false);
         }
       } catch (err) {
         console.error("Error loading category client details:", err);
-        setIsValidCategory(false);
-      } finally {
-        setLoading(false);
+        if (isCurrent) {
+          setIsValidCategory(false);
+          setLoading(false);
+        }
       }
     }
     loadAll();
+    return () => {
+      isCurrent = false;
+    };
   }, [params.id]);
 
   if (loading) {

@@ -116,7 +116,9 @@ export default function ProductDetailClient() {
   const searchParams = useSearchParams();
   const productId = searchParams.get("id") || "1";
 
-  const [product, setProduct] = useState<any>(productsDb[productId] || productsDb["1"]);
+  const [product, setProduct] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [mode, setMode] = useState<"rent" | "sale">("sale");
   const [quantity, setQuantity] = useState(1);
   const [isAdded, setIsAdded] = useState(false);
@@ -128,9 +130,10 @@ export default function ProductDetailClient() {
   }, []);
 
   // Gallery state
-  const productImages = (product.images && product.images.length > 0 ? product.images : [product.image])
+  const productImages = (product?.images && product.images.length > 0 ? product.images : [product?.image || ""])
+    .filter(Boolean)
     .map((img: string) => resolveAssetPath(img));
-  const [activeImage, setActiveImage] = useState(productImages[0]);
+  const [activeImage, setActiveImage] = useState("");
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
 
@@ -139,13 +142,19 @@ export default function ProductDetailClient() {
   }, [activeImage]);
 
   useEffect(() => {
+    let isCurrent = true;
+    setLoading(true);
+    setProduct(null);
+    setError(false);
+    setActiveImage("");
+
     getSupabaseProducts().then(dbProducts => {
+      if (!isCurrent) return;
+      
       const found = dbProducts.find(p => p.id === productId);
       if (found) {
-        // If DB product doesn't have images array, we use its main image as a single-item array
         const dbProduct: any = found;
         if (!dbProduct.images) {
-          // If we found the Kuwaiti cap from db, and we want to preserve our mock gallery for it:
           if (dbProduct.id === "1" && productsDb["1"].images) {
              dbProduct.images = productsDb["1"].images;
           }
@@ -163,13 +172,39 @@ export default function ProductDetailClient() {
 
         const imagesList = dbProduct.images && dbProduct.images.length > 0 ? dbProduct.images : [dbProduct.image];
         setActiveImage(resolveAssetPath(imagesList[0]));
+        setLoading(false);
+      } else {
+        // Try mock databases as fallback if ID exists in local mock database
+        const mockFound = productsDb[productId];
+        if (mockFound) {
+          const fallbackProduct = { id: productId, ...mockFound };
+          setProduct(fallbackProduct);
+          setMode(mockFound.priceRent > 0 && mockFound.priceSale === 0 ? "rent" : "sale");
+          const imagesList = mockFound.images && mockFound.images.length > 0 ? mockFound.images : [mockFound.image];
+          setActiveImage(resolveAssetPath(imagesList[0]));
+          setLoading(false);
+        } else {
+          setError(true);
+          setLoading(false);
+        }
       }
-    }).catch(err => console.error("Error fetching product detail in PD:", err));
+    }).catch(err => {
+      console.error("Error fetching product detail in PD:", err);
+      if (isCurrent) {
+        setError(true);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      isCurrent = false;
+    };
   }, [productId]);
 
-  const currentPrice = mode === "sale" ? product.priceSale : product.priceRent;
+  const currentPrice = product ? (mode === "sale" ? product.priceSale : product.priceRent) : 0;
 
   const handleAddToCart = () => {
+    if (!product) return;
     addToCart(
       {
         id: productId,
@@ -183,6 +218,65 @@ export default function ProductDetailClient() {
     setIsAdded(true);
     setTimeout(() => setIsAdded(false), 2000);
   };
+
+  if (loading) {
+    return (
+      <>
+        <Header />
+        <main className="min-h-screen bg-background pt-8 pb-24 text-right">
+          <div className="container mx-auto px-4 lg:px-8">
+            {/* Shimmer Breadcrumbs */}
+            <div className="flex gap-2 mb-8 animate-pulse justify-end">
+              <div className="h-4 bg-surface-hover/50 rounded w-20"></div>
+              <div className="h-4 bg-surface-hover/30 rounded w-4"></div>
+              <div className="h-4 bg-surface-hover/50 rounded w-24"></div>
+              <div className="h-4 bg-surface-hover/30 rounded w-4"></div>
+              <div className="h-4 bg-surface-hover/50 rounded w-32"></div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+              {/* Shimmer Gallery */}
+              <div className="space-y-4 animate-pulse">
+                <div className="aspect-square w-full rounded-2xl bg-surface-hover/40 border border-border"></div>
+                <div className="flex gap-4 justify-end">
+                  <div className="w-24 h-24 rounded-xl bg-surface-hover/30"></div>
+                  <div className="w-24 h-24 rounded-xl bg-surface-hover/30"></div>
+                  <div className="w-24 h-24 rounded-xl bg-surface-hover/30"></div>
+                </div>
+              </div>
+
+              {/* Shimmer Info */}
+              <div className="space-y-6 animate-pulse flex flex-col items-end text-right">
+                <div className="h-4 bg-surface-hover/50 rounded w-1/4"></div>
+                <div className="h-12 bg-surface-hover/70 rounded w-3/4"></div>
+                <div className="h-6 bg-surface-hover/50 rounded w-1/3"></div>
+                <div className="h-20 bg-surface-hover/30 rounded w-full"></div>
+                <div className="h-10 bg-surface-hover/50 rounded w-1/2"></div>
+                <div className="h-14 bg-surface-hover/70 rounded w-full"></div>
+              </div>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <>
+        <Header />
+        <main className="min-h-screen bg-background pt-24 pb-24 flex items-center justify-center text-center">
+          <div className="max-w-md p-8 glass rounded-2xl border border-border">
+            <h1 className="text-3xl font-black text-red-500 mb-4">المنتج غير موجود</h1>
+            <p className="text-foreground/70 mb-8 font-bold">عذراً، لم نتمكن من العثور على المنتج المطلوب أو قد يكون تم حذفه.</p>
+            <Link href="/categories" className="btn-premium px-8 py-3">تصفح الأقسام</Link>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   return (
     <>
