@@ -56,7 +56,9 @@ import {
   getSupabaseAllChangeRequests,
   getSupabasePendingChangeRequestsCount,
   adminApproveChangeRequest,
-  adminRejectChangeRequest
+  adminRejectChangeRequest,
+  approveOrderCancellation,
+  rejectOrderCancellation
 } from "@/lib/supabase";
 
 const cityNames: Record<string, string> = {
@@ -244,6 +246,13 @@ export default function AdminDashboard() {
   const [reviewAction, setReviewAction] = useState<"approve" | "reject" | null>(null);
   const [adminNoteInput, setAdminNoteInput] = useState("");
   const [isProcessingReview, setIsProcessingReview] = useState(false);
+
+  // Cancellation review states
+  const [selectedOrderForCancellation, setSelectedOrderForCancellation] = useState<string | null>(null);
+  const [cancellationAction, setCancellationAction] = useState<"approve" | "reject" | null>(null);
+  const [isProcessingCancellation, setIsProcessingCancellation] = useState(false);
+  const [cancellationPasscodeOpen, setCancellationPasscodeOpen] = useState(false);
+  const [cancellationPasscode, setCancellationPasscode] = useState("");
 
   // Homepage Sections Builder States
   const [homepageSectionsList, setHomepageSectionsList] = useState<any[]>([]);
@@ -1248,6 +1257,48 @@ ${orderSum}
     }
   };
 
+  // Cancellation request handlers
+  const handleReviewCancellation = (orderId: string, action: "approve" | "reject") => {
+    setSelectedOrderForCancellation(orderId);
+    setCancellationAction(action);
+    setCancellationPasscode("");
+    setCancellationPasscodeOpen(true);
+  };
+
+  const handleSubmitCancellationPasscode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedOrderForCancellation || !cancellationAction) return;
+
+    if (cancellationPasscode !== "9922") {
+      alert("رمز مرور المسؤول غير صحيح! يرجى إدخال الرمز الصحيح للموافقة أو الرفض.");
+      return;
+    }
+
+    setIsProcessingCancellation(true);
+    try {
+      let res;
+      if (cancellationAction === "approve") {
+        res = await approveOrderCancellation(selectedOrderForCancellation, cancellationPasscode);
+      } else {
+        res = await rejectOrderCancellation(selectedOrderForCancellation, cancellationPasscode);
+      }
+
+      if (res.success) {
+        alert(cancellationAction === "approve" ? "تم قبول طلب الإلغاء وتعديل حالة الطلب إلى ملغي بنجاح!" : "تم رفض طلب الإلغاء بنجاح.");
+        setCancellationPasscodeOpen(false);
+        setSelectedOrderForCancellation(null);
+        setCancellationAction(null);
+        await refreshAllData();
+      } else {
+        alert("فشل تنفيذ الإجراء: " + res.error);
+      }
+    } catch (err: any) {
+      alert("خطأ غير متوقع: " + err?.message);
+    } finally {
+      setIsProcessingCancellation(false);
+    }
+  };
+
   // Categories CRUD
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1740,10 +1791,10 @@ ${orderSum}
               }`}
             >
               <RefreshCw className="w-4 h-4 inline-block ml-2" />
-              طلبات تعديل بانتظار الموافقة
-              {pendingRequestsCount > 0 && (
+              طلبات التعديل والإلغاء
+              {(pendingRequestsCount + orders.filter(o => o.cancellation_status === 'pending').length) > 0 && (
                 <span className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black animate-pulse">
-                  {pendingRequestsCount}
+                  {pendingRequestsCount + orders.filter(o => o.cancellation_status === 'pending').length}
                 </span>
               )}
             </button>
@@ -3129,178 +3180,245 @@ ${orderSum}
               {activeTab === "change_requests" && (
                 <div className="space-y-8 text-right">
                   <div className="glass p-8 rounded-3xl border border-border">
-                    <h2 className="text-xl font-bold">طلبات تعديل البيانات المحجوزة بانتظار الموافقة</h2>
+                    <h2 className="text-xl font-bold">طلبات التعديل وإلغاء الطلبيات بانتظار الموافقة</h2>
                     <p className="text-xs text-foreground/60 mt-1">
-                      هنا تظهر طلبات تعديل التواريخ، أرقام الهواتف أو العناوين التي يقدمها الزبائن. يمكنك مقارنة البيانات الحالية بالجديدة والموافقة عليها.
+                      هنا تظهر طلبات تعديل البيانات أو طلبات إلغاء الحجز المقدمة من قبل الزبائن. يمكنك مراجعتها واتخاذ القرار المناسب.
                     </p>
                   </div>
 
-                  {changeRequests.filter(r => r.status === "pending").length === 0 ? (
-                    <div className="text-center py-20 glass rounded-3xl border border-border">
-                      <div className="w-16 h-16 bg-primary/10 rounded-full border border-primary/20 flex items-center justify-center mx-auto mb-4 text-primary">
-                        <RefreshCw className="w-8 h-8" />
+                  {/* 1. SECTION: Order Cancellation Requests */}
+                  <div className="glass p-8 rounded-3xl border border-border space-y-6">
+                    <h3 className="text-lg font-bold flex items-center gap-2 border-b border-border/40 pb-3">
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+                      طلبات إلغاء الطلبيات بانتظار موافقة الإدارة
+                    </h3>
+                    
+                    {orders.filter(o => o.cancellation_status === 'pending').length === 0 ? (
+                      <div className="text-center py-8 bg-surface/10 border border-dashed border-border rounded-xl">
+                        <p className="text-xs text-foreground/45 font-bold">لا توجد طلبات إلغاء معلقة حالياً.</p>
                       </div>
-                      <p className="text-foreground/60 text-base font-bold">لا توجد طلبات تعديل معلقة بانتظار الموافقة حالياً.</p>
-                      <p className="text-xs text-foreground/45 mt-1">ستظهر الطلبات الجديدة هنا فور تقديمها من قبل الزبائن.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      {changeRequests
-                        .filter(r => r.status === "pending")
-                        .map((req) => {
-                          const ord = req.order;
-                          const changes = req.requested_changes;
-                          
-                          if (!ord) return null;
-
-                          return (
-                            <div key={req.id} className="glass p-6 rounded-2xl border border-amber-500/20 hover:border-amber-500/30 transition-all space-y-6">
-                              
-                              {/* Request Header */}
-                              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-border/40">
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {orders
+                          .filter(o => o.cancellation_status === 'pending')
+                          .map((ord) => (
+                            <div key={ord.id} className="bg-surface/50 border border-red-500/20 hover:border-red-500/35 rounded-2xl p-6 transition-all space-y-4">
+                              <div className="flex justify-between items-start border-b border-border/40 pb-3 gap-2">
                                 <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-black animate-pulse">طلب تعديل معلق</span>
-                                    <span className="font-black text-sm text-foreground">الرقم المرجعي للطلب: <span className="text-primary-light font-black">{ord.tracking_number}</span></span>
-                                  </div>
-                                  <p className="text-xs text-foreground/50 mt-1 flex items-center gap-1.5 font-semibold">
-                                    👤 العميل: {ord.guest_name} · رقم العميل: {req.user_id.substring(0, 8)}...
-                                    · تاريخ الطلب: {new Date(req.created_at).toLocaleString("ar-LY")}
+                                  <h4 className="font-bold text-sm">رقم الطلب: <span className="text-primary-light font-black">{ord.tracking_number}</span></h4>
+                                  <p className="text-[10px] text-foreground/50 mt-1 font-semibold">
+                                    تاريخ الطلب: {new Date(ord.created_at).toLocaleDateString("ar-LY")}
                                   </p>
                                 </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleReviewRequest(req, "approve")}
-                                    className="px-4 py-2 bg-green-500 hover:bg-green-600 text-black text-xs font-black rounded-xl transition-all cursor-pointer hover:scale-105"
-                                  >
-                                    قبول التعديل
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleReviewRequest(req, "reject")}
-                                    className="px-4 py-2 bg-red-500 hover:bg-red-600 text-black text-xs font-black rounded-xl transition-all cursor-pointer hover:scale-105"
-                                  >
-                                    رفض التعديل
-                                  </button>
-                                </div>
+                                <span className="px-2.5 py-1 text-[10px] font-black bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg animate-pulse">
+                                  طلب إلغاء معلق
+                                </span>
                               </div>
 
-                              {/* Comparison Layout */}
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-                                
-                                {/* Current Order State */}
-                                <div className="p-4 rounded-xl bg-surface/30 border border-border/50 space-y-3">
-                                  <h4 className="font-bold text-foreground/50 border-b border-border/30 pb-1.5 flex items-center gap-1">
-                                    <span>🔴</span>
-                                    <span>البيانات الحالية للطلب</span>
-                                  </h4>
-                                  <div className="space-y-1.5 font-semibold text-foreground/80">
-                                    <p>🛡️ نوع الحجز: {ord.is_preliminary ? <span className="text-amber-400 font-bold">⚠️ حجز مبدئي (التواريخ غير محددة)</span> : <span className="text-green-400 font-bold">حجز مؤكد التاريخ</span>}</p>
-                                    {!ord.is_preliminary && (
-                                      <>
-                                        <p>📅 تاريخ المناسبة: <span className="text-foreground/90 font-bold">{formatArabicDate(ord.event_date)}</span></p>
-                                        <p>🚚 تاريخ الاستلام: <span className="text-foreground/60">{formatArabicDate(ord.pickup_date)}</span></p>
-                                        <p>🔄 تاريخ الإرجاع: <span className="text-foreground/60">{formatArabicDate(ord.return_date)}</span></p>
-                                      </>
-                                    )}
-                                    <p>📞 رقم الهاتف الأساسي: <span className="text-foreground/80 font-bold">{ord.guest_phone || "غير متوفر"}</span></p>
-                                    {ord.guest_backup_phone && <p>📞 الهاتف الاحتياطي: {ord.guest_backup_phone}</p>}
-                                    <p>📍 العنوان الحالي: {ord.guest_city} · {ord.guest_street} {ord.guest_address_detail ? `· ${ord.guest_address_detail}` : ""}</p>
-                                    <p className="text-primary-light">💬 ملاحظات مقاس التطريز: {ord.customer_notes || "لا يوجد"}</p>
-                                  </div>
-                                </div>
-
-                                {/* Requested Changes State */}
-                                <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-3">
-                                  <h4 className="font-bold text-amber-400 border-b border-amber-500/20 pb-1.5 flex items-center gap-1">
-                                    <span>🟡</span>
-                                    <span>التعديلات الجديدة المطلوبة</span>
-                                  </h4>
-                                  <div className="space-y-1.5 font-bold text-foreground">
-                                    
-                                    {/* Preliminary vs Dated */}
-                                    {changes.is_preliminary_reservation !== undefined && changes.is_preliminary_reservation !== ord.is_preliminary ? (
-                                      <p className="text-amber-400">🛡️ تعديل نوع الحجز: {changes.is_preliminary_reservation ? "تحويل إلى حجز مبدئي" : "تحويل إلى حجز مؤكد التاريخ"}</p>
-                                    ) : null}
-
-                                    {/* Event Date */}
-                                    {changes.is_preliminary_reservation ? (
-                                      <p className="text-amber-400">⚠️ سيتم تأجيل تحديد موعد المناسبة لوقت لاحق.</p>
-                                    ) : (
-                                      <>
-                                        {changes.event_date && (
-                                          <p className={changes.event_date !== ord.event_date ? "text-amber-400" : ""}>
-                                            📅 تاريخ المناسبة: {formatArabicDate(changes.event_date)}
-                                            {changes.event_date !== ord.event_date && <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded mr-1 font-bold">معدل</span>}
-                                          </p>
-                                        )}
-                                        {changes.pickup_date && (
-                                          <p className={changes.pickup_date !== ord.pickup_date ? "text-amber-400" : ""}>
-                                            🚚 تاريخ الاستلام: {formatArabicDate(changes.pickup_date)}
-                                            {changes.pickup_date !== ord.pickup_date && <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded mr-1 font-bold">معدل</span>}
-                                          </p>
-                                        )}
-                                        {changes.return_date && (
-                                          <p className={changes.return_date !== ord.return_date ? "text-amber-400" : ""}>
-                                            🔄 تاريخ الإرجاع: {formatArabicDate(changes.return_date)}
-                                            {changes.return_date !== ord.return_date && <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded mr-1 font-bold">معدل</span>}
-                                          </p>
-                                        )}
-                                      </>
-                                    )}
-
-                                    {/* Phone Changes */}
-                                    {changes.customer_phone && (
-                                      <p className={changes.customer_phone !== ord.guest_phone ? "text-amber-400" : ""}>
-                                        📞 رقم الهاتف الأساسي: {changes.customer_phone}
-                                        {changes.customer_phone !== ord.guest_phone && <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded mr-1 font-bold">معدل</span>}
-                                      </p>
-                                    )}
-                                    {changes.customer_backup_phone !== undefined && (
-                                      <p className={changes.customer_backup_phone !== ord.guest_backup_phone ? "text-amber-400" : ""}>
-                                        📞 الهاتف الاحتياطي: {changes.customer_backup_phone || "ملغي/فارغ"}
-                                        {changes.customer_backup_phone !== ord.guest_backup_phone && <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded mr-1 font-bold">معدل</span>}
-                                      </p>
-                                    )}
-
-                                    {/* Address Changes */}
-                                    {(changes.customer_city || changes.customer_street || changes.customer_address_details) && (
-                                      <p className="text-amber-400">
-                                        📍 العنوان الجديد: {changes.customer_city || ord.guest_city} · {changes.customer_street || ord.guest_street} {changes.customer_address_details !== undefined ? `· ${changes.customer_address_details}` : (ord.guest_address_detail ? `· ${ord.guest_address_detail}` : "")}
-                                        <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded mr-1 font-bold">معدل العنوان</span>
-                                      </p>
-                                    )}
-
-                                    {/* Customer Notes */}
-                                    {changes.customer_notes !== undefined && (
-                                      <p className={changes.customer_notes !== ord.customer_notes ? "text-primary-light" : ""}>
-                                        💬 ملاحظات مقاس التطريز: {changes.customer_notes || "ملغية/فارغة"}
-                                        {changes.customer_notes !== ord.customer_notes && <span className="text-[10px] bg-primary/10 text-primary-light px-1.5 py-0.5 rounded mr-1 font-bold">معدل</span>}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
+                              <div className="text-xs space-y-1.5 font-semibold text-foreground/80 leading-relaxed">
+                                <p>👤 اسم الزبون: <span className="text-foreground font-black">{ord.guest_name}</span></p>
+                                <p>📞 رقم الهاتف: <span className="text-foreground/90 font-bold">{ord.guest_phone}</span></p>
+                                <p>📍 عنوان التوصيل: <span className="text-foreground/90 font-bold">{ord.guest_city} · {ord.guest_street}</span></p>
+                                <p>💸 إجمالي الفاتورة: <span className="text-primary-light font-black">{ord.total_amount} د.ل</span></p>
+                                <p>🛡️ حالة الطلب الحالية: 
+                                  <span className="bg-foreground/5 border border-border/20 px-2 py-0.5 rounded text-[10px] mr-1.5 inline-block text-foreground/80 font-black">
+                                    {statusTranslations[ord.status] || ord.status}
+                                  </span>
+                                </p>
                               </div>
 
-                              {/* Customer request note */}
-                              {req.customer_note && (
-                                <div className="p-4 rounded-xl bg-black/35 border border-border/80 text-xs">
-                                  <p className="text-foreground/50 font-bold mb-1">💬 رسالة وتوضيح الزبون للطلب:</p>
-                                  <p className="text-amber-400 font-bold italic">"{req.customer_note}"</p>
-                                </div>
-                              )}
-
+                              <div className="flex items-center gap-3 pt-3 border-t border-border/20">
+                                <button
+                                  type="button"
+                                  onClick={() => handleReviewCancellation(ord.id, "approve")}
+                                  className="flex-1 py-2.5 bg-green-500 hover:bg-green-600 text-black text-xs font-black rounded-xl transition-all cursor-pointer text-center hover:scale-105"
+                                >
+                                  قبول الإلغاء
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleReviewCancellation(ord.id, "reject")}
+                                  className="flex-1 py-2.5 bg-red-500 hover:bg-red-650 text-white hover:text-black border border-red-500/25 text-xs font-black rounded-xl transition-all cursor-pointer text-center hover:scale-105"
+                                >
+                                  رفض الإلغاء
+                                </button>
+                              </div>
                             </div>
-                          );
-                        })}
+                          ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. SECTION: Order Edit (Change) Requests */}
+                  <div className="glass p-8 rounded-3xl border border-border space-y-6">
+                    <h3 className="text-lg font-bold flex items-center gap-2 border-b border-border/40 pb-3">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                      طلبات تعديل بيانات الحجز بانتظار الموافقة
+                    </h3>
+
+                    {changeRequests.filter(r => r.status === "pending").length === 0 ? (
+                      <div className="text-center py-8 bg-surface/10 border border-dashed border-border rounded-xl">
+                        <p className="text-xs text-foreground/45 font-bold">لا توجد طلبات تعديل معلقة حالياً.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {changeRequests
+                          .filter(r => r.status === "pending")
+                          .map((req) => {
+                            const ord = req.order;
+                            const changes = req.requested_changes;
+                            
+                            if (!ord) return null;
+
+                            return (
+                              <div key={req.id} className="glass p-6 rounded-2xl border border-amber-500/20 hover:border-amber-500/30 transition-all space-y-6">
+                                
+                                {/* Request Header */}
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-border/40">
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-black animate-pulse">طلب تعديل معلق</span>
+                                      <span className="font-black text-sm text-foreground">الرقم المرجعي للطلب: <span className="text-primary-light font-black">{ord.tracking_number}</span></span>
+                                    </div>
+                                    <p className="text-xs text-foreground/50 mt-1 flex items-center gap-1.5 font-semibold">
+                                      👤 العميل: {ord.guest_name} · رقم العميل: {req.user_id.substring(0, 8)}...
+                                      · تاريخ الطلب: {new Date(req.created_at).toLocaleString("ar-LY")}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleReviewRequest(req, "approve")}
+                                      className="flex-1 sm:flex-initial px-4 py-2 bg-green-500 hover:bg-green-600 text-black text-xs font-black rounded-xl transition-all cursor-pointer hover:scale-105 text-center"
+                                    >
+                                      قبول التعديل
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleReviewRequest(req, "reject")}
+                                      className="flex-1 sm:flex-initial px-4 py-2 bg-red-500 hover:bg-red-650 text-white hover:text-black border border-red-500/20 text-xs font-black rounded-xl transition-all cursor-pointer hover:scale-105 text-center"
+                                    >
+                                      رفض التعديل
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Comparison Layout */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-right">
+                                  
+                                  {/* Current Order State */}
+                                  <div className="p-4 rounded-xl bg-surface/30 border border-border/50 space-y-3">
+                                    <h4 className="font-bold text-foreground/50 border-b border-border/30 pb-1.5 flex items-center gap-1">
+                                      <span>🔴</span>
+                                      <span>البيانات الحالية للطلب</span>
+                                    </h4>
+                                    <div className="space-y-1.5 font-semibold text-foreground/80">
+                                      <p>🛡️ نوع الحجز: {ord.is_preliminary ? <span className="text-amber-400 font-bold">⚠️ حجز مبدئي (التواريخ غير محددة)</span> : <span className="text-green-400 font-bold">حجز مؤكد التاريخ</span>}</p>
+                                      {!ord.is_preliminary && (
+                                        <>
+                                          <p>📅 تاريخ المناسبة: <span className="text-foreground/90 font-bold">{formatArabicDate(ord.event_date)}</span></p>
+                                          <p>🚚 تاريخ الاستلام: <span className="text-foreground/60">{formatArabicDate(ord.pickup_date)}</span></p>
+                                          <p>🔄 تاريخ الإرجاع: <span className="text-foreground/60">{formatArabicDate(ord.return_date)}</span></p>
+                                        </>
+                                      )}
+                                      <p>📞 رقم الهاتف الأساسي: <span className="text-foreground/80 font-bold">{ord.guest_phone || "غير متوفر"}</span></p>
+                                      {ord.guest_backup_phone && <p>📞 الهاتف الاحتياطي: {ord.guest_backup_phone}</p>}
+                                      <p>📍 العنوان الحالي: {ord.guest_city} · {ord.guest_street} {ord.guest_address_detail ? `· ${ord.guest_address_detail}` : ""}</p>
+                                      <p className="text-primary-light">💬 ملاحظات مقاس التطريز: {ord.customer_notes || "لا يوجد"}</p>
+                                    </div>
+                                  </div>
+
+                                  {/* Requested Changes State */}
+                                  <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 space-y-3">
+                                    <h4 className="font-bold text-amber-400 border-b border-amber-500/20 pb-1.5 flex items-center gap-1">
+                                      <span>🟡</span>
+                                      <span>التعديلات الجديدة المطلوبة</span>
+                                    </h4>
+                                    <div className="space-y-1.5 font-bold text-foreground">
+                                      
+                                      {/* Preliminary vs Dated */}
+                                      {changes.is_preliminary_reservation !== undefined && changes.is_preliminary_reservation !== ord.is_preliminary ? (
+                                        <p className="text-amber-400">🛡️ تعديل نوع الحجز: {changes.is_preliminary_reservation ? "تحويل إلى حجز مبدئي" : "تحويل إلى حجز مؤكد التاريخ"}</p>
+                                      ) : null}
+
+                                      {/* Event Date */}
+                                      {changes.is_preliminary_reservation ? (
+                                        <p className="text-amber-400">⚠️ سيتم تأجيل تحديد موعد المناسبة لوقت لاحق.</p>
+                                      ) : (
+                                        <>
+                                          {changes.event_date && (
+                                            <p className={changes.event_date !== ord.event_date ? "text-amber-400" : ""}>
+                                              📅 تاريخ المناسبة: {formatArabicDate(changes.event_date)}
+                                              {changes.event_date !== ord.event_date && <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded mr-1 font-bold">معدل</span>}
+                                            </p>
+                                          )}
+                                          {changes.pickup_date && (
+                                            <p className={changes.pickup_date !== ord.pickup_date ? "text-amber-400" : ""}>
+                                              🚚 تاريخ الاستلام: {formatArabicDate(changes.pickup_date)}
+                                              {changes.pickup_date !== ord.pickup_date && <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded mr-1 font-bold">معدل</span>}
+                                            </p>
+                                          )}
+                                          {changes.return_date && (
+                                            <p className={changes.return_date !== ord.return_date ? "text-amber-400" : ""}>
+                                              🔄 تاريخ الإرجاع: {formatArabicDate(changes.return_date)}
+                                              {changes.return_date !== ord.return_date && <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded mr-1 font-bold">معدل</span>}
+                                            </p>
+                                          )}
+                                        </>
+                                      )}
+
+                                      {/* Phone Changes */}
+                                      {changes.customer_phone && (
+                                        <p className={changes.customer_phone !== ord.guest_phone ? "text-amber-400" : ""}>
+                                          📞 رقم الهاتف الأساسي: {changes.customer_phone}
+                                          {changes.customer_phone !== ord.guest_phone && <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded mr-1 font-bold">معدل</span>}
+                                        </p>
+                                      )}
+                                      {changes.customer_backup_phone !== undefined && (
+                                        <p className={changes.customer_backup_phone !== ord.guest_backup_phone ? "text-amber-400" : ""}>
+                                          📞 الهاتف الاحتياطي: {changes.customer_backup_phone || "ملغي/فارغ"}
+                                          {changes.customer_backup_phone !== ord.guest_backup_phone && <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded mr-1 font-bold">معدل</span>}
+                                        </p>
+                                      )}
+
+                                      {/* Address Changes */}
+                                      {(changes.customer_city || changes.customer_street || changes.customer_address_details) && (
+                                        <p className="text-amber-400">
+                                          📍 العنوان الجديد: {changes.customer_city || ord.guest_city} · {changes.customer_street || ord.guest_street} {changes.customer_address_details !== undefined ? `· ${changes.customer_address_details}` : (ord.guest_address_detail ? `· ${ord.guest_address_detail}` : "")}
+                                          <span className="text-[10px] bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded mr-1 font-bold">معدل العنوان</span>
+                                        </p>
+                                      )}
+
+                                      {/* Customer Notes */}
+                                      {changes.customer_notes !== undefined && (
+                                        <p className={changes.customer_notes !== ord.customer_notes ? "text-primary-light" : ""}>
+                                          💬 ملاحظات مقاس التطريز: {changes.customer_notes || "ملغية/فارغة"}
+                                          {changes.customer_notes !== ord.customer_notes && <span className="text-[10px] bg-primary/10 text-primary-light px-1.5 py-0.5 rounded mr-1 font-bold">معدل</span>}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                               {/* Customer request note */}
+                                {req.customer_note && (
+                                  <div className="p-4 rounded-xl bg-black/35 border border-border/80 text-xs">
+                                    <p className="text-foreground/50 font-bold mb-1">💬 رسالة وتوضيح الزبون للطلب:</p>
+                                    <p className="text-amber-400 font-bold italic">"{req.customer_note}"</p>
+                                  </div>
+                                )}
+
+                              </div>
+                            );
+                          })}
                     </div>
                   )}
                 </div>
-              )}
+              </div>
+            )}
 
-            </div>
-          )}
+          </div>
+        )}
 
           {/* ============================================== */}
           {/* ================ MODAL WINDOWS =============== */}
@@ -5135,6 +5253,74 @@ ${orderSum}
                     }`}
                   >
                     {isProcessingReview ? (
+                      <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <>
+                        <Check className="w-4.5 h-4.5" />
+                        تأكيد وإتمام العملية الآن
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Order Cancellation Passcode Verification Dialog Modal */}
+          {cancellationPasscodeOpen && selectedOrderForCancellation && (
+            <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[9999] flex items-center justify-center p-4" dir="rtl">
+              <div className="glass rounded-3xl border border-primary/20 w-full max-w-md p-6 md:p-8 text-right space-y-6 relative">
+                
+                <button
+                  onClick={() => setCancellationPasscodeOpen(false)}
+                  className="absolute top-6 left-6 w-8 h-8 rounded-full border border-border/80 flex items-center justify-center text-foreground/60 hover:text-foreground hover:bg-surface transition-all text-sm font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
+
+                <div className="text-center space-y-2">
+                  <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto border ${
+                    cancellationAction === "approve" 
+                      ? "bg-green-500/10 text-green-400 border-green-500/25" 
+                      : "bg-red-500/10 text-red-400 border-red-500/25"
+                  }`}>
+                    <Lock className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-lg font-black">
+                    {cancellationAction === "approve" ? "قبول طلب إلغاء الطلبية" : "رفض طلب إلغاء الطلبية"}
+                  </h3>
+                  <p className="text-xs text-foreground/55 max-w-xs mx-auto">
+                    {cancellationAction === "approve" 
+                      ? "سيتم تحويل حالة هذه الطلبية فورياً إلى ملغية (Cancelled) مع إعلام الزبون."
+                      : "سيتم رفض طلب الإلغاء وتبقى الطلبية نشطة كما هي."}
+                  </p>
+                </div>
+
+                <form onSubmit={handleSubmitCancellationPasscode} className="space-y-4">
+                  {/* Passcode input */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-foreground/80">رمز مرور المسؤول لتأكيد العملية *</label>
+                    <input
+                      type="password"
+                      required
+                      value={cancellationPasscode}
+                      onChange={(e) => setCancellationPasscode(e.target.value)}
+                      placeholder="إدخال رمز المرور الإداري المكون من 4 أرقام"
+                      className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-foreground text-center tracking-widest font-black"
+                      dir="ltr"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isProcessingCancellation}
+                    className={`w-full py-3.5 rounded-xl font-black text-sm transition-all hover:scale-[1.02] cursor-pointer flex justify-center items-center gap-1.5 ${
+                      cancellationAction === "approve"
+                        ? "bg-green-500 text-black hover:bg-green-600"
+                        : "bg-red-500 text-black hover:bg-red-600"
+                    }`}
+                  >
+                    {isProcessingCancellation ? (
                       <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
                     ) : (
                       <>

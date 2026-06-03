@@ -1937,4 +1937,107 @@ export async function adminRejectChangeRequest(
   }
 }
 
+// =====================================================================
+// 📜 نظام إلغاء الطلبيات من قبل العملاء (Order Cancellation Requests)
+// =====================================================================
 
+export async function requestOrderCancellation(
+  orderId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data, error } = await supabase.rpc('request_order_cancellation', {
+      p_order_id: orderId
+    });
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    console.warn("DB request cancellation failed, trying local fallback:", err);
+    try {
+      const requests = getMockChangeRequests();
+      const existingIdx = requests.findIndex(r => r.order_id === orderId && r.status === 'pending');
+      const nowStr = new Date().toISOString();
+      if (existingIdx !== -1) {
+        requests[existingIdx].status = 'pending';
+        requests[existingIdx].updated_at = nowStr;
+      } else {
+        const mockReq: OrderChangeRequest = {
+          id: Math.random().toString(36).substring(2, 9),
+          order_id: orderId,
+          user_id: 'mock-user-id',
+          requested_changes: { request_type: 'cancellation' },
+          customer_note: 'طلب إلغاء الطلب من الزبون',
+          status: 'pending',
+          created_at: nowStr,
+          updated_at: nowStr
+        };
+        requests.push(mockReq);
+      }
+      saveMockChangeRequests(requests);
+      return { success: true };
+    } catch (fallbackErr: any) {
+      return { success: false, error: fallbackErr?.message || String(fallbackErr) };
+    }
+  }
+}
+
+export async function approveOrderCancellation(
+  orderId: string,
+  passcode: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data, error } = await supabase.rpc('approve_order_cancellation', {
+      p_order_id: orderId,
+      p_passcode: passcode
+    });
+    if (error) throw error;
+    return { success: !!data };
+  } catch (err: any) {
+    console.warn("DB approve cancellation failed, trying local fallback:", err);
+    if (passcode !== '9922') {
+      return { success: false, error: "رمز مرور المسؤول غير صحيح." };
+    }
+    try {
+      const requests = getMockChangeRequests();
+      const idx = requests.findIndex(r => r.order_id === orderId && r.status === 'pending');
+      if (idx !== -1) {
+        requests[idx].status = 'approved';
+        requests[idx].reviewed_at = new Date().toISOString();
+        saveMockChangeRequests(requests);
+      }
+      return { success: true };
+    } catch (fallbackErr: any) {
+      return { success: false, error: fallbackErr?.message || String(fallbackErr) };
+    }
+  }
+}
+
+export async function rejectOrderCancellation(
+  orderId: string,
+  passcode: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data, error } = await supabase.rpc('reject_order_cancellation', {
+      p_order_id: orderId,
+      p_passcode: passcode
+    });
+    if (error) throw error;
+    return { success: !!data };
+  } catch (err: any) {
+    console.warn("DB reject cancellation failed, trying local fallback:", err);
+    if (passcode !== '9922') {
+      return { success: false, error: "رمز مرور المسؤول غير صحيح." };
+    }
+    try {
+      const requests = getMockChangeRequests();
+      const idx = requests.findIndex(r => r.order_id === orderId && r.status === 'pending');
+      if (idx !== -1) {
+        requests[idx].status = 'rejected';
+        requests[idx].reviewed_at = new Date().toISOString();
+        saveMockChangeRequests(requests);
+      }
+      return { success: true };
+    } catch (fallbackErr: any) {
+      return { success: false, error: fallbackErr?.message || String(fallbackErr) };
+    }
+  }
+}

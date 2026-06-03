@@ -11,6 +11,7 @@ import {
   getSupabaseOrderChangeRequestsForUser,
   submitSupabaseOrderChangeRequest,
   cancelSupabaseOrderChangeRequest,
+  requestOrderCancellation,
   OrderChangeRequest
 } from "@/lib/supabase";
 import { User, ShoppingBag, MapPin, Phone, LogOut, Package, RefreshCw, Calendar, CreditCard, ChevronDown, ChevronUp, MessageCircle } from "lucide-react";
@@ -267,6 +268,33 @@ export default function AccountPage() {
       }
     } catch (err: any) {
       alert("خطأ أثناء إلغاء الطلب: " + err?.message);
+    }
+  };
+
+  // Request order cancellation request from customer
+  const handleRequestCancellation = async (orderId: string) => {
+    if (!confirm("هل أنت متأكد أنك تريد إرسال طلب إلغاء هذا الطلب؟")) return;
+    try {
+      const res = await requestOrderCancellation(orderId);
+      if (res.success) {
+        alert("تم إرسال طلب الإلغاء، بانتظار موافقة الإدارة.");
+        // Refresh customer orders list
+        if (user) {
+          const { data: dbOrders, error } = await supabase
+            .from("orders")
+            .select("*, order_items(*)")
+            .eq("customer_id", user.id)
+            .order("created_at", { ascending: false });
+
+          if (dbOrders && !error) {
+            setOrders(dbOrders);
+          }
+        }
+      } else {
+        alert("فشل إرسال طلب الإلغاء: " + res.error);
+      }
+    } catch (err: any) {
+      alert("خطأ أثناء إرسال طلب الإلغاء: " + err?.message);
     }
   };
 
@@ -700,12 +728,25 @@ ${itemsList}
                               </p>
                             </div>
 
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-3">
                               {/* Status Badge */}
                               <span className={`px-3 py-1.5 rounded-lg text-xs font-black shrink-0 ${
                                 isCancelled ? "bg-red-500/15 text-red-400" : "bg-primary/10 text-primary-light"
                               }`}>
                                 {statusTranslations[ord.status] || ord.status}
+                              </span>
+
+                              {/* Cancellation Status Badge */}
+                              <span className={`px-3 py-1.5 rounded-lg text-xs font-black shrink-0 ${
+                                ord.cancellation_status === 'pending' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' :
+                                ord.cancellation_status === 'approved' ? 'bg-green-500/15 text-green-400 border border-green-500/30' :
+                                ord.cancellation_status === 'rejected' ? 'bg-red-500/15 text-red-400 border border-red-500/30' :
+                                'bg-foreground/5 text-foreground/50 border border-border/30'
+                              }`}>
+                                {ord.cancellation_status === 'pending' ? 'طلب الإلغاء بانتظار موافقة الإدارة' :
+                                 ord.cancellation_status === 'approved' ? 'تم قبول طلب الإلغاء' :
+                                 ord.cancellation_status === 'rejected' ? 'تم رفض طلب الإلغاء' :
+                                 'لا يوجد طلب إلغاء'}
                               </span>
 
                               <a
@@ -837,7 +878,7 @@ ${itemsList}
 
                               {renderChangeRequestStatus(ord)}
 
-                              <div className="pt-4 flex justify-start border-t border-border/20 mt-2">
+                              <div className="pt-4 flex flex-wrap justify-start gap-3 border-t border-border/20 mt-2">
                                 <a
                                   href={getWhatsAppLink(ord)}
                                   target="_blank"
@@ -847,6 +888,15 @@ ${itemsList}
                                   <MessageCircle className="w-4.5 h-4.5" />
                                   استفسار ومساعدة فورية بالواتساب عن هذا الطلب
                                 </a>
+
+                                {ord.status !== "cancelled" && ord.status !== "completed" && ord.cancellation_status !== "pending" && ord.cancellation_status !== "approved" && (
+                                  <button
+                                    onClick={() => handleRequestCancellation(ord.id)}
+                                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/25 rounded-lg font-black text-xs transition-all hover:scale-105 cursor-pointer"
+                                  >
+                                    طلب إلغاء الطلب
+                                  </button>
+                                )}
                               </div>
                             </div>
                           )}
