@@ -7,7 +7,7 @@ import Image from "next/image";
 import { ShoppingCart, Heart, ShieldCheck, Truck, ChevronRight, Plus, Minus, Check, X } from "lucide-react";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
-import { getSupabaseProducts, resolveAssetPath, getSupabaseSettings } from "@/lib/supabase";
+import { getSupabaseProducts, resolveAssetPath, getSupabaseSettings, getSupabaseCategories, getSupabaseSubcategories } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams } from "next/navigation";
 
@@ -123,10 +123,14 @@ export default function ProductDetailClient() {
   const [quantity, setQuantity] = useState(1);
   const [isAdded, setIsAdded] = useState(false);
   const [settings, setSettings] = useState<Record<string, string>>({});
+  const [categories, setCategories] = useState<any[]>([]);
+  const [subcategories, setSubcategories] = useState<any[]>([]);
   const { addToCart } = useCart();
 
   useEffect(() => {
     getSupabaseSettings().then(setSettings).catch(err => console.error("Error fetching settings in PD:", err));
+    getSupabaseCategories().then(setCategories).catch(err => console.error("Error fetching categories in PD:", err));
+    getSupabaseSubcategories().then(setSubcategories).catch(err => console.error("Error fetching subcategories in PD:", err));
   }, []);
 
   // Gallery state
@@ -278,6 +282,15 @@ export default function ProductDetailClient() {
     );
   }
 
+  // Resolve main category and subcategory details dynamically for breadcrumbs
+  const mainCategoryObj = product ? categories.find(c => c.id === product.categoryId || c.slug === product.categoryId) : null;
+  const mainCategoryName = mainCategoryObj ? mainCategoryObj.name : (product?.category || "القسم");
+  const mainCategorySlug = mainCategoryObj ? mainCategoryObj.id : (product?.categoryId || "");
+
+  const subcategoryObj = product && product.subcategoryId ? subcategories.find(s => s.id === product.subcategoryId) : null;
+  const subcategoryName = subcategoryObj ? subcategoryObj.name : null;
+  const subcategoryId = subcategoryObj ? subcategoryObj.id : null;
+
   return (
     <>
       <Header />
@@ -290,8 +303,14 @@ export default function ProductDetailClient() {
             <ChevronRight className="w-4 h-4 shrink-0" />
             <Link href="/categories" className="hover:text-primary whitespace-nowrap">الأقسام</Link>
             <ChevronRight className="w-4 h-4 shrink-0" />
-            <Link href={`/categories/${product.categoryId}`} className="hover:text-primary whitespace-nowrap">{product.category}</Link>
+            <Link href={`/categories/${mainCategorySlug}`} className="hover:text-primary whitespace-nowrap">{mainCategoryName}</Link>
             <ChevronRight className="w-4 h-4 shrink-0" />
+            {subcategoryName && (
+              <>
+                <Link href={`/categories/${mainCategorySlug}?sub=${subcategoryId}`} className="hover:text-primary whitespace-nowrap">{subcategoryName}</Link>
+                <ChevronRight className="w-4 h-4 shrink-0" />
+              </>
+            )}
             <span className="text-primary whitespace-nowrap">{product.name}</span>
           </div>
 
