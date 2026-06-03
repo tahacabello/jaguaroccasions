@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import Image from "next/image";
-import { ShoppingCart, Heart, ShieldCheck, Truck, ChevronRight, Plus, Minus, Check, X } from "lucide-react";
+import { ShoppingCart, Heart, ShieldCheck, Truck, ChevronLeft, ChevronRight, Plus, Minus, Check, X } from "lucide-react";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { getSupabaseProducts, resolveAssetPath, getSupabaseSettings, getSupabaseCategories, getSupabaseSubcategories } from "@/lib/supabase";
@@ -144,6 +144,31 @@ export default function ProductDetailClient() {
   useEffect(() => {
     setImageLoading(true);
   }, [activeImage]);
+
+  // Listen for keyboard arrows to switch lightbox photos
+  useEffect(() => {
+    if (!isLightboxOpen || productImages.length <= 1) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeIdx = productImages.indexOf(activeImage);
+      if (activeIdx === -1) return;
+
+      if (e.key === "ArrowRight") {
+        const nextIdx = (activeIdx + 1) % productImages.length;
+        setActiveImage(productImages[nextIdx]);
+      } else if (e.key === "ArrowLeft") {
+        const prevIdx = (activeIdx - 1 + productImages.length) % productImages.length;
+        setActiveImage(productImages[prevIdx]);
+      } else if (e.key === "Escape") {
+        setIsLightboxOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isLightboxOpen, activeImage, productImages]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -635,14 +660,52 @@ export default function ProductDetailClient() {
             onClick={() => setIsLightboxOpen(false)}
           >
             <button 
-              className="absolute top-6 right-6 text-white/70 hover:text-white bg-black/50 p-2 rounded-full transition-colors z-50"
+              className="absolute top-6 right-6 text-white/70 hover:text-white bg-black/50 hover:bg-black/80 p-2.5 rounded-full transition-all z-55 hover:scale-105 border border-white/10"
               onClick={(e) => {
                 e.stopPropagation();
                 setIsLightboxOpen(false);
               }}
             >
-              <X className="w-8 h-8" />
+              <X className="w-6 h-6" />
             </button>
+
+            {/* Navigation Arrows */}
+            {productImages.length > 1 && (
+              <>
+                {/* Previous (Left Arrow) */}
+                <button
+                  className="absolute left-6 top-1/2 -translate-y-1/2 text-white/75 hover:text-white bg-black/45 hover:bg-black/75 p-3.5 rounded-full transition-all z-55 hover:scale-110 border border-white/5 active:scale-95"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const activeIdx = productImages.indexOf(activeImage);
+                    if (activeIdx !== -1) {
+                      const prevIdx = (activeIdx - 1 + productImages.length) % productImages.length;
+                      setActiveImage(productImages[prevIdx]);
+                    }
+                  }}
+                  title="الصورة السابقة"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+
+                {/* Next (Right Arrow) */}
+                <button
+                  className="absolute right-6 top-1/2 -translate-y-1/2 text-white/75 hover:text-white bg-black/45 hover:bg-black/75 p-3.5 rounded-full transition-all z-55 hover:scale-110 border border-white/5 active:scale-95"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const activeIdx = productImages.indexOf(activeImage);
+                    if (activeIdx !== -1) {
+                      const nextIdx = (activeIdx + 1) % productImages.length;
+                      setActiveImage(productImages[nextIdx]);
+                    }
+                  }}
+                  title="الصورة التالية"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              </>
+            )}
+
             <motion.div 
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
@@ -650,13 +713,24 @@ export default function ProductDetailClient() {
               className="relative w-full max-w-5xl aspect-square md:aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <Image
-                src={activeImage}
-                alt={product.name}
-                fill
-                className="object-contain"
-                quality={100}
-              />
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeImage}
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 1.02 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute inset-0"
+                >
+                  <Image
+                    src={activeImage}
+                    alt={product.name}
+                    fill
+                    className="object-contain"
+                    quality={100}
+                  />
+                </motion.div>
+              </AnimatePresence>
             </motion.div>
           </motion.div>
         )}
