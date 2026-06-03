@@ -311,8 +311,10 @@ export default function AdminDashboard() {
 
   // Dynamic input states for products
   const [prodName, setProdName] = useState("");
-  const [prodPriceSale, setProdPriceSale] = useState(0);
-  const [prodPriceRent, setProdPriceRent] = useState(0);
+  const [prodPriceSale, setProdPriceSale] = useState<number | string>("");
+  const [prodPriceRent, setProdPriceRent] = useState<number | string>("");
+  const [prodSaleAvailable, setProdSaleAvailable] = useState(true);
+  const [prodRentAvailable, setProdRentAvailable] = useState(true);
   const [prodDescription, setProdDescription] = useState("");
   const [prodCategoryId, setProdCategoryId] = useState("");
   const [prodSubcategoryId, setProdSubcategoryId] = useState("");
@@ -1370,30 +1372,72 @@ ${orderSum}
   // Products CRUD
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prodName || !prodCategoryId) return;
+    if (!prodName.trim()) {
+      alert("اسم المنتج مطلوب");
+      return;
+    }
+    if (!prodCategoryId) {
+      alert("القسم الرئيسي مطلوب");
+      return;
+    }
+    if (prodStock < 0) {
+      alert("كمية المخزن غير صالحة");
+      return;
+    }
+
+    // Validation for pricing only if toggles are active
+    if (prodSaleAvailable && (prodPriceSale === "" || Number(prodPriceSale) < 0)) {
+      alert("يرجى إدخال سعر بيع صالح عند تفعيل خيار البيع");
+      return;
+    }
+    if (prodRentAvailable && (prodPriceRent === "" || Number(prodPriceRent) < 0)) {
+      alert("يرجى إدخال سعر إيجار صالح عند تفعيل خيار الإيجار");
+      return;
+    }
+
+    // Availability validation: at least one mode must be active unless product status is unavailable or hidden
+    const isUnavailableOrHidden = 
+      prodStatus === "unavailable" || 
+      prodStatus === "hidden" || 
+      prodStatus === "غير متوفر" || 
+      prodStatus === "مخفي";
+
+    if (!prodSaleAvailable && !prodRentAvailable && !isUnavailableOrHidden) {
+      alert("يجب تفعيل خيار البيع أو الإيجار أو كلاهما للمنتجات المتوفرة.");
+      return;
+    }
+
+    // Resolve item_mode value based on toggles
+    let resolvedItemMode = "both";
+    if (prodSaleAvailable && prodRentAvailable) resolvedItemMode = "both";
+    else if (prodSaleAvailable) resolvedItemMode = "sale";
+    else if (prodRentAvailable) resolvedItemMode = "rent";
 
     const res = await addSupabaseProduct({
-      name: prodName,
-      priceSale: prodPriceSale,
-      priceRent: prodPriceRent,
-      description: prodDescription,
+      name: prodName.trim(),
+      priceSale: prodSaleAvailable ? prodPriceSale : "",
+      priceRent: prodRentAvailable ? prodPriceRent : "",
+      description: prodDescription.trim(),
       categoryId: prodCategoryId,
       subcategoryId: prodSubcategoryId || null,
-      code: prodCode,
+      code: prodCode.trim(),
       stockQuantity: prodStock,
       status: prodStatus,
       isFeatured: prodIsFeatured,
       isHidden: prodIsHidden,
       image: prodImage,
       images: prodImages,
-      sortOrder: prodSortOrder
+      sortOrder: prodSortOrder,
+      itemMode: resolvedItemMode
     });
 
     if (res.success) {
       setShowAddProdModal(false);
       setProdName("");
-      setProdPriceSale(0);
-      setProdPriceRent(0);
+      setProdPriceSale("");
+      setProdPriceRent("");
+      setProdSaleAvailable(true);
+      setProdRentAvailable(true);
       setProdDescription("");
       setProdCategoryId("");
       setProdSubcategoryId("");
@@ -1415,21 +1459,61 @@ ${orderSum}
     e.preventDefault();
     if (!editingProduct) return;
 
+    if (!editingProduct.name.trim()) {
+      alert("اسم المنتج مطلوب");
+      return;
+    }
+    if (!editingProduct.categoryId) {
+      alert("القسم الرئيسي مطلوب");
+      return;
+    }
+    if (editingProduct.stockQuantity < 0) {
+      alert("كمية المخزن غير صالحة");
+      return;
+    }
+
+    // Pricing validation
+    if (editingProduct.saleAvailable && (editingProduct.priceSale === "" || Number(editingProduct.priceSale) < 0)) {
+      alert("يرجى إدخال سعر بيع صالح عند تفعيل خيار البيع");
+      return;
+    }
+    if (editingProduct.rentAvailable && (editingProduct.priceRent === "" || Number(editingProduct.priceRent) < 0)) {
+      alert("يرجى إدخال سعر إيجار صالح عند تفعيل خيار الإيجار");
+      return;
+    }
+
+    const isUnavailableOrHidden = 
+      editingProduct.status === "unavailable" || 
+      editingProduct.status === "hidden" || 
+      editingProduct.status === "غير متوفر" || 
+      editingProduct.status === "مخفي";
+
+    if (!editingProduct.saleAvailable && !editingProduct.rentAvailable && !isUnavailableOrHidden) {
+      alert("يجب تفعيل خيار البيع أو الإيجار أو كلاهما للمنتجات المتوفرة.");
+      return;
+    }
+
+    let resolvedItemMode = "both";
+    if (editingProduct.saleAvailable && editingProduct.rentAvailable) resolvedItemMode = "both";
+    else if (editingProduct.saleAvailable) resolvedItemMode = "sale";
+    else if (editingProduct.rentAvailable) resolvedItemMode = "rent";
+
     const res = await updateSupabaseProduct(editingProduct.id, {
-      name: editingProduct.name,
-      priceSale: editingProduct.priceSale,
-      priceRent: editingProduct.priceRent,
-      description: editingProduct.description,
+      name: editingProduct.name.trim(),
+      priceSale: editingProduct.saleAvailable ? editingProduct.priceSale : "",
+      priceRent: editingProduct.rentAvailable ? editingProduct.priceRent : "",
+      description: editingProduct.description.trim(),
       categoryId: editingProduct.categoryId,
       subcategoryId: editingProduct.subcategoryId || null,
-      code: editingProduct.code,
+      code: editingProduct.code.trim(),
       stockQuantity: editingProduct.stockQuantity,
       status: editingProduct.status,
       isFeatured: editingProduct.isFeatured,
       isHidden: editingProduct.isHidden,
       image: prodImage || editingProduct.image,
       images: prodImages,
-      sortOrder: editingProduct.sortOrder
+      sortOrder: editingProduct.sortOrder,
+      itemMode: resolvedItemMode
     });
 
     if (res.success) {
@@ -1454,7 +1538,16 @@ ${orderSum}
 
   // Helper to prefill product edit form states
   const openEditProduct = (prod: any) => {
-    setEditingProduct(prod);
+    const saleAvail = prod.itemMode === "sale" || prod.itemMode === "both";
+    const rentAvail = prod.itemMode === "rent" || prod.itemMode === "both";
+    setEditingProduct({
+      ...prod,
+      status: prod.statusKey || "available",
+      priceSale: prod.priceSale === null || prod.priceSale === undefined || prod.priceSale === 0 ? "" : String(prod.priceSale),
+      priceRent: prod.priceRent === null || prod.priceRent === undefined || prod.priceRent === 0 ? "" : String(prod.priceRent),
+      saleAvailable: saleAvail,
+      rentAvailable: rentAvail
+    });
     setProdImage(prod.image);
     setProdImages(prod.images || []);
   };
@@ -4115,7 +4208,7 @@ ${orderSum}
 
                 <form onSubmit={handleAddProduct} className="space-y-4">
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-1">
                       <label className="block text-xs font-bold text-foreground/60">اسم المنتج *</label>
                       <input
@@ -4138,30 +4231,6 @@ ${orderSum}
                         className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm"
                       />
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                      <label className="block text-xs font-bold text-foreground/60">سعر البيع (د.ل) *</label>
-                      <input
-                        type="number"
-                        required
-                        value={prodPriceSale}
-                        onChange={(e) => setProdPriceSale(Number(e.target.value))}
-                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm font-bold"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="block text-xs font-bold text-foreground/60">سعر الإيجار (د.ل) *</label>
-                      <input
-                        type="number"
-                        required
-                        value={prodPriceRent}
-                        onChange={(e) => setProdPriceRent(Number(e.target.value))}
-                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm font-bold"
-                      />
-                    </div>
 
                     <div className="space-y-1">
                       <label className="block text-xs font-bold text-foreground/60">الكمية في المخزن (Stock) *</label>
@@ -4172,6 +4241,96 @@ ${orderSum}
                         onChange={(e) => setProdStock(Number(e.target.value))}
                         className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm font-bold"
                       />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl bg-surface/20 border border-border/60">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/60">خيارات البيع</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          type="checkbox"
+                          id="prodSaleAvailable"
+                          checked={prodSaleAvailable}
+                          onChange={(e) => {
+                            setProdSaleAvailable(e.target.checked);
+                            if (!e.target.checked) setProdPriceSale("");
+                          }}
+                          className="accent-primary w-4 h-4 cursor-pointer"
+                        />
+                        <label htmlFor="prodSaleAvailable" className="text-xs font-bold cursor-pointer">متوفر للبيع</label>
+                      </div>
+                      {prodSaleAvailable && (
+                        <div className="space-y-1 mt-2">
+                          <label className="block text-[10px] font-bold text-foreground/60">سعر البيع (د.ل) *</label>
+                          <input
+                            type="text"
+                            required
+                            value={prodPriceSale}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (/^0\d+/.test(val)) {
+                                setProdPriceSale(val.replace(/^0+/, ''));
+                              } else {
+                                setProdPriceSale(val);
+                              }
+                            }}
+                            className="w-full bg-surface border border-border rounded-xl px-3 py-1.5 text-sm font-bold text-primary-light"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/60">خيارات الإيجار</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          type="checkbox"
+                          id="prodRentAvailable"
+                          checked={prodRentAvailable}
+                          onChange={(e) => {
+                            setProdRentAvailable(e.target.checked);
+                            if (!e.target.checked) setProdPriceRent("");
+                          }}
+                          className="accent-primary w-4 h-4 cursor-pointer"
+                        />
+                        <label htmlFor="prodRentAvailable" className="text-xs font-bold cursor-pointer">متوفر للإيجار</label>
+                      </div>
+                      {prodRentAvailable && (
+                        <div className="space-y-1 mt-2">
+                          <label className="block text-[10px] font-bold text-foreground/60">سعر الإيجار (د.ل) *</label>
+                          <input
+                            type="text"
+                            required
+                            value={prodPriceRent}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (/^0\d+/.test(val)) {
+                                setProdPriceRent(val.replace(/^0+/, ''));
+                              } else {
+                                setProdPriceRent(val);
+                              }
+                            }}
+                            className="w-full bg-surface border border-border rounded-xl px-3 py-1.5 text-sm font-bold text-primary-light"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/60">حالة المنتج العامة *</label>
+                      <select
+                        required
+                        value={prodStatus}
+                        onChange={(e) => setProdStatus(e.target.value)}
+                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm font-bold mt-1 cursor-pointer"
+                      >
+                        <option value="available">متوفر (Available)</option>
+                        <option value="unavailable">غير متوفر (Unavailable)</option>
+                        <option value="reserved">محجوز (Reserved)</option>
+                        <option value="sold">مباع (Sold)</option>
+                        <option value="hidden">مخفي (Hidden)</option>
+                      </select>
                     </div>
                   </div>
 
@@ -4344,7 +4503,7 @@ ${orderSum}
 
                 <form onSubmit={handleEditProduct} className="space-y-4">
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-1">
                       <label className="block text-xs font-bold text-foreground/60">اسم المنتج *</label>
                       <input
@@ -4365,30 +4524,6 @@ ${orderSum}
                         className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm"
                       />
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                      <label className="block text-xs font-bold text-foreground/60">سعر البيع (د.ل) *</label>
-                      <input
-                        type="number"
-                        required
-                        value={editingProduct.priceSale}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, priceSale: Number(e.target.value) })}
-                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm font-bold"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="block text-xs font-bold text-foreground/60">سعر الإيجار (د.ل) *</label>
-                      <input
-                        type="number"
-                        required
-                        value={editingProduct.priceRent}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, priceRent: Number(e.target.value) })}
-                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm font-bold"
-                      />
-                    </div>
 
                     <div className="space-y-1">
                       <label className="block text-xs font-bold text-foreground/60">الكمية (Stock) *</label>
@@ -4399,6 +4534,102 @@ ${orderSum}
                         onChange={(e) => setEditingProduct({ ...editingProduct, stockQuantity: Number(e.target.value) })}
                         className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm font-bold"
                       />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl bg-surface/20 border border-border/60">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/60">خيارات البيع</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          type="checkbox"
+                          id="editSaleAvailable"
+                          checked={editingProduct.saleAvailable}
+                          onChange={(e) => {
+                            setEditingProduct({
+                              ...editingProduct,
+                              saleAvailable: e.target.checked,
+                              priceSale: e.target.checked ? editingProduct.priceSale : ""
+                            });
+                          }}
+                          className="accent-primary w-4 h-4 cursor-pointer"
+                        />
+                        <label htmlFor="editSaleAvailable" className="text-xs font-bold cursor-pointer">متوفر للبيع</label>
+                      </div>
+                      {editingProduct.saleAvailable && (
+                        <div className="space-y-1 mt-2">
+                          <label className="block text-[10px] font-bold text-foreground/60">سعر البيع (د.ل) *</label>
+                          <input
+                            type="text"
+                            required
+                            value={editingProduct.priceSale}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              let cleaned = val;
+                              if (/^0\d+/.test(val)) {
+                                cleaned = val.replace(/^0+/, '');
+                              }
+                              setEditingProduct({ ...editingProduct, priceSale: cleaned });
+                            }}
+                            className="w-full bg-surface border border-border rounded-xl px-3 py-1.5 text-sm font-bold text-primary-light"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/60">خيارات الإيجار</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          type="checkbox"
+                          id="editRentAvailable"
+                          checked={editingProduct.rentAvailable}
+                          onChange={(e) => {
+                            setEditingProduct({
+                              ...editingProduct,
+                              rentAvailable: e.target.checked,
+                              priceRent: e.target.checked ? editingProduct.priceRent : ""
+                            });
+                          }}
+                          className="accent-primary w-4 h-4 cursor-pointer"
+                        />
+                        <label htmlFor="editRentAvailable" className="text-xs font-bold cursor-pointer">متوفر للإيجار</label>
+                      </div>
+                      {editingProduct.rentAvailable && (
+                        <div className="space-y-1 mt-2">
+                          <label className="block text-[10px] font-bold text-foreground/60">سعر الإيجار (د.ل) *</label>
+                          <input
+                            type="text"
+                            required
+                            value={editingProduct.priceRent}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              let cleaned = val;
+                              if (/^0\d+/.test(val)) {
+                                cleaned = val.replace(/^0+/, '');
+                              }
+                              setEditingProduct({ ...editingProduct, priceRent: cleaned });
+                            }}
+                            className="w-full bg-surface border border-border rounded-xl px-3 py-1.5 text-sm font-bold text-primary-light"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-foreground/60">حالة المنتج العامة *</label>
+                      <select
+                        required
+                        value={editingProduct.status}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, status: e.target.value })}
+                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm font-bold mt-1 cursor-pointer"
+                      >
+                        <option value="available">متوفر (Available)</option>
+                        <option value="unavailable">غير متوفر (Unavailable)</option>
+                        <option value="reserved">محجوز (Reserved)</option>
+                        <option value="sold">مباع (Sold)</option>
+                        <option value="hidden">مخفي (Hidden)</option>
+                      </select>
                     </div>
                   </div>
 

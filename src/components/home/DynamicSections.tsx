@@ -16,6 +16,16 @@ import {
   resolveAssetPath
 } from "@/lib/supabase";
 
+const getArabicStatusLabel = (status: string) => {
+  const s = (status || "").toLowerCase().trim();
+  if (s === "available" || s === "متوفر") return "متوفر";
+  if (s === "unavailable" || s === "غير متوفر" || s === "غير متوفر حالياً") return "غير متوفر";
+  if (s === "reserved" || s === "محجوز") return "محجوز";
+  if (s === "sold" || s === "مباع") return "مباع";
+  if (s === "hidden" || s === "مخفي") return "مخفي";
+  return status;
+};
+
 export function DynamicSections() {
   const { addToCart } = useCart();
   const [sections, setSections] = useState<any[]>([]);
@@ -201,7 +211,7 @@ export function DynamicSections() {
 
                     const title = item.display_title || matchedProd.name;
                     const image = item.display_image_url || getProductImage(matchedProd);
-                    const href = `/products/${matchedProd.id}`;
+                    const href = `/product?id=${matchedProd.id}`;
 
                     return (
                       <motion.div
@@ -224,13 +234,27 @@ export function DynamicSections() {
                           </Link>
                           {/* Badges */}
                           <div className="absolute top-4 right-4 flex flex-col gap-2">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                              matchedProd.status === "متوفر" || matchedProd.status === "available"
-                                ? "bg-green-500/20 text-green-400"
-                                : "bg-amber-500/20 text-amber-400"
-                            }`}>
-                              {matchedProd.status === "available" ? "متوفر" : matchedProd.status}
-                            </span>
+                            {(() => {
+                              const isUnavailableOrSoldOrHidden =
+                                matchedProd.statusKey === "unavailable" ||
+                                matchedProd.statusKey === "sold" ||
+                                matchedProd.statusKey === "hidden" ||
+                                matchedProd.status === "غير متوفر" ||
+                                matchedProd.status === "مباع" ||
+                                matchedProd.status === "مخفي";
+                              const isReserved = matchedProd.status === "محجوز" || matchedProd.statusKey === "reserved";
+                              const cleanStatus = getArabicStatusLabel(matchedProd.status);
+
+                              return (
+                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                  isUnavailableOrSoldOrHidden ? "bg-red-500/20 text-red-400" :
+                                  isReserved ? "bg-amber-500/20 text-amber-400" :
+                                  "bg-green-500/20 text-green-400"
+                                }`}>
+                                  {isUnavailableOrSoldOrHidden ? "غير متوفر حالياً" : cleanStatus}
+                                </span>
+                              );
+                            })()}
                           </div>
                         </div>
 
@@ -244,32 +268,73 @@ export function DynamicSections() {
                             </p>
                           )}
                           <div className="flex items-center justify-between mt-auto">
-                            <div className="flex flex-col">
-                              {matchedProd.priceSale > 0 && (
-                                <span className="text-lg font-black text-primary-light">
-                                  {matchedProd.priceSale} <span className="text-xs font-normal">د.ل بيع</span>
-                                </span>
-                              )}
-                              {matchedProd.priceRent > 0 && (
-                                <span className="text-sm font-semibold text-foreground/75">
-                                  {matchedProd.priceRent} <span className="text-xs font-normal">د.ل إيجار</span>
-                                </span>
-                              )}
-                            </div>
-                            <button
-                              onClick={() =>
-                                addToCart({
-                                  id: matchedProd.id,
-                                  name: matchedProd.name,
-                                  price: matchedProd.priceSale || matchedProd.priceRent || 0,
-                                  image: matchedProd.image,
-                                  mode: matchedProd.priceSale > 0 ? "sale" : "rent",
-                                })
+                            {(() => {
+                              const isUnavailableOrSoldOrHidden =
+                                matchedProd.statusKey === "unavailable" ||
+                                matchedProd.statusKey === "sold" ||
+                                matchedProd.statusKey === "hidden" ||
+                                matchedProd.status === "غير متوفر" ||
+                                matchedProd.status === "مباع" ||
+                                matchedProd.status === "مخفي";
+                              const isSaleActive = (matchedProd.itemMode === "sale" || matchedProd.itemMode === "both") && matchedProd.priceSale !== null && matchedProd.priceSale !== undefined && matchedProd.priceSale > 0;
+                              const isRentActive = (matchedProd.itemMode === "rent" || matchedProd.itemMode === "both") && matchedProd.priceRent !== null && matchedProd.priceRent !== undefined && matchedProd.priceRent > 0;
+
+                              let targetMode: "rent" | "sale" = "rent";
+                              let targetPrice = 0;
+                              if (isRentActive) {
+                                targetMode = "rent";
+                                targetPrice = matchedProd.priceRent;
+                              } else if (isSaleActive) {
+                                targetMode = "sale";
+                                targetPrice = matchedProd.priceSale;
                               }
-                              className="p-3 bg-surface hover:bg-primary hover:text-black rounded-xl transition-all border border-border group-hover:border-primary/50"
-                            >
-                              <ShoppingBag className="w-5 h-5" />
-                            </button>
+
+                              return (
+                                <>
+                                  <div className="flex flex-col">
+                                    {isUnavailableOrSoldOrHidden ? (
+                                      <span className="text-red-500 text-sm font-bold">غير متوفر حالياً</span>
+                                    ) : isRentActive && !isSaleActive ? (
+                                      <span className="text-lg font-black text-primary-light">
+                                        {matchedProd.priceRent} <span className="text-xs font-normal">د.ل إيجار</span>
+                                      </span>
+                                    ) : isSaleActive && !isRentActive ? (
+                                      <span className="text-lg font-black text-primary-light">
+                                        {matchedProd.priceSale} <span className="text-xs font-normal">د.ل شراء</span>
+                                      </span>
+                                    ) : isRentActive && isSaleActive ? (
+                                      <div className="flex flex-col text-right">
+                                        <span className="text-lg font-black text-primary-light">
+                                          {matchedProd.priceRent} <span className="text-xs font-normal">د.ل إيجار</span>
+                                        </span>
+                                        <span className="text-xs text-foreground/50">
+                                          {matchedProd.priceSale} د.ل شراء
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-red-500 text-sm font-bold">غير متوفر</span>
+                                    )}
+                                  </div>
+                                  <button
+                                    disabled={isUnavailableOrSoldOrHidden || (!isSaleActive && !isRentActive)}
+                                    onClick={() => {
+                                      addToCart({
+                                        id: matchedProd.id,
+                                        name: matchedProd.name,
+                                        price: targetPrice,
+                                        image: matchedProd.image,
+                                        mode: targetMode,
+                                      });
+                                    }}
+                                    className={`p-3 bg-surface hover:bg-primary hover:text-black rounded-xl transition-all border border-border group-hover:border-primary/50 ${
+                                      (isUnavailableOrSoldOrHidden || (!isSaleActive && !isRentActive)) ? "opacity-40 cursor-not-allowed" : ""
+                                    }`}
+                                  >
+                                    <ShoppingBag className="w-5 h-5" />
+                                  </button>
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
                       </motion.div>

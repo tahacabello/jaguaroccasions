@@ -429,6 +429,18 @@ export async function swapProductOrderInDb(id1: string, order1: number, id2: str
   }
 }
 
+// RFC 4122 v4 UUID Generator for client-side resiliency
+export function generateUUID(): string {
+  if (typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 // =====================================================================
 // 📂 المنتجات (Products)
 // =====================================================================
@@ -436,30 +448,64 @@ export async function getSupabaseProducts(): Promise<any[]> {
   try {
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select('*, categories(name)')
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: false });
 
     if (error) throw error;
     if (!data) return [];
 
-    return data.map(item => ({
-      id: item.id,
-      name: item.name,
-      priceSale: Number(item.sale_price || 0),
-      priceRent: Number(item.rent_price || 0),
-      description: item.description,
-      image: resolveAssetPath(item.image || ""),
-      images: item.images ? item.images.map((img: string) => resolveAssetPath(img)) : [],
-      status: item.status,
-      categoryId: item.category_id,
-      subcategoryId: item.subcategory_id,
-      stockQuantity: item.stock_quantity || 0,
-      isFeatured: item.is_featured || false,
-      isHidden: item.is_hidden || false,
-      code: item.code,
-      sortOrder: item.sort_order || 0
-    }));
+    return data.map(item => {
+      // Coalesce both pricing formats
+      const pSale = item.price_sale !== null && item.price_sale !== undefined ? Number(item.price_sale) : (item.sale_price !== null && item.sale_price !== undefined ? Number(item.sale_price) : 0);
+      const pRent = item.price_rent !== null && item.price_rent !== undefined ? Number(item.price_rent) : (item.rent_price !== null && item.rent_price !== undefined ? Number(item.rent_price) : 0);
+      
+      // Determine item_mode fallback if it's missing or null
+      let itemMode = item.item_mode;
+      if (!itemMode) {
+        itemMode = (pSale > 0 && pRent > 0) ? 'both' : (pSale > 0 ? 'sale' : 'rent');
+      }
+
+      // Map stable English status keys to Arabic labels for UI backward compatibility
+      let statusLabel = "متوفر";
+      const s = (item.status || "").trim();
+      if (s === "available" || s === "متوفر") statusLabel = "متوفر";
+      else if (s === "unavailable" || s === "غير متوفر") statusLabel = "غير متوفر";
+      else if (s === "reserved" || s === "محجوز") statusLabel = "محجوز";
+      else if (s === "sold" || s === "مباع") statusLabel = "مباع";
+      else if (s === "hidden" || s === "مخفي") statusLabel = "مخفي";
+      else if (s) statusLabel = s;
+
+      const statusKey = s === "متوفر" || s === "available" ? "available" :
+                        s === "غير متوفر" || s === "unavailable" ? "unavailable" :
+                        s === "محجوز" || s === "reserved" ? "reserved" :
+                        s === "مباع" || s === "sold" ? "sold" :
+                        s === "مخفي" || s === "hidden" ? "hidden" : "available";
+
+      // Resolve category name from joined categories relation or fallback
+      const catName = (item.categories as any)?.name || item.category || "";
+
+      return {
+        id: item.id,
+        name: item.name,
+        priceSale: pSale,
+        priceRent: pRent,
+        description: item.description,
+        image: resolveAssetPath(item.image || ""),
+        images: item.images ? item.images.map((img: string) => resolveAssetPath(img)) : [],
+        status: statusLabel,
+        statusKey: statusKey,
+        categoryId: item.category_id,
+        category: catName,
+        subcategoryId: item.subcategory_id,
+        stockQuantity: item.stock_quantity || 0,
+        isFeatured: item.is_featured || false,
+        isHidden: item.is_hidden || false,
+        code: item.code,
+        sortOrder: item.sort_order || 0,
+        itemMode: itemMode
+      };
+    });
   } catch (err) {
     console.warn("Supabase products fetch failed:", err);
     return [];
@@ -468,22 +514,46 @@ export async function getSupabaseProducts(): Promise<any[]> {
 
 export async function addSupabaseProduct(product: any) {
   try {
-    const dbItem = {
+    // Standardize database status key (must be stable English string)
+    let dbStatus = "available";
+    const s = (product.status || "").trim();
+    if (s === "متوفر" || s === "available") dbStatus = "available";
+    else if (s === "غير متوفر" || s === "unavailable") dbStatus = "unavailable";
+    else if (s === "محجوز" || s === "reserved") dbStatus = "reserved";
+    else if (s === "مباع" || s === "sold") dbStatus = "sold";
+    else if (s === "مخفي" || s === "hidden") dbStatus = "hidden";
+
+    // Standardize prices: empty string -> null
+    const priceSaleVal = product.priceSale !== "" && product.priceSale !== null && product.priceSale !== undefined ? Number(product.priceSale) : null;
+    const priceRentVal = product.priceRent !== "" && product.priceRent !== null && product.priceRent !== undefined ? Number(product.priceRent) : null;
+
+    const dbItem: any = {
       name: product.name,
-      sale_price: Number(product.priceSale || 0),
-      rent_price: Number(product.priceRent || 0),
+      // Sync both pricing column formats for absolute database compatibility
+      sale_price: priceSaleVal,
+      price_sale: priceSaleVal,
+      rent_price: priceRentVal,
+      price_rent: priceRentVal,
       description: product.description || "",
       image: product.image || "",
       images: product.images || [],
-      status: product.status || "available",
+      status: dbStatus,
       category_id: product.categoryId || null,
       subcategory_id: product.subcategoryId || null,
       stock_quantity: Number(product.stockQuantity || 10),
       is_featured: product.isFeatured || false,
       is_hidden: product.isHidden || false,
       code: product.code || `JG-${Math.floor(100000 + Math.random() * 900000)}`,
-      sort_order: Number(product.sortOrder || 0)
+      sort_order: Number(product.sortOrder || 0),
+      item_mode: product.itemMode || "both"
     };
+
+    // Client-side UUID generator fallback (never send id: null to DB)
+    if (product.id && product.id.trim() !== "") {
+      dbItem.id = product.id;
+    } else {
+      dbItem.id = generateUUID();
+    }
 
     const { data, error } = await supabase
       .from('products')
@@ -503,12 +573,33 @@ export async function updateSupabaseProduct(productId: string, updates: any) {
   try {
     const dbUpdates: any = {};
     if (updates.name !== undefined) dbUpdates.name = updates.name;
-    if (updates.priceSale !== undefined) dbUpdates.sale_price = Number(updates.priceSale);
-    if (updates.priceRent !== undefined) dbUpdates.rent_price = Number(updates.priceRent);
+    
+    if (updates.priceSale !== undefined) {
+      const pSaleVal = updates.priceSale !== "" && updates.priceSale !== null && updates.priceSale !== undefined ? Number(updates.priceSale) : null;
+      dbUpdates.sale_price = pSaleVal;
+      dbUpdates.price_sale = pSaleVal;
+    }
+    if (updates.priceRent !== undefined) {
+      const pRentVal = updates.priceRent !== "" && updates.priceRent !== null && updates.priceRent !== undefined ? Number(updates.priceRent) : null;
+      dbUpdates.rent_price = pRentVal;
+      dbUpdates.price_rent = pRentVal;
+    }
+
     if (updates.description !== undefined) dbUpdates.description = updates.description;
     if (updates.image !== undefined) dbUpdates.image = updates.image;
     if (updates.images !== undefined) dbUpdates.images = updates.images;
-    if (updates.status !== undefined) dbUpdates.status = updates.status;
+    
+    if (updates.status !== undefined) {
+      let dbStatus = "available";
+      const s = (updates.status || "").trim();
+      if (s === "متوفر" || s === "available") dbStatus = "available";
+      else if (s === "غير متوفر" || s === "unavailable") dbStatus = "unavailable";
+      else if (s === "محجوز" || s === "reserved") dbStatus = "reserved";
+      else if (s === "مباع" || s === "sold") dbStatus = "sold";
+      else if (s === "مخفي" || s === "hidden") dbStatus = "hidden";
+      dbUpdates.status = dbStatus;
+    }
+
     if (updates.categoryId !== undefined) dbUpdates.category_id = updates.categoryId;
     if (updates.subcategoryId !== undefined) dbUpdates.subcategory_id = updates.subcategoryId;
     if (updates.stockQuantity !== undefined) dbUpdates.stock_quantity = Number(updates.stockQuantity);
@@ -516,6 +607,7 @@ export async function updateSupabaseProduct(productId: string, updates: any) {
     if (updates.isHidden !== undefined) dbUpdates.is_hidden = updates.isHidden;
     if (updates.code !== undefined) dbUpdates.code = updates.code;
     if (updates.sortOrder !== undefined) dbUpdates.sort_order = Number(updates.sortOrder);
+    if (updates.itemMode !== undefined) dbUpdates.item_mode = updates.itemMode;
 
     const { error } = await supabase
       .from('products')

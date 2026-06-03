@@ -9,8 +9,9 @@ import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { getSupabaseProducts, resolveAssetPath, getSupabaseSettings } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSearchParams } from "next/navigation";
 
-// Mock products database for details fetching
+// Mock products database for details fetching fallback
 const productsDb: Record<string, {
   name: string;
   priceSale: number;
@@ -101,8 +102,21 @@ const productsDb: Record<string, {
   },
 };
 
-export default function ProductDetailClient({ params }: { params: { id: string } }) {
-  const [product, setProduct] = useState<any>(productsDb[params.id] || productsDb["1"]);
+const getArabicStatusLabel = (status: string) => {
+  const s = (status || "").toLowerCase().trim();
+  if (s === "available" || s === "متوفر") return "متوفر";
+  if (s === "unavailable" || s === "غير متوفر" || s === "غير متوفر حالياً") return "غير متوفر";
+  if (s === "reserved" || s === "محجوز") return "محجوز";
+  if (s === "sold" || s === "مباع") return "مباع";
+  if (s === "hidden" || s === "مخفي") return "مخفي";
+  return status;
+};
+
+export default function ProductDetailClient() {
+  const searchParams = useSearchParams();
+  const productId = searchParams.get("id") || "1";
+
+  const [product, setProduct] = useState<any>(productsDb[productId] || productsDb["1"]);
   const [mode, setMode] = useState<"rent" | "sale">("sale");
   const [quantity, setQuantity] = useState(1);
   const [isAdded, setIsAdded] = useState(false);
@@ -126,7 +140,7 @@ export default function ProductDetailClient({ params }: { params: { id: string }
 
   useEffect(() => {
     getSupabaseProducts().then(dbProducts => {
-      const found = dbProducts.find(p => p.id === params.id);
+      const found = dbProducts.find(p => p.id === productId);
       if (found) {
         // If DB product doesn't have images array, we use its main image as a single-item array
         const dbProduct: any = found;
@@ -138,9 +152,9 @@ export default function ProductDetailClient({ params }: { params: { id: string }
         }
         setProduct(dbProduct);
 
-        // Auto select mode based on availability
-        const isSale = dbProduct.itemMode === 'sale' || dbProduct.itemMode === 'both';
-        const isRent = dbProduct.itemMode === 'rent' || dbProduct.itemMode === 'both';
+        // Auto select mode based on availability and price > 0
+        const isSale = (dbProduct.itemMode === 'sale' || dbProduct.itemMode === 'both') && dbProduct.priceSale > 0;
+        const isRent = (dbProduct.itemMode === 'rent' || dbProduct.itemMode === 'both') && dbProduct.priceRent > 0;
         if (!isSale && isRent) {
           setMode("rent");
         } else {
@@ -151,14 +165,14 @@ export default function ProductDetailClient({ params }: { params: { id: string }
         setActiveImage(resolveAssetPath(imagesList[0]));
       }
     }).catch(err => console.error("Error fetching product detail in PD:", err));
-  }, [params.id]);
+  }, [productId]);
 
   const currentPrice = mode === "sale" ? product.priceSale : product.priceRent;
 
   const handleAddToCart = () => {
     addToCart(
       {
-        id: params.id,
+        id: productId,
         name: product.name,
         price: currentPrice,
         image: product.image,
@@ -173,14 +187,14 @@ export default function ProductDetailClient({ params }: { params: { id: string }
   return (
     <>
       <Header />
-      <main className="min-h-screen bg-background pt-8 pb-24">
+      <main className="min-h-screen bg-background pt-8 pb-24 text-right">
         <div className="container mx-auto px-4 lg:px-8">
           
           {/* Breadcrumbs */}
           <div className="flex items-center gap-2 text-sm text-foreground/60 mb-8 font-medium overflow-x-auto pb-2">
             <Link href="/" className="hover:text-primary whitespace-nowrap">الرئيسية</Link>
             <ChevronRight className="w-4 h-4 shrink-0" />
-            <Link href="/products" className="hover:text-primary whitespace-nowrap">المنتجات</Link>
+            <Link href="/categories" className="hover:text-primary whitespace-nowrap">الأقسام</Link>
             <ChevronRight className="w-4 h-4 shrink-0" />
             <Link href={`/categories/${product.categoryId}`} className="hover:text-primary whitespace-nowrap">{product.category}</Link>
             <ChevronRight className="w-4 h-4 shrink-0" />
@@ -259,8 +273,8 @@ export default function ProductDetailClient({ params }: { params: { id: string }
                 {/* Price display with mode explanation */}
                 <div className="flex items-baseline gap-4 mt-2">
                   {(() => {
-                    const isSaleAvailable = product.itemMode === "sale" || product.itemMode === "both";
-                    const isRentAvailable = product.itemMode === "rent" || product.itemMode === "both";
+                    const isSaleAvailable = (product.itemMode === "sale" || product.itemMode === "both") && product.priceSale > 0;
+                    const isRentAvailable = (product.itemMode === "rent" || product.itemMode === "both") && product.priceRent > 0;
                     const isUnavailableOrSoldOrHidden =
                       product.statusKey === "unavailable" ||
                       product.statusKey === "sold" ||
@@ -291,8 +305,8 @@ export default function ProductDetailClient({ params }: { params: { id: string }
                     }
                   })()}
                   {(() => {
-                    const isSaleAvailable = product.itemMode === "sale" || product.itemMode === "both";
-                    const isRentAvailable = product.itemMode === "rent" || product.itemMode === "both";
+                    const isSaleAvailable = (product.itemMode === "sale" || product.itemMode === "both") && product.priceSale > 0;
+                    const isRentAvailable = (product.itemMode === "rent" || product.itemMode === "both") && product.priceRent > 0;
                     const isUnavailableOrSoldOrHidden =
                       product.statusKey === "unavailable" ||
                       product.statusKey === "sold" ||
@@ -325,16 +339,18 @@ export default function ProductDetailClient({ params }: { params: { id: string }
                     product.status === "مباع" ||
                     product.status === "مخفي";
 
+                  const cleanStatus = getArabicStatusLabel(product.status);
+
                   return (
                     <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold ${
                       isUnavailableOrSoldOrHidden
                         ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                        : product.status === "محجوز" || product.statusKey === "reserved"
+                        : cleanStatus === "محجوز" || product.statusKey === "reserved"
                         ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
                         : "bg-green-500/10 text-green-400 border border-green-500/20"
                     }`}>
                       <div className="w-2 h-2 rounded-full bg-current"></div>
-                      {isUnavailableOrSoldOrHidden ? "غير متوفر حالياً" : product.status}
+                      {isUnavailableOrSoldOrHidden ? "غير متوفر حالياً" : cleanStatus}
                     </span>
                   );
                 })()}
@@ -344,8 +360,8 @@ export default function ProductDetailClient({ params }: { params: { id: string }
               <div className="mb-8">
                 <h3 className="text-sm font-bold text-foreground/60 mb-3">اختر نوع الخدمة:</h3>
                 {(() => {
-                  const isSaleAvailable = product.itemMode === "sale" || product.itemMode === "both";
-                  const isRentAvailable = product.itemMode === "rent" || product.itemMode === "both";
+                  const isSaleAvailable = (product.itemMode === "sale" || product.itemMode === "both") && product.priceSale > 0;
+                  const isRentAvailable = (product.itemMode === "rent" || product.itemMode === "both") && product.priceRent > 0;
                   const isUnavailableOrSoldOrHidden =
                     product.statusKey === "unavailable" ||
                     product.statusKey === "sold" ||
@@ -361,10 +377,10 @@ export default function ProductDetailClient({ params }: { params: { id: string }
                         onClick={() => setMode("sale")}
                         className={`p-4 rounded-xl border text-center transition-all ${
                           !isSaleAvailable || isUnavailableOrSoldOrHidden
-                            ? "border-border/30 bg-surface/30 text-foreground/30 cursor-not-allowed opacity-50"
+                            ? "border-border/30 bg-surface/30 text-foreground/30 cursor-not-allowed opacity-50 font-bold"
                             : mode === "sale"
                             ? "border-primary bg-primary/10 text-primary-light font-black"
-                            : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
+                            : "border-border bg-surface hover:bg-surface-hover text-foreground/80 font-bold"
                         }`}
                       >
                         <div className="text-lg font-bold">شراء ملكية</div>
@@ -377,10 +393,10 @@ export default function ProductDetailClient({ params }: { params: { id: string }
                         onClick={() => setMode("rent")}
                         className={`p-4 rounded-xl border text-center transition-all ${
                           !isRentAvailable || isUnavailableOrSoldOrHidden
-                            ? "border-border/30 bg-surface/30 text-foreground/30 cursor-not-allowed opacity-50"
+                            ? "border-border/30 bg-surface/30 text-foreground/30 cursor-not-allowed opacity-50 font-bold"
                             : mode === "rent"
                             ? "border-primary bg-primary/10 text-primary-light font-black"
-                            : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
+                            : "border-border bg-surface hover:bg-surface-hover text-foreground/80 font-bold"
                         }`}
                       >
                         <div className="text-lg font-bold">إيجار للمناسبة</div>
@@ -393,10 +409,10 @@ export default function ProductDetailClient({ params }: { params: { id: string }
                 })()}
 
                 {mode === "rent" && settings.rental_policy && (
-                  <div className="mt-4 p-4 bg-primary/5 border border-primary/20 rounded-xl space-y-2 text-right">
+                  <div className="mt-4 p-4 bg-primary/5 border border-primary/20 rounded-xl space-y-2 text-right animate-fadeIn">
                     <div className="flex items-center gap-2 text-primary font-bold text-sm">
-                      <ShieldCheck className="w-4 h-4 text-primary" />
-                      <span>سياسة الإيجار</span>
+                       <ShieldCheck className="w-4 h-4 text-primary" />
+                       <span>سياسة الإيجار</span>
                     </div>
                     <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-line">
                       {settings.rental_policy}
@@ -428,8 +444,8 @@ export default function ProductDetailClient({ params }: { params: { id: string }
               {/* Actions */}
               <div className="flex flex-col sm:flex-row gap-4 mb-12">
                 {(() => {
-                  const isSaleAvailable = product.itemMode === "sale" || product.itemMode === "both";
-                  const isRentAvailable = product.itemMode === "rent" || product.itemMode === "both";
+                  const isSaleAvailable = (product.itemMode === "sale" || product.itemMode === "both") && product.priceSale > 0;
+                  const isRentAvailable = (product.itemMode === "rent" || product.itemMode === "both") && product.priceRent > 0;
                   const isUnavailableOrSoldOrHidden =
                     product.statusKey === "unavailable" ||
                     product.statusKey === "sold" ||

@@ -1,4 +1,4 @@
-import ProductDetailClient from "./ProductDetailClient";
+import RedirectClient from "./RedirectClient";
 
 export async function generateStaticParams() {
   return [
@@ -17,5 +17,5 @@ interface PageProps {
 
 export default async function Page({ params }: PageProps) {
   const resolvedParams = await params;
-  return <ProductDetailClient params={resolvedParams} />;
+  return <RedirectClient id={resolvedParams.id} />;
 }
