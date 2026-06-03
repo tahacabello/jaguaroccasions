@@ -3190,7 +3190,7 @@ ${orderSum}
                   <div className="glass p-8 rounded-3xl border border-border space-y-6">
                     <h3 className="text-lg font-bold flex items-center gap-2 border-b border-border/40 pb-3">
                       <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
-                      طلبات إلغاء الطلبيات بانتظار موافقة الإدارة
+                      طلبات إلغاء بانتظار الموافقة
                     </h3>
                     
                     {orders.filter(o => o.cancellation_status === 'pending').length === 0 ? (

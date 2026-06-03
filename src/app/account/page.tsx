@@ -444,26 +444,8 @@ ${itemsList}
       .filter(r => r.order_id === ord.id)
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
 
-    if (!latest) {
-      return (
-        <div className="mt-4 p-4 rounded-xl border border-border bg-surface/35 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <p className="text-xs text-foreground/50">طلب التعديل:</p>
-            <p className="text-sm font-bold text-foreground/80 flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-foreground/35 text-xs"></span>
-              لا يوجد طلب تعديل
-            </p>
-          </div>
-          {ord.status !== "completed" && ord.status !== "cancelled" && (
-            <button
-              onClick={() => handleOpenRequestModal(ord)}
-              className="px-4 py-2 bg-primary hover:bg-primary-light text-black text-xs font-black rounded-lg transition-all cursor-pointer"
-            >
-              طلب تعديل على الطلب
-            </button>
-          )}
-        </div>
-      );
+    if (!latest || latest.status === "cancelled" || latest.status === "approved") {
+      return null;
     }
 
     if (latest.status === "pending") {
@@ -474,26 +456,28 @@ ${itemsList}
               <p className="text-[10px] text-amber-500 font-bold uppercase tracking-wider">طلب تعديل معلق</p>
               <p className="text-sm font-black text-amber-400 flex items-center gap-1.5 mt-0.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
-                طلب تعديل بانتظار موافقة الإدارة
+                طلب التعديل بانتظار موافقة الإدارة
               </p>
               <p className="text-xs text-foreground/70 font-semibold mt-1">
                 لن يتم تطبيق التعديل إلا بعد موافقة الإدارة.
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleOpenRequestModal(ord)}
-                className="px-3 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary-light border border-primary/20 text-xs font-bold rounded-lg transition-all cursor-pointer"
-              >
-                تعديل طلب التغيير
-              </button>
-              <button
-                onClick={() => handleCancelRequest(latest.id)}
-                className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold rounded-lg transition-all cursor-pointer"
-              >
-                إلغاء طلب التغيير
-              </button>
-            </div>
+            {ord.status !== "completed" && ord.status !== "cancelled" && ord.cancellation_status !== "pending" && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleOpenRequestModal(ord)}
+                  className="px-3 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary-light border border-primary/20 text-xs font-bold rounded-lg transition-all cursor-pointer"
+                >
+                  تعديل طلب التغيير
+                </button>
+                <button
+                  onClick={() => handleCancelRequest(latest.id)}
+                  className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold rounded-lg transition-all cursor-pointer"
+                >
+                  إلغاء طلب التغيير
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Requested changes preview */}
@@ -535,25 +519,6 @@ ${itemsList}
       );
     }
 
-    if (latest.status === "approved") {
-      return (
-        <div className="mt-4 p-4 rounded-xl border border-green-500/20 bg-green-500/5 space-y-2">
-          <p className="text-xs font-black text-green-400 flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-green-500"></span>
-            تم قبول التعديل
-          </p>
-          <p className="text-xs text-foreground/75 leading-relaxed font-semibold">
-            تمت الموافقة على طلب التعديل وتحديث بيانات الطلبية الحالية بنجاح.
-          </p>
-          {latest.admin_note && (
-            <p className="text-xs text-foreground/60 italic">
-              💬 رد الإدارة: "{latest.admin_note}"
-            </p>
-          )}
-        </div>
-      );
-    }
-
     if (latest.status === "rejected") {
       return (
         <div className="mt-4 p-4 rounded-xl border border-red-500/20 bg-red-500/5 space-y-2">
@@ -562,7 +527,7 @@ ${itemsList}
               <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
               تم رفض التعديل
             </p>
-            {ord.status !== "completed" && ord.status !== "cancelled" && (
+            {ord.status !== "completed" && ord.status !== "cancelled" && ord.cancellation_status !== "pending" && (
               <button
                 onClick={() => handleOpenRequestModal(ord)}
                 className="px-3 py-1 bg-primary hover:bg-primary-light text-black text-[10px] font-black rounded-lg transition-all cursor-pointer"
@@ -578,28 +543,6 @@ ${itemsList}
             <p className="text-xs text-red-400/80 font-bold">
               💬 سبب الرفض: "{latest.admin_note}"
             </p>
-          )}
-        </div>
-      );
-    }
-
-    if (latest.status === "cancelled") {
-      return (
-        <div className="mt-4 p-4 rounded-xl border border-border bg-surface/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <p className="text-xs text-foreground/50">طلب التعديل:</p>
-            <p className="text-sm font-bold text-foreground/60 flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-foreground/35"></span>
-              تم إلغاء طلب التعديل
-            </p>
-          </div>
-          {ord.status !== "completed" && ord.status !== "cancelled" && (
-            <button
-              onClick={() => handleOpenRequestModal(ord)}
-              className="px-4 py-2 bg-primary hover:bg-primary-light text-black text-xs font-black rounded-lg transition-all cursor-pointer"
-            >
-              طلب تعديل على الطلب
-            </button>
           )}
         </div>
       );
@@ -737,17 +680,15 @@ ${itemsList}
                               </span>
 
                               {/* Cancellation Status Badge */}
-                              <span className={`px-3 py-1.5 rounded-lg text-xs font-black shrink-0 ${
-                                ord.cancellation_status === 'pending' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' :
-                                ord.cancellation_status === 'approved' ? 'bg-green-500/15 text-green-400 border border-green-500/30' :
-                                ord.cancellation_status === 'rejected' ? 'bg-red-500/15 text-red-400 border border-red-500/30' :
-                                'bg-foreground/5 text-foreground/50 border border-border/30'
-                              }`}>
-                                {ord.cancellation_status === 'pending' ? 'طلب الإلغاء بانتظار موافقة الإدارة' :
-                                 ord.cancellation_status === 'approved' ? 'تم قبول طلب الإلغاء' :
-                                 ord.cancellation_status === 'rejected' ? 'تم رفض طلب الإلغاء' :
-                                 'لا يوجد طلب إلغاء'}
-                              </span>
+                              {ord.status !== "cancelled" && ord.cancellation_status && ord.cancellation_status !== 'approved' && (
+                                <span className={`px-3 py-1.5 rounded-lg text-xs font-black shrink-0 ${
+                                  ord.cancellation_status === 'pending' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 animate-pulse' :
+                                  'bg-red-500/15 text-red-400 border border-red-500/30'
+                                }`}>
+                                  {ord.cancellation_status === 'pending' ? 'طلب الإلغاء بانتظار موافقة الإدارة' :
+                                   'تم رفض طلب الإلغاء'}
+                                </span>
+                              )}
 
                               <a
                                 href={getWhatsAppLink(ord)}
@@ -878,24 +819,66 @@ ${itemsList}
 
                               {renderChangeRequestStatus(ord)}
 
-                              <div className="pt-4 flex flex-wrap justify-start gap-3 border-t border-border/20 mt-2">
-                                <a
-                                  href={getWhatsAppLink(ord)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="px-4 py-2 bg-green-500 hover:bg-green-600 text-black rounded-lg font-black text-xs transition-all flex items-center gap-1.5 hover:scale-105"
-                                >
-                                  <MessageCircle className="w-4.5 h-4.5" />
-                                  استفسار ومساعدة فورية بالواتساب عن هذا الطلب
-                                </a>
+                              {/* Action Buttons & Status Info */}
+                              <div className="pt-4 flex flex-col gap-3 border-t border-border/20 mt-2">
+                                {ord.status !== "cancelled" && ord.status !== "completed" ? (
+                                  ord.cancellation_status === "pending" ? (
+                                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 font-black text-xs text-center flex items-center justify-center gap-1.5 animate-pulse">
+                                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                                      طلب الإلغاء بانتظار موافقة الإدارة
+                                    </div>
+                                  ) : (
+                                    <>
+                                      {ord.cancellation_status === "rejected" && (
+                                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 font-bold text-xs">
+                                          تم رفض طلب الإلغاء
+                                        </div>
+                                      )}
+                                      
+                                      <div className="flex flex-wrap justify-start gap-3">
+                                        <a
+                                          href={getWhatsAppLink(ord)}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="px-4 py-2 bg-green-500 hover:bg-green-600 text-black rounded-lg font-black text-xs transition-all flex items-center gap-1.5 hover:scale-105"
+                                        >
+                                          <MessageCircle className="w-4.5 h-4.5" />
+                                          واتساب للمساعدة
+                                        </a>
 
-                                {ord.status !== "cancelled" && ord.status !== "completed" && ord.cancellation_status !== "pending" && ord.cancellation_status !== "approved" && (
-                                  <button
-                                    onClick={() => handleRequestCancellation(ord.id)}
-                                    className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/25 rounded-lg font-black text-xs transition-all hover:scale-105 cursor-pointer"
-                                  >
-                                    طلب إلغاء الطلب
-                                  </button>
+                                        {/* Edit request button (only if no edit request is pending) */}
+                                        {!changeRequests.some(r => r.order_id === ord.id && r.status === "pending") && (
+                                          <button
+                                            onClick={() => handleOpenRequestModal(ord)}
+                                            className="px-4 py-2 bg-primary hover:bg-primary-light text-black rounded-lg font-black text-xs transition-all hover:scale-105 cursor-pointer"
+                                          >
+                                            طلب تعديل على الطلب
+                                          </button>
+                                        )}
+
+                                        {/* Cancellation request button */}
+                                        <button
+                                          onClick={() => handleRequestCancellation(ord.id)}
+                                          className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/25 rounded-lg font-black text-xs transition-all hover:scale-105 cursor-pointer"
+                                        >
+                                          طلب إلغاء الطلب
+                                        </button>
+                                      </div>
+                                    </>
+                                  )
+                                ) : (
+                                  /* For cancelled or completed orders, just show WhatsApp query option, but no cancel/edit actions */
+                                  <div className="flex flex-wrap justify-start gap-3">
+                                    <a
+                                      href={getWhatsAppLink(ord)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-4 py-2 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 rounded-lg font-black text-xs transition-all flex items-center gap-1.5 hover:scale-105"
+                                    >
+                                      <MessageCircle className="w-4.5 h-4.5" />
+                                      واتساب للمساعدة
+                                    </a>
+                                  </div>
                                 )}
                               </div>
                             </div>
