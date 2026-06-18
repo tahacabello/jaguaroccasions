@@ -3,7 +3,7 @@ import {
   Search, Plus, Check, X, AlertCircle, RefreshCw, Printer, Download,
   ShoppingBag, DollarSign, FileText, Trash
 } from 'lucide-react';
-import { addOrder, deleteOrder, addCustomer } from '@/lib/supabase';
+import { addOrder, deleteOrder, addCustomer, addProduct } from '@/lib/supabase';
 
 interface SalesManagerProps {
   orders: any[];
@@ -92,6 +92,23 @@ export default function SalesManager({
     }));
   };
 
+  const handleAddCustomProduct = () => {
+    const customId = `custom-${Date.now()}`;
+    const newCustomItem = {
+      id: customId,
+      name: 'منتج مخصص جديد',
+      category: 'أخرى',
+      price_rent: 0,
+      price_sale: 0,
+      quantity: 1,
+      custom_price: 0,
+      is_custom: true
+    };
+    const updated = [...selectedProducts, newCustomItem];
+    setSelectedProducts(updated);
+    recalcTotal(updated);
+  };
+
   const handleSaveSale = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -125,13 +142,36 @@ export default function SalesManager({
         finalCustomerId = custRes.data.id;
       }
 
+      // Check and add custom products first
+      const savedProducts = [];
+      for (const p of selectedProducts) {
+        if (p.is_custom) {
+          const prodRes = await addProduct({
+            name: p.name.trim() || "منتج مخصص",
+            category: "أخرى",
+            price_rent: p.custom_price,
+            price_sale: p.custom_price,
+            quantity: p.quantity,
+            status: 'available' // available for sale
+          });
+          if (!prodRes.success) throw new Error(prodRes.error || `فشل إضافة المنتج المخصص: ${p.name}`);
+          savedProducts.push({
+            id: prodRes.data.id,
+            quantity: p.quantity,
+            custom_price: p.custom_price
+          });
+        } else {
+          savedProducts.push(p);
+        }
+      }
+
       const payload = {
         ...newSale,
         customer_id: finalCustomerId,
         status: 'completed'
       };
 
-      const itemsPayload = selectedProducts.map(p => ({
+      const itemsPayload = savedProducts.map(p => ({
         product_id: p.id,
         quantity: p.quantity,
         price: p.custom_price
@@ -493,7 +533,7 @@ export default function SalesManager({
               {/* Products selection list */}
               <div className="space-y-2">
                 <label className="text-xs text-gray-300 font-bold block">اختيار المنتجات المباعة *</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 bg-zinc-950 rounded-lg border border-zinc-900">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 bg-zinc-955 rounded-lg border border-zinc-900">
                   {products.filter(p => p.status === 'available' && p.quantity > 0).map(prod => {
                     const isSelected = selectedProducts.some(p => p.id === prod.id);
                     return (
@@ -513,6 +553,14 @@ export default function SalesManager({
                     );
                   })}
                 </div>
+                <button
+                  type="button"
+                  onClick={handleAddCustomProduct}
+                  className="w-full py-2 border border-dashed border-zinc-800 hover:border-amber-500/50 hover:bg-amber-500/5 rounded-lg text-xs text-amber-500 font-bold flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <Plus size={14} />
+                  إضافة منتج مخصص غير مدرج في القائمة
+                </button>
               </div>
 
               {/* Selected items edit */}
@@ -522,8 +570,21 @@ export default function SalesManager({
                   <div className="space-y-3">
                     {selectedProducts.map(p => (
                       <div key={p.id} className="flex justify-between items-center gap-4 border-b border-zinc-900 pb-2 last:border-0 last:pb-0">
-                        <div className="flex-1">
-                          <span className="text-xs font-semibold text-gray-200">{p.name}</span>
+                        <div className="flex-1 space-y-1">
+                          {p.is_custom ? (
+                            <input 
+                              type="text"
+                              value={p.name}
+                              onChange={(e) => {
+                                const updated = selectedProducts.map(item => item.id === p.id ? { ...item, name: e.target.value } : item);
+                                setSelectedProducts(updated);
+                              }}
+                              className="bg-zinc-950 border border-zinc-800 focus:border-amber-500 focus:outline-none rounded px-2 py-1 text-xs text-white w-full max-w-[200px]"
+                              placeholder="اسم المنتج المخصص..."
+                            />
+                          ) : (
+                            <span className="text-xs font-semibold text-gray-200">{p.name}</span>
+                          )}
                           <div className="text-[10px] text-gray-500">السعر الافتراضي: {p.price_sale} د.ل</div>
                         </div>
                         
@@ -533,7 +594,7 @@ export default function SalesManager({
                             <input
                               type="number"
                               min="1"
-                              max={p.quantity}
+                              max={p.is_custom ? undefined : p.quantity}
                               value={p.quantity}
                               onChange={(e) => handleProductQtyChange(p.id, Number(e.target.value))}
                               className="w-12 bg-zinc-955 border border-zinc-800 rounded p-1 text-xs text-center text-white"
@@ -549,6 +610,20 @@ export default function SalesManager({
                               className="w-16 bg-zinc-955 border border-zinc-800 rounded p-1 text-xs text-center text-white font-bold"
                             />
                           </div>
+                          {p.is_custom && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const filtered = selectedProducts.filter(item => item.id !== p.id);
+                                setSelectedProducts(filtered);
+                                recalcTotal(filtered);
+                              }}
+                              className="text-rose-500 hover:text-rose-400 p-1.5 bg-zinc-950 border border-zinc-800 rounded hover:border-rose-500/20 transition-all"
+                              title="إزالة"
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}

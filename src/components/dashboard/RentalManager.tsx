@@ -3,7 +3,7 @@ import {
   Search, Plus, Check, X, AlertCircle, RefreshCw, Printer, Download,
   Calendar, DollarSign, Clock, CheckCircle
 } from 'lucide-react';
-import { addRental, updateRental, deleteRental, addPayment, addCustomer } from '@/lib/supabase';
+import { addRental, updateRental, deleteRental, addPayment, addCustomer, addProduct } from '@/lib/supabase';
 
 interface RentalManagerProps {
   rentals: any[];
@@ -141,6 +141,23 @@ export default function RentalManager({
     }));
   };
 
+  const handleAddCustomProduct = () => {
+    const customId = `custom-${Date.now()}`;
+    const newCustomItem = {
+      id: customId,
+      name: 'منتج مخصص جديد',
+      category: 'أخرى',
+      price_rent: 0,
+      price_sale: 0,
+      quantity: 1,
+      custom_price: 0,
+      is_custom: true
+    };
+    const updated = [...selectedProducts, newCustomItem];
+    setSelectedProducts(updated);
+    recalcTotal(updated);
+  };
+
   const handleSaveRental = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -178,6 +195,29 @@ export default function RentalManager({
         finalCustomerId = custRes.data.id;
       }
 
+      // Check and add custom products first
+      const savedProducts = [];
+      for (const p of selectedProducts) {
+        if (p.is_custom) {
+          const prodRes = await addProduct({
+            name: p.name.trim() || "منتج مخصص",
+            category: "أخرى",
+            price_rent: p.custom_price,
+            price_sale: p.custom_price,
+            quantity: p.quantity,
+            status: 'rented' // instantly rented status
+          });
+          if (!prodRes.success) throw new Error(prodRes.error || `فشل إضافة المنتج المخصص: ${p.name}`);
+          savedProducts.push({
+            id: prodRes.data.id,
+            quantity: p.quantity,
+            custom_price: p.custom_price
+          });
+        } else {
+          savedProducts.push(p);
+        }
+      }
+
       const remaining = Number(newRent.rental_value) - Number(newRent.deposit);
       const payload = {
         ...newRent,
@@ -189,7 +229,7 @@ export default function RentalManager({
         actual_delivery_date: newRent.start_date
       };
 
-      const itemsPayload = selectedProducts.map(p => ({
+      const itemsPayload = savedProducts.map(p => ({
         product_id: p.id,
         quantity: p.quantity,
         price: p.custom_price
@@ -658,6 +698,14 @@ export default function RentalManager({
                     );
                   })}
                 </div>
+                <button
+                  type="button"
+                  onClick={handleAddCustomProduct}
+                  className="w-full py-2 border border-dashed border-zinc-800 hover:border-amber-500/50 hover:bg-amber-500/5 rounded-lg text-xs text-amber-500 font-bold flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <Plus size={14} />
+                  إضافة منتج مخصص غير مدرج في القائمة
+                </button>
               </div>
 
               {/* Selected items quantities & custom prices */}
@@ -667,8 +715,21 @@ export default function RentalManager({
                   <div className="space-y-3">
                     {selectedProducts.map(p => (
                       <div key={p.id} className="flex justify-between items-center gap-4 border-b border-zinc-900 pb-2 last:border-0 last:pb-0">
-                        <div className="flex-1">
-                          <span className="text-xs font-semibold text-gray-200">{p.name}</span>
+                        <div className="flex-1 space-y-1">
+                          {p.is_custom ? (
+                            <input 
+                              type="text"
+                              value={p.name}
+                              onChange={(e) => {
+                                const updated = selectedProducts.map(item => item.id === p.id ? { ...item, name: e.target.value } : item);
+                                setSelectedProducts(updated);
+                              }}
+                              className="bg-zinc-950 border border-zinc-800 focus:border-amber-500 focus:outline-none rounded px-2 py-1 text-xs text-white w-full max-w-[200px]"
+                              placeholder="اسم المنتج المخصص..."
+                            />
+                          ) : (
+                            <span className="text-xs font-semibold text-gray-200">{p.name}</span>
+                          )}
                           <div className="text-[10px] text-gray-500">التصنيف: {p.category}</div>
                         </div>
                         
@@ -680,7 +741,7 @@ export default function RentalManager({
                               min="1"
                               value={p.quantity}
                               onChange={(e) => handleProductQtyChange(p.id, Number(e.target.value))}
-                              className="w-12 bg-zinc-955 border border-zinc-800 rounded p-1 text-xs text-center text-white"
+                              className="w-12 bg-zinc-950 border border-zinc-800 rounded p-1 text-xs text-center text-white"
                             />
                           </div>
                           <div className="flex items-center gap-1">
@@ -690,9 +751,23 @@ export default function RentalManager({
                               min="0"
                               value={p.custom_price}
                               onChange={(e) => handleProductPriceChange(p.id, Number(e.target.value))}
-                              className="w-16 bg-zinc-955 border border-zinc-800 rounded p-1 text-xs text-center text-white font-bold"
+                              className="w-16 bg-zinc-950 border border-zinc-800 rounded p-1 text-xs text-center text-white font-bold"
                             />
                           </div>
+                          {p.is_custom && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const filtered = selectedProducts.filter(item => item.id !== p.id);
+                                setSelectedProducts(filtered);
+                                recalcTotal(filtered);
+                              }}
+                              className="text-rose-500 hover:text-rose-400 p-1.5 bg-zinc-950 border border-zinc-800 rounded hover:border-rose-500/20 transition-all"
+                              title="إزالة"
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
