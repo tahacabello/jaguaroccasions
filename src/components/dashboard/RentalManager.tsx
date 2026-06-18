@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Search, Plus, Check, X, AlertCircle, RefreshCw, Printer, Download,
-  Calendar, DollarSign, Clock, CheckCircle
+  Calendar, DollarSign, Clock, CheckCircle, Edit
 } from 'lucide-react';
-import { addRental, updateRental, deleteRental, addPayment, addCustomer, addProduct } from '@/lib/supabase';
+import { supabase, addRental, updateRental, deleteRental, addPayment, addCustomer, addProduct } from '@/lib/supabase';
 
 interface RentalManagerProps {
   rentals: any[];
@@ -48,6 +48,102 @@ export default function RentalManager({
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
   const [guestWhatsapp, setGuestWhatsapp] = useState('');
+
+  // Editing and Success Screen states
+  const [editingRent, setEditingRent] = useState<any>(null);
+  const [savedRentData, setSavedRentData] = useState<any>(null);
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingRent(null);
+    setSavedRentData(null);
+    setSelectedProducts([]);
+    setSuccessMsg('');
+    setErrorMsg('');
+    setNewRent({
+      customer_id: '',
+      start_date: new Date().toISOString().split('T')[0],
+      end_date: '',
+      expected_return_date: '',
+      rental_value: 0,
+      deposit: 0,
+      notes: '',
+    });
+    setIsGuestCustomer(false);
+    setGuestName('');
+    setGuestPhone('');
+    setGuestWhatsapp('');
+    setOpenNewRentalFlag(false);
+  };
+
+  const handleEditClick = (rent: any) => {
+    setEditingRent(rent);
+    setNewRent({
+      customer_id: rent.customer_id || '',
+      start_date: rent.start_date || new Date().toISOString().split('T')[0],
+      end_date: rent.end_date || '',
+      expected_return_date: rent.expected_return_date || '',
+      rental_value: rent.rental_value || 0,
+      deposit: rent.deposit || 0,
+      notes: rent.notes || '',
+    });
+    
+    // Load products
+    const mapped = (rent.items || []).map((item: any) => ({
+      id: item.product_id,
+      name: item.products?.name || "منتج مخصص",
+      price_rent: item.price,
+      custom_price: item.price,
+      quantity: item.quantity,
+      category: item.products?.category || "أخرى"
+    }));
+    setSelectedProducts(mapped);
+    setIsGuestCustomer(false); 
+    setIsModalOpen(true);
+  };
+
+  const printReceipt = (rent: any) => {
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      const custName = rent.customers?.name || 'عميل';
+      const custPhone = rent.customers?.phone || '';
+      let itemsHtml = '';
+      if (rent.items) {
+        for (const item of rent.items) {
+          const prodName = item.products?.name || item.name || 'منتج مخصص';
+          const price = item.price || item.custom_price || 0;
+          itemsHtml += '<tr><td style="padding: 8px; border-bottom: 1px solid #ddd;">' + prodName + '</td>' +
+                       '<td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">' + item.quantity + '</td>' +
+                       '<td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: left;">' + price + ' د.ل</td></tr>';
+        }
+      }
+
+      printWindow.document.write(
+        '<html><head><title>عقد إيجار - جاغوار للمناسبات</title>' +
+        '<style>body { font-family: "Cairo", sans-serif; direction: rtl; text-align: right; padding: 20px; color: #333; }' +
+        '.header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #d4af37; padding-bottom: 10px; }' +
+        '.header h1 { margin: 0; font-size: 20px; color: #b38728; }' +
+        '.info-table, .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }' +
+        '.info-table td { padding: 5px; font-size: 13px; }' +
+        '.items-table th { background-color: #f5f5f5; padding: 8px; text-align: right; border-bottom: 2px solid #ddd; font-size: 13px; }' +
+        '.totals { font-size: 13px; font-weight: bold; text-align: left; }' +
+        '.footer { text-align: center; font-size: 11px; color: #777; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px; }</style></head>' +
+        '<body onload="window.print(); window.close();"><div class="header"><h1>جاغوار للمناسبات</h1><div style="font-size: 12px; margin-top: 5px;">عقد تأجير واستلام ملابس المناسبة</div></div>' +
+        '<table class="info-table"><tr><td><strong>رقم العقد:</strong> ' + rent.operation_number + '</td><td><strong>تاريخ التسجيل:</strong> ' + new Date(rent.created_at || Date.now()).toLocaleDateString('ar-LY') + '</td></tr>' +
+        '<tr><td><strong>الزبون:</strong> ' + custName + '</td><td><strong>الهاتف:</strong> ' + custPhone + '</td></tr>' +
+        '<tr><td><strong>تاريخ الاستلام الفعلي:</strong> ' + rent.start_date + '</td><td><strong>تاريخ الإرجاع المتوقع:</strong> ' + rent.expected_return_date + '</td></tr></table>' +
+        '<h3 style="font-size: 14px; border-bottom: 1px solid #eee; padding-bottom: 5px;">القطع المستلمة</h3>' +
+        '<table class="items-table"><thead><tr><th>اسم المنتج</th><th style="text-align: center;">الكمية</th><th style="text-align: left;">القيمة</th></tr></thead><tbody>' +
+        itemsHtml +
+        '</tbody></table><div class="totals"><p>قيمة الإيجار الإجمالية: ' + (rent.rental_value || rent.total_amount || 0) + ' د.ل</p>' +
+        '<p style="color: green;">المستحصل (عربون/مدفوع): ' + rent.deposit + ' د.ل</p>' +
+        '<p style="color: red;">المتبقي قيد التحصيل: ' + rent.remaining + ' د.ل</p></div>' +
+        '<div class="footer"><p>شكراً لتعاملكم معنا. يرجى الحفاظ على القطع وإرجاعها في الموعد المحدد تجنباً لغرامات التأخير.</p>' +
+        '<p>جاغوار للمناسبات © 2026</p></div></body></html>'
+      );
+      printWindow.document.close();
+    }
+  };
 
   // Return Operation form state
   const [returnRentalObj, setReturnRentalObj] = useState<any>(null);
@@ -210,6 +306,7 @@ export default function RentalManager({
           if (!prodRes.success) throw new Error(prodRes.error || `فشل إضافة المنتج المخصص: ${p.name}`);
           savedProducts.push({
             id: prodRes.data.id,
+            name: p.name,
             quantity: p.quantity,
             custom_price: p.custom_price
           });
@@ -223,41 +320,78 @@ export default function RentalManager({
         ...newRent,
         customer_id: finalCustomerId,
         remaining,
-        status: 'rented',
-        return_status: 'not_returned',
-        // Immediately delivered on start date
-        actual_delivery_date: newRent.start_date
+        status: editingRent ? editingRent.status : 'rented',
+        return_status: editingRent ? editingRent.return_status : 'not_returned',
+        actual_delivery_date: editingRent ? editingRent.actual_delivery_date : newRent.start_date
       };
 
-      const itemsPayload = savedProducts.map(p => ({
-        product_id: p.id,
-        quantity: p.quantity,
-        price: p.custom_price
-      }));
+      if (editingRent) {
+        // 1. Revert old products to 'available'
+        if (editingRent.items) {
+          for (const oldItem of editingRent.items) {
+            await supabase.from('products').update({ status: 'available' }).eq('id', oldItem.product_id);
+          }
+        }
 
-      const res = await addRental(payload, itemsPayload);
-      if (!res.success) throw new Error(res.error || "فشل تسجيل عقد الإيجار");
+        // 2. Update rentals record
+        const { error: rentErr } = await supabase.from('rentals').update(payload).eq('id', editingRent.id);
+        if (rentErr) throw rentErr;
 
-      setSuccessMsg("تم تسجيل الإيجار بنجاح وتأكيد تسليم القطع!");
-      setTimeout(() => {
-        setIsModalOpen(false);
-        setSelectedProducts([]);
-        setNewRent({
-          customer_id: '',
-          start_date: new Date().toISOString().split('T')[0],
-          end_date: '',
-          expected_return_date: '',
-          rental_value: 0,
-          deposit: 0,
-          notes: '',
+        // 3. Delete old items
+        const { error: delErr } = await supabase.from('rental_items').delete().eq('rental_id', editingRent.id);
+        if (delErr) throw delErr;
+
+        // 4. Insert new items
+        const itemsPayload = savedProducts.map(p => ({
+          rental_id: editingRent.id,
+          product_id: p.id,
+          quantity: p.quantity,
+          price: p.custom_price
+        }));
+        const { error: itemsErr } = await supabase.from('rental_items').insert(itemsPayload);
+        if (itemsErr) throw itemsErr;
+
+        // 5. Update new products status to 'rented'
+        for (const newItem of savedProducts) {
+          await supabase.from('products').update({ status: 'rented' }).eq('id', newItem.id);
+        }
+
+        setSavedRentData({
+          ...payload,
+          id: editingRent.id,
+          operation_number: editingRent.operation_number,
+          items: savedProducts.map(it => ({
+            ...it,
+            products: products.find(p => p.id === it.id) || { name: it.name || "منتج مخصص" }
+          })),
+          customers: isGuestCustomer ? { name: guestName, phone: guestPhone } : customers.find(c => c.id === finalCustomerId)
         });
-        setIsGuestCustomer(false);
-        setGuestName('');
-        setGuestPhone('');
-        setGuestWhatsapp('');
-        onRefresh();
-      }, 1500);
 
+        setSuccessMsg("تم تحديث عقد الإيجار بنجاح!");
+      } else {
+        const itemsPayload = savedProducts.map(p => ({
+          product_id: p.id,
+          quantity: p.quantity,
+          price: p.custom_price
+        }));
+        const res = await addRental(payload, itemsPayload);
+        if (!res.success) throw new Error(res.error || "فشل تسجيل عقد الإيجار");
+
+        setSavedRentData({
+          ...payload,
+          id: res.data.id,
+          operation_number: res.data.operation_number,
+          items: savedProducts.map(it => ({
+            ...it,
+            products: products.find(p => p.id === it.id) || { name: it.name || "منتج مخصص" }
+          })),
+          customers: isGuestCustomer ? { name: guestName, phone: guestPhone } : customers.find(c => c.id === finalCustomerId)
+        });
+
+        setSuccessMsg("تم تسجيل الإيجار بنجاح وتأكيد تسليم القطع!");
+      }
+
+      onRefresh();
     } catch (err: any) {
       setErrorMsg(err.message || "حدث خطأ أثناء حفظ الإيجار.");
     } finally {
@@ -566,14 +700,99 @@ export default function RentalManager({
           <div className="glass-premium rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-zinc-800">
             {/* Header */}
             <div className="flex justify-between items-center p-4 border-b border-zinc-800">
-              <h3 className="font-bold text-white text-base">تسجيل عقد إيجار فوري جديد</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white">
+              <h3 className="font-bold text-white text-base">
+                {savedRentData ? "تم تسجيل العقد بنجاح" : (editingRent ? "تعديل عقد الإيجار" : "تسجيل عقد إيجار فوري جديد")}
+              </h3>
+              <button onClick={closeModal} className="text-gray-400 hover:text-white">
                 <X size={20} />
               </button>
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleSaveRental} className="p-6 space-y-6">
+            {savedRentData ? (
+              <div className="p-6 space-y-6 text-center">
+                {/* Gold glowing animated Check */}
+                <div className="flex justify-center py-4">
+                  <div className="w-20 h-20 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-full flex items-center justify-center relative shadow-[0_0_30px_rgba(245,158,11,0.2)] animate-pulse">
+                    <span className="absolute inset-0 rounded-full bg-amber-500/5 animate-ping" />
+                    <Check className="w-12 h-12" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-lg font-black text-white">{successMsg}</h4>
+                  <p className="text-xs text-amber-500 font-bold tracking-widest">
+                    رقم العقد: {savedRentData.operation_number}
+                  </p>
+                </div>
+
+                {/* Information Breakdown */}
+                <div className="glass p-5 rounded-xl border border-zinc-855 space-y-3 text-right text-xs bg-zinc-950/40">
+                  <div className="flex items-center gap-2 text-gray-300 font-semibold border-b border-zinc-900 pb-2">
+                    <span className="text-amber-500">👤 الزبون:</span>
+                    <span>{savedRentData.customers?.name || "غير معروف"}</span>
+                    {savedRentData.customers?.phone && (
+                      <span className="text-gray-500 font-normal">({savedRentData.customers.phone})</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-300 font-semibold border-b border-zinc-900 pb-2">
+                    <span className="text-amber-500">📅 الموعد:</span>
+                    <span>استلام: {savedRentData.start_date} ➔ إرجاع متوقع: {savedRentData.expected_return_date}</span>
+                  </div>
+                  
+                  {/* Items List */}
+                  <div className="pt-2">
+                    <span className="text-[10px] text-gray-400 font-bold block mb-1.5">المنتجات المستلمة:</span>
+                    <div className="space-y-1 bg-black/10 p-2.5 rounded-lg border border-zinc-900">
+                      {savedRentData.items?.map((item: any, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center text-gray-400 font-normal text-[11px]">
+                          <span>• {item.products?.name || item.name || "منتج مخصص"} × {item.quantity}</span>
+                          <span className="text-amber-500 font-bold">{item.price || item.custom_price} د.ل</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Financial info */}
+                  <div className="border-t border-zinc-900 pt-3 flex justify-between items-center text-xs font-bold gap-3 flex-wrap">
+                    <div className="text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                      المدفوع: {savedRentData.deposit} د.ل
+                    </div>
+                    {Number(savedRentData.remaining) > 0 && (
+                      <div className="text-rose-500 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg">
+                        المتبقي: {savedRentData.remaining} د.ل
+                      </div>
+                    )}
+                    <div className="text-white bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg font-black text-amber-500">
+                      الإجمالي: {savedRentData.rental_value || savedRentData.total_amount} د.ل
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-zinc-900/40 border border-zinc-800/80 rounded-xl text-[10px] text-gray-400 leading-relaxed text-right font-medium">
+                  تم تسجيل عقد الإيجار وتسليم الملابس للعميل بنجاح وتحديث المخزن.
+                </div>
+
+                {/* Operations */}
+                <div className="flex gap-2 justify-end border-t border-zinc-800 pt-4">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="bg-zinc-900 hover:bg-zinc-800 text-gray-400 py-2.5 px-6 rounded-lg text-xs font-semibold border border-zinc-800 transition-all cursor-pointer"
+                  >
+                    إغلاق النافذة
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => printReceipt(savedRentData)}
+                    className="btn-premium py-2.5 px-6 rounded-lg text-xs font-black flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Printer size={14} />
+                    طباعة العقد الفوري
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleSaveRental} className="p-6 space-y-6">
               {errorMsg && (
                 <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-rose-500 text-xs flex items-center gap-2">
                   <AlertCircle size={16} />
@@ -826,15 +1045,15 @@ export default function RentalManager({
               <div className="flex gap-2 justify-end border-t border-zinc-800 pt-4">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="bg-zinc-900 hover:bg-zinc-800 text-gray-400 py-2.5 px-5 rounded-lg text-xs font-semibold border border-zinc-800 transition-all"
+                  onClick={closeModal}
+                  className="bg-zinc-900 hover:bg-zinc-800 text-gray-400 py-2.5 px-5 rounded-lg text-xs font-semibold border border-zinc-800 transition-all cursor-pointer"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="btn-premium py-2.5 px-6 rounded-lg text-xs font-semibold flex items-center gap-1"
+                  className="btn-premium py-2.5 px-6 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
                 >
                   {isSubmitting ? (
                     <>
@@ -842,11 +1061,12 @@ export default function RentalManager({
                       جاري الحفظ...
                     </>
                   ) : (
-                    'تأكيد الإيجار والتسليم الفوري'
+                    editingRent ? 'حفظ التعديلات' : 'تأكيد الإيجار والتسليم الفوري'
                   )}
                 </button>
               </div>
             </form>
+            )}
           </div>
         </div>
       )}

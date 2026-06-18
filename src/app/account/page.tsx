@@ -410,7 +410,7 @@ export default function AccountPage() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    sessionStorage.removeItem("jaguar_admin_auth");
+    localStorage.removeItem("jaguar_admin_auth");
     router.push("/");
   };
 

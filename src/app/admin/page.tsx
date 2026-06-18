@@ -722,7 +722,7 @@ ${orderSum}
 
   // Check auth session on mount
   useEffect(() => {
-    const sessionAuth = sessionStorage.getItem("jaguar_admin_auth");
+    const sessionAuth = localStorage.getItem("jaguar_admin_auth");
     if (sessionAuth === "true") {
       setIsAuthenticated(true);
     }
@@ -930,7 +930,7 @@ ${orderSum}
     try {
       // Reverted to simple passcode '9922' check as requested by the user
       if (password === "9922") {
-        sessionStorage.setItem("jaguar_admin_auth", "true");
+        localStorage.setItem("jaguar_admin_auth", "true");
         setIsAuthenticated(true);
       } else {
         setAuthError("رمز المرور غير صحيح! يرجى إدخال الرمز الصحيح للدخول.");
@@ -945,7 +945,7 @@ ${orderSum}
 
   // Sign out admin
   const handleAdminSignOut = async () => {
-    sessionStorage.removeItem("jaguar_admin_auth");
+    localStorage.removeItem("jaguar_admin_auth");
     setIsAuthenticated(false);
     setPassword("");
   };

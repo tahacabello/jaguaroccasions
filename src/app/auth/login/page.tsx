@@ -61,8 +61,8 @@ function LoginContent() {
 
       const redirectPath = searchParams.get("redirect");
       if (profile && !profileError && profile.is_admin) {
-        // Save flag in sessionStorage as additional sync
-        sessionStorage.setItem("jaguar_admin_auth", "true");
+        // Save flag in localStorage as additional sync
+        localStorage.setItem("jaguar_admin_auth", "true");
         setTimeout(() => {
           router.push("/admin");
         }, 1500);

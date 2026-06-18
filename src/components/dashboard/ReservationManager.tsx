@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Search, Plus, Check, X, AlertCircle, RefreshCw, Printer, Download,
-  Calendar, FileText, DollarSign, ShoppingBag, Truck, Info, Award
+  Calendar, FileText, DollarSign, ShoppingBag, Truck, Info, Award, Edit
 } from 'lucide-react';
-import { addReservation, updateReservation, deleteReservation, addPayment, addCustomer, addProduct } from '@/lib/supabase';
+import { supabase, addReservation, updateReservation, deleteReservation, addPayment, addCustomer, addProduct } from '@/lib/supabase';
 
 interface ReservationManagerProps {
   reservations: any[];
@@ -55,10 +55,64 @@ export default function ReservationManager({
   const [paymentNotes, setPaymentNotes] = useState('');
   const [isPaying, setIsPaying] = useState(false);
 
+  // Editing and Success Screen states
+  const [editingRes, setEditingRes] = useState<any>(null);
+  const [savedResData, setSavedResData] = useState<any>(null);
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingRes(null);
+    setSavedResData(null);
+    setSelectedProducts([]);
+    setSuccessMsg('');
+    setErrorMsg('');
+    setNewRes({
+      customer_id: '',
+      start_date: new Date().toISOString().split('T')[0],
+      pickup_date: '',
+      return_date: '',
+      total_amount: 0,
+      deposit: 0,
+      notes: '',
+      delivery_method: 'store_pickup',
+    });
+    setIsGuestCustomer(false);
+    setGuestName('');
+    setGuestPhone('');
+    setGuestWhatsapp('');
+    setOpenNewReservationFlag(false);
+  };
+
+  const handleEditClick = (res: any) => {
+    setEditingRes(res);
+    setNewRes({
+      customer_id: res.customer_id || '',
+      start_date: res.start_date || new Date().toISOString().split('T')[0],
+      pickup_date: res.pickup_date || '',
+      return_date: res.return_date || '',
+      total_amount: res.total_amount || 0,
+      deposit: res.deposit || 0,
+      notes: res.notes || '',
+      delivery_method: res.delivery_method || 'store_pickup',
+    });
+    
+    // Load products
+    const mapped = (res.items || []).map((item: any) => ({
+      id: item.product_id,
+      name: item.products?.name || "منتج مخصص",
+      price_rent: item.price,
+      custom_price: item.price,
+      quantity: item.quantity,
+      category: item.products?.category || "أخرى"
+    }));
+    setSelectedProducts(mapped);
+    setIsGuestCustomer(false); 
+    setIsModalOpen(true);
+  };
+
   useEffect(() => {
     if (openNewReservationFlag) {
       setIsModalOpen(true);
-      setOpenNewReservationFlag(false);
     }
   }, [openNewReservationFlag]);
 
@@ -178,6 +232,7 @@ export default function ReservationManager({
           if (!prodRes.success) throw new Error(prodRes.error || `فشل إضافة المنتج المخصص: ${p.name}`);
           savedProducts.push({
             id: prodRes.data.id,
+            name: p.name,
             quantity: p.quantity,
             custom_price: p.custom_price
           });
@@ -194,39 +249,76 @@ export default function ReservationManager({
         customer_id: finalCustomerId,
         remaining,
         payment_status: paymentStatus,
-        status: 'active'
+        status: editingRes ? editingRes.status : 'active'
       };
 
-      const itemsPayload = savedProducts.map(p => ({
-        product_id: p.id,
-        quantity: p.quantity,
-        price: p.custom_price
-      }));
+      if (editingRes) {
+        // 1. Revert old products status to 'available'
+        if (editingRes.items) {
+          for (const oldItem of editingRes.items) {
+            await supabase.from('products').update({ status: 'available' }).eq('id', oldItem.product_id);
+          }
+        }
 
-      const res = await addReservation(payload, itemsPayload);
-      if (!res.success) throw new Error(res.error || "فشل تسجيل الحجز");
+        // 2. Update reservations record
+        const { error: resErr } = await supabase.from('reservations').update(payload).eq('id', editingRes.id);
+        if (resErr) throw resErr;
 
-      setSuccessMsg("تم تسجيل الحجز بنجاح!");
-      setTimeout(() => {
-        setIsModalOpen(false);
-        setSelectedProducts([]);
-        setNewRes({
-          customer_id: '',
-          start_date: new Date().toISOString().split('T')[0],
-          pickup_date: '',
-          return_date: '',
-          total_amount: 0,
-          deposit: 0,
-          notes: '',
-          delivery_method: 'store_pickup',
+        // 3. Delete old items
+        const { error: delErr } = await supabase.from('reservation_items').delete().eq('reservation_id', editingRes.id);
+        if (delErr) throw delErr;
+
+        // 4. Insert new items
+        const itemsPayload = savedProducts.map(p => ({
+          reservation_id: editingRes.id,
+          product_id: p.id,
+          quantity: p.quantity,
+          price: p.custom_price
+        }));
+        const { error: itemsErr } = await supabase.from('reservation_items').insert(itemsPayload);
+        if (itemsErr) throw itemsErr;
+
+        // 5. Update new products status to 'reserved'
+        for (const newItem of savedProducts) {
+          await supabase.from('products').update({ status: 'reserved' }).eq('id', newItem.id);
+        }
+
+        setSavedResData({
+          ...payload,
+          id: editingRes.id,
+          reservation_number: editingRes.reservation_number,
+          items: savedProducts.map(it => ({
+            ...it,
+            products: products.find(p => p.id === it.id) || { name: it.name || "منتج مخصص" }
+          })),
+          customers: isGuestCustomer ? { name: guestName, phone: guestPhone } : customers.find(c => c.id === finalCustomerId)
         });
-        setIsGuestCustomer(false);
-        setGuestName('');
-        setGuestPhone('');
-        setGuestWhatsapp('');
-        onRefresh();
-      }, 1500);
 
+        setSuccessMsg("تم تحديث الحجز بنجاح!");
+      } else {
+        const itemsPayload = savedProducts.map(p => ({
+          product_id: p.id,
+          quantity: p.quantity,
+          price: p.custom_price
+        }));
+        const res = await addReservation(payload, itemsPayload);
+        if (!res.success) throw new Error(res.error || "فشل تسجيل الحجز");
+
+        setSavedResData({
+          ...payload,
+          id: res.data.id,
+          reservation_number: res.data.reservation_number,
+          items: savedProducts.map(it => ({
+            ...it,
+            products: products.find(p => p.id === it.id) || { name: it.name || "منتج مخصص" }
+          })),
+          customers: isGuestCustomer ? { name: guestName, phone: guestPhone } : customers.find(c => c.id === finalCustomerId)
+        });
+
+        setSuccessMsg("تم تسجيل الحجز بنجاح!");
+      }
+
+      onRefresh();
     } catch (err: any) {
       setErrorMsg(err.message || "حدث خطأ أثناء حفظ الحجز.");
     } finally {
@@ -602,6 +694,13 @@ export default function ReservationManager({
                             </>
                           )}
                           <button 
+                            onClick={() => handleEditClick(res)}
+                            className="bg-zinc-900 hover:bg-zinc-800 text-amber-500 border border-zinc-800 rounded p-1.5"
+                            title="تعديل الحجز"
+                          >
+                            <Edit size={12} />
+                          </button>
+                          <button 
                             onClick={() => printReceipt(res)}
                             className="bg-zinc-900 hover:bg-zinc-800 text-gray-400 hover:text-white border border-zinc-800 rounded p-1.5"
                             title="طباعة الوصل"
@@ -625,14 +724,103 @@ export default function ReservationManager({
           <div className="glass-premium rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-zinc-800">
             {/* Header */}
             <div className="flex justify-between items-center p-4 border-b border-zinc-800">
-              <h3 className="font-bold text-white text-base">تسجيل حجز جديد (تأجير للمناسبة)</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white">
+              <h3 className="font-bold text-white text-base">
+                {savedResData ? "تم تسجيل العملية" : (editingRes ? "تعديل بيانات الحجز" : "تسجيل حجز جديد (تأجير للمناسبة)")}
+              </h3>
+              <button onClick={closeModal} className="text-gray-400 hover:text-white">
                 <X size={20} />
               </button>
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleSaveReservation} className="p-6 space-y-6">
+            {savedResData ? (
+              <div className="p-6 space-y-6 text-center">
+                {/* Gold glowing animated Check */}
+                <div className="flex justify-center py-4">
+                  <div className="w-20 h-20 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-full flex items-center justify-center relative shadow-[0_0_30px_rgba(245,158,11,0.2)] animate-pulse">
+                    <span className="absolute inset-0 rounded-full bg-amber-500/5 animate-ping" />
+                    <Check className="w-12 h-12" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="text-lg font-black text-white">{successMsg}</h4>
+                  <p className="text-xs text-amber-500 font-bold tracking-widest">
+                    رقم الحجز المرجعي: {savedResData.reservation_number}
+                  </p>
+                </div>
+
+                {/* Information Breakdown */}
+                <div className="glass p-5 rounded-xl border border-zinc-850 space-y-3 text-right text-xs bg-zinc-950/40">
+                  <div className="flex items-center gap-2 text-gray-300 font-semibold border-b border-zinc-900 pb-2">
+                    <span className="text-amber-500">👤 الزبون:</span>
+                    <span>{savedResData.customers?.name || "غير معروف"}</span>
+                    {savedResData.customers?.phone && (
+                      <span className="text-gray-500 font-normal">({savedResData.customers.phone})</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-300 font-semibold border-b border-zinc-900 pb-2">
+                    <span className="text-amber-500">📅 الموعد:</span>
+                    <span>استلام: {savedResData.pickup_date} ➔ إرجاع: {savedResData.return_date}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-300 font-semibold border-b border-zinc-900 pb-2">
+                    <span className="text-amber-500">🚚 التوصيل:</span>
+                    <span>{savedResData.delivery_method === 'delivery' ? 'توصيل للعنوان' : '🏪 استلام من المحل'}</span>
+                  </div>
+                  
+                  {/* Items List */}
+                  <div className="pt-2">
+                    <span className="text-[10px] text-gray-400 font-bold block mb-1.5">المنتجات المحجوزة:</span>
+                    <div className="space-y-1 bg-black/10 p-2.5 rounded-lg border border-zinc-900">
+                      {savedResData.items?.map((item: any, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center text-gray-400 font-normal text-[11px]">
+                          <span>• {item.products?.name || item.name || "منتج مخصص"} × {item.quantity}</span>
+                          <span className="text-amber-500 font-bold">{item.price || item.custom_price} د.ل</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Financial info */}
+                  <div className="border-t border-zinc-900 pt-3 flex justify-between items-center text-xs font-bold gap-3 flex-wrap">
+                    <div className="text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                      المدفوع: {savedResData.deposit} د.ل
+                    </div>
+                    {Number(savedResData.remaining) > 0 && (
+                      <div className="text-rose-500 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-lg">
+                        المتبقي: {savedResData.remaining} د.ل
+                      </div>
+                    )}
+                    <div className="text-white bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg font-black text-amber-500">
+                      الإجمالي: {savedResData.total_amount} د.ل
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-zinc-900/40 border border-zinc-800/80 rounded-xl text-[10px] text-gray-400 leading-relaxed text-right font-medium">
+                  المنظومة في أتم الجاهزية! تم تحديث المخزون وحجز القطع بنجاح. يمكنك الآن طباعة وصل الاستلام أو إغلاق المودال.
+                </div>
+
+                {/* Operations */}
+                <div className="flex gap-2 justify-end border-t border-zinc-800 pt-4">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="bg-zinc-900 hover:bg-zinc-800 text-gray-400 py-2.5 px-6 rounded-lg text-xs font-semibold border border-zinc-800 transition-all cursor-pointer"
+                  >
+                    إغلاق النافذة
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => printReceipt(savedResData)}
+                    className="btn-premium py-2.5 px-6 rounded-lg text-xs font-black flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Printer size={14} />
+                    طباعة الوصل الفوري
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleSaveReservation} className="p-6 space-y-6">
               {errorMsg && (
                 <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-rose-500 text-xs flex items-center gap-2">
                   <AlertCircle size={16} />
@@ -899,15 +1087,15 @@ export default function ReservationManager({
               <div className="flex gap-2 justify-end border-t border-zinc-800 pt-4">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="bg-zinc-900 hover:bg-zinc-800 text-gray-400 py-2.5 px-5 rounded-lg text-xs font-semibold border border-zinc-800 transition-all"
+                  onClick={closeModal}
+                  className="bg-zinc-900 hover:bg-zinc-800 text-gray-400 py-2.5 px-5 rounded-lg text-xs font-semibold border border-zinc-800 transition-all cursor-pointer"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="btn-premium py-2.5 px-6 rounded-lg text-xs font-semibold flex items-center gap-1"
+                  className="btn-premium py-2.5 px-6 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
                 >
                   {isSubmitting ? (
                     <>
@@ -915,11 +1103,12 @@ export default function ReservationManager({
                       جاري الحفظ...
                     </>
                   ) : (
-                    'تأكيد الحجز وتسجيل الدفعة'
+                    editingRes ? 'حفظ التعديلات' : 'تأكيد الحجز وتسجيل الدفعة'
                   )}
                 </button>
               </div>
             </form>
+            )}
           </div>
         </div>
       )}

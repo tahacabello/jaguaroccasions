@@ -2521,7 +2521,13 @@ export async function addOrder(order: any, items: any[]): Promise<{ success: boo
       total_amount: Number(order.total_amount || 0),
       payment_status: order.payment_status || 'paid',
       status: order.status || 'completed',
-      notes: order.notes || null
+      customer_notes: order.notes || order.customer_notes || null,
+      deposit: Number(order.deposit || 0),
+      remaining: Number(order.remaining || 0),
+      event_date: order.event_date || null,
+      pickup_date: order.pickup_date || null,
+      return_date: order.return_date || null,
+      is_preliminary: order.is_preliminary || false
     };
 
     const { error: orderErr } = await supabase.from('orders').insert([orderPayload]);
@@ -2540,7 +2546,7 @@ export async function addOrder(order: any, items: any[]): Promise<{ success: boo
 
     // 3. Register payment
     await addPayment({
-      amount: Number(order.total_amount),
+      amount: Number(order.deposit !== undefined ? order.deposit : order.total_amount),
       date: new Date().toISOString().split('T')[0],
       movement_type: order.payment_status === 'paid' ? 'cash' : 'partial',
       linked_operation_type: 'order',
@@ -2551,15 +2557,17 @@ export async function addOrder(order: any, items: any[]): Promise<{ success: boo
 
     // 4. Update products status to 'sold' (and decrement stock quantity)
     for (const item of items) {
-      // Get current stock
-      const { data: prodData } = await supabase.from('products').select('quantity').eq('id', item.product_id).single();
-      const currentQty = prodData?.quantity || 1;
-      const newQty = Math.max(0, currentQty - Number(item.quantity));
-      
-      await updateProduct(item.product_id, { 
-        status: newQty === 0 ? 'sold' : 'available',
-        quantity: newQty
-      });
+      if (item.product_id) {
+        // Get current stock
+        const { data: prodData } = await supabase.from('products').select('quantity').eq('id', item.product_id).single();
+        const currentQty = prodData?.quantity || 1;
+        const newQty = Math.max(0, currentQty - Number(item.quantity));
+        
+        await updateProduct(item.product_id, { 
+          status: newQty === 0 ? 'sold' : 'available',
+          quantity: newQty
+        });
+      }
     }
 
     await logActivity('add', 'orders', orderId, { order_number: orderNumber });
