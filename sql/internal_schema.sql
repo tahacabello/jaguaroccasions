@@ -84,7 +84,7 @@ create table if not exists public.reservations (
 create table if not exists public.reservation_items (
     id uuid primary key default gen_random_uuid(),
     reservation_id uuid references public.reservations(id) on delete cascade,
-    product_id uuid references public.products(id) on delete cascade,
+    product_id text references public.products(id) on delete cascade,
     quantity integer default 1,
     price numeric(12, 2) default 0
 );
@@ -113,7 +113,7 @@ create table if not exists public.rentals (
 create table if not exists public.rental_items (
     id uuid primary key default gen_random_uuid(),
     rental_id uuid references public.rentals(id) on delete cascade,
-    product_id uuid references public.products(id) on delete cascade,
+    product_id text references public.products(id) on delete cascade,
     quantity integer default 1,
     price numeric(12, 2) default 0
 );
@@ -134,7 +134,7 @@ create table if not exists public.orders (
 create table if not exists public.order_items (
     id uuid primary key default gen_random_uuid(),
     order_id uuid references public.orders(id) on delete cascade,
-    product_id uuid references public.products(id) on delete cascade,
+    product_id text references public.products(id) on delete cascade,
     quantity integer default 1,
     price numeric(12, 2) default 0
 );
