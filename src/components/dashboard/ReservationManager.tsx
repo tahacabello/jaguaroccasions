@@ -3,7 +3,7 @@ import {
   Search, Plus, Check, X, AlertCircle, RefreshCw, Printer, Download,
   Calendar, FileText, DollarSign, ShoppingBag, Truck, Info, Award
 } from 'lucide-react';
-import { addReservation, updateReservation, deleteReservation, addPayment } from '@/lib/supabase';
+import { addReservation, updateReservation, deleteReservation, addPayment, addCustomer } from '@/lib/supabase';
 
 interface ReservationManagerProps {
   reservations: any[];
@@ -43,6 +43,12 @@ export default function ReservationManager({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  
+  // Guest customer states
+  const [isGuestCustomer, setIsGuestCustomer] = useState(false);
+  const [guestName, setGuestName] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
+  const [guestWhatsapp, setGuestWhatsapp] = useState('');
   
   // Payment recording state
   const [paymentAmount, setPaymentAmount] = useState(0);
@@ -108,8 +114,12 @@ export default function ReservationManager({
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (!newRes.customer_id) {
+    if (!isGuestCustomer && !newRes.customer_id) {
       setErrorMsg("الرجاء اختيار العميل.");
+      return;
+    }
+    if (isGuestCustomer && !guestName.trim()) {
+      setErrorMsg("الرجاء إدخال اسم العميل.");
       return;
     }
     if (selectedProducts.length === 0) {
@@ -124,11 +134,24 @@ export default function ReservationManager({
     setIsSubmitting(true);
 
     try {
+      let finalCustomerId = newRes.customer_id;
+
+      if (isGuestCustomer) {
+        const custRes = await addCustomer({
+          name: guestName.trim(),
+          phone: guestPhone.trim() || null,
+          whatsapp: guestWhatsapp.trim() || null
+        });
+        if (!custRes.success) throw new Error(custRes.error || "فشل تسجيل العميل الجديد.");
+        finalCustomerId = custRes.data.id;
+      }
+
       const remaining = Number(newRes.total_amount) - Number(newRes.deposit);
       const paymentStatus = remaining <= 0 ? 'paid' : (Number(newRes.deposit) > 0 ? 'partial' : 'unpaid');
 
       const payload = {
         ...newRes,
+        customer_id: finalCustomerId,
         remaining,
         payment_status: paymentStatus,
         status: 'active'
@@ -157,6 +180,10 @@ export default function ReservationManager({
           notes: '',
           delivery_method: 'store_pickup',
         });
+        setIsGuestCustomer(false);
+        setGuestName('');
+        setGuestPhone('');
+        setGuestWhatsapp('');
         onRefresh();
       }, 1500);
 
@@ -580,18 +607,66 @@ export default function ReservationManager({
               )}
 
               {/* Customer Selection */}
-              <div className="space-y-1">
-                <label className="text-xs text-gray-300 font-bold">اختيار العميل *</label>
-                <select
-                  value={newRes.customer_id}
-                  onChange={(e) => setNewRes(prev => ({ ...prev, customer_id: e.target.value }))}
-                  className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500 focus:outline-none rounded-lg p-2.5 text-xs text-white font-bold"
-                >
-                  <option value="">-- اختر عميلاً --</option>
-                  {customers.map(c => (
-                    <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>
-                  ))}
-                </select>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs text-gray-300 font-bold">العميل *</label>
+                  <label className="flex items-center gap-1.5 text-xs text-amber-500 font-bold cursor-pointer select-none">
+                    <input 
+                      type="checkbox"
+                      checked={isGuestCustomer}
+                      onChange={(e) => setIsGuestCustomer(e.target.checked)}
+                      className="w-3.5 h-3.5 rounded bg-zinc-900 border-zinc-800 text-amber-500 focus:ring-amber-500"
+                    />
+                    إدخال عميل يدوي (غير مسجل)
+                  </label>
+                </div>
+
+                {!isGuestCustomer ? (
+                  <select
+                    value={newRes.customer_id}
+                    onChange={(e) => setNewRes(prev => ({ ...prev, customer_id: e.target.value }))}
+                    className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500 focus:outline-none rounded-lg p-2.5 text-xs text-white font-bold"
+                  >
+                    <option value="">-- اختر عميلاً --</option>
+                    {customers.map(c => (
+                      <option key={c.id} value={c.id}>{c.name} ({c.phone || 'بدون هاتف'})</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-zinc-950/60 rounded-lg border border-zinc-900">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-gray-400 block font-bold">اسم العميل *</label>
+                      <input 
+                        type="text"
+                        required={isGuestCustomer}
+                        value={guestName}
+                        onChange={(e) => setGuestName(e.target.value)}
+                        className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500 focus:outline-none rounded p-2 text-xs text-white"
+                        placeholder="مثال: أحمد محمد"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-gray-400 block font-bold">رقم الهاتف</label>
+                      <input 
+                        type="text"
+                        value={guestPhone}
+                        onChange={(e) => setGuestPhone(e.target.value)}
+                        className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500 focus:outline-none rounded p-2 text-xs text-white"
+                        placeholder="مثال: 0912345678"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-gray-400 block font-bold">رقم الواتساب (اختياري)</label>
+                      <input 
+                        type="text"
+                        value={guestWhatsapp}
+                        onChange={(e) => setGuestWhatsapp(e.target.value)}
+                        className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500 focus:outline-none rounded p-2 text-xs text-white"
+                        placeholder="مثال: 0912345678"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Dates */}

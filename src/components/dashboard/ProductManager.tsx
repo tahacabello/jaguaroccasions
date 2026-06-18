@@ -40,6 +40,8 @@ export default function ProductManager({ products, onRefresh }: ProductManagerPr
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState('');
+  const [imageOption, setImageOption] = useState<'upload' | 'text'>('upload');
+  const [imageText, setImageText] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -71,7 +73,26 @@ export default function ProductManager({ products, onRefresh }: ProductManagerPr
         color_embroidery: editingProduct.color_embroidery || '',
         image: editingProduct.image || '',
       });
-      setImagePreview(editingProduct.image || '');
+      
+      if (editingProduct.image) {
+        const isUrl = editingProduct.image.startsWith('http://') || 
+                      editingProduct.image.startsWith('https://') || 
+                      editingProduct.image.startsWith('data:') || 
+                      editingProduct.image.startsWith('/');
+        if (isUrl) {
+          setImageOption('upload');
+          setImagePreview(editingProduct.image || '');
+          setImageText('');
+        } else {
+          setImageOption('text');
+          setImagePreview('');
+          setImageText(editingProduct.image || '');
+        }
+      } else {
+        setImageOption('upload');
+        setImagePreview('');
+        setImageText('');
+      }
     } else {
       setFormData({
         name: '',
@@ -92,8 +113,10 @@ export default function ProductManager({ products, onRefresh }: ProductManagerPr
         color_embroidery: '',
         image: '',
       });
+      setImageOption('upload');
       setImagePreview('');
       setImageFile(null);
+      setImageText('');
     }
   }, [editingProduct, isModalOpen]);
 
@@ -128,18 +151,23 @@ export default function ProductManager({ products, onRefresh }: ProductManagerPr
     setSuccessMsg('');
 
     try {
-      let finalImageUrl = formData.image;
+      let finalImageUrl = '';
 
-      // Upload image if file exists
-      if (imageFile) {
-        setIsUploading(true);
-        try {
-          finalImageUrl = await uploadProductImage(imageFile);
-        } catch (uploadErr: any) {
-          console.error("Image upload error:", uploadErr);
-          setErrorMsg("حدث خطأ أثناء رفع الصورة، سيتم حفظ المنتج بدون صورة.");
-        } finally {
-          setIsUploading(false);
+      if (imageOption === 'text') {
+        finalImageUrl = imageText;
+      } else {
+        if (imageFile) {
+          setIsUploading(true);
+          try {
+            finalImageUrl = await uploadProductImage(imageFile);
+          } catch (uploadErr: any) {
+            console.error("Image upload error:", uploadErr);
+            setErrorMsg("حدث خطأ أثناء رفع الصورة، سيتم حفظ المنتج بدون صورة.");
+          } finally {
+            setIsUploading(false);
+          }
+        } else {
+          finalImageUrl = imagePreview; // Keep existing image url if editing and not changed
         }
       }
 
@@ -293,11 +321,18 @@ export default function ProductManager({ products, onRefresh }: ProductManagerPr
               {/* Image Preview Container */}
               <div className="aspect-video w-full bg-zinc-950 relative overflow-hidden flex items-center justify-center">
                 {prod.image ? (
-                  <img 
-                    src={prod.image} 
-                    alt={prod.name} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
-                  />
+                  (prod.image.startsWith('http://') || prod.image.startsWith('https://') || prod.image.startsWith('data:') || prod.image.startsWith('/')) ? (
+                    <img 
+                      src={prod.image} 
+                      alt={prod.name} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full p-4 bg-zinc-900/60 flex flex-col items-center justify-center text-center text-[11px] text-amber-500 font-bold border border-zinc-900">
+                      <ImageIcon size={20} className="text-amber-500/40 mb-1" />
+                      <span className="line-clamp-3 leading-relaxed">{prod.image}</span>
+                    </div>
+                  )
                 ) : (
                   <ImageIcon size={36} className="text-zinc-800" />
                 )}
@@ -632,33 +667,66 @@ export default function ProductManager({ products, onRefresh }: ProductManagerPr
                 )}
               </div>
 
-              {/* Image Upload Area */}
-              <div className="space-y-2">
-                <label className="text-xs text-gray-300 font-bold block">تحميل صورة المنتج من الجهاز</label>
-                
-                {imagePreview ? (
-                  <div className="relative aspect-video w-full rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950 flex items-center justify-center">
-                    <img src={imagePreview} alt="Preview" className="h-full object-contain" />
-                    <button 
-                      type="button"
-                      onClick={removeImage}
-                      className="absolute top-2 right-2 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full transition-all"
-                      title="إزالة الصورة"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
+              {/* Image Input Options */}
+              <div className="space-y-3">
+                <label className="text-xs text-gray-300 font-bold block">صورة المنتج أو الوصف البديل</label>
+                <div className="flex gap-2 p-1 bg-zinc-950 rounded-lg border border-zinc-900">
+                  <button
+                    type="button"
+                    onClick={() => setImageOption('upload')}
+                    className={`flex-1 py-1.5 text-[11px] rounded-md transition-all font-semibold ${
+                      imageOption === 'upload' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    رفع صورة من الجهاز
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImageOption('text')}
+                    className={`flex-1 py-1.5 text-[11px] rounded-md transition-all font-semibold ${
+                      imageOption === 'text' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    كتابة نص/ملاحظة بديلة للصورة
+                  </button>
+                </div>
+
+                {imageOption === 'upload' ? (
+                  imagePreview ? (
+                    <div className="relative aspect-video w-full rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950 flex items-center justify-center">
+                      <img src={imagePreview} alt="Preview" className="h-full object-contain" />
+                      <button 
+                        type="button"
+                        onClick={removeImage}
+                        className="absolute top-2 right-2 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full transition-all"
+                        title="إزالة الصورة"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-zinc-800 hover:border-amber-500/50 rounded-lg p-8 text-center cursor-pointer transition-all relative">
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleImageChange}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      <ImageIcon size={32} className="mx-auto text-zinc-700 mb-2" />
+                      <span className="text-xs text-gray-500 block">اضغط هنا لاختيار صورة من جهازك</span>
+                      <span className="text-[10px] text-gray-600 block mt-1">تنسيق JPG, PNG, WEBP فقط</span>
+                    </div>
+                  )
                 ) : (
-                  <div className="border-2 border-dashed border-zinc-800 hover:border-amber-500/50 rounded-lg p-8 text-center cursor-pointer transition-all relative">
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={handleImageChange}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  <div className="space-y-1">
+                    <input
+                      type="text"
+                      value={imageText}
+                      onChange={(e) => setImageText(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 focus:border-amber-500 focus:outline-none rounded-lg p-2.5 text-xs text-white"
+                      placeholder="مثال: شريط تطريز كذا كذا..."
                     />
-                    <ImageIcon size={32} className="mx-auto text-zinc-700 mb-2" />
-                    <span className="text-xs text-gray-500 block">اضغط هنا لاختيار صورة من جهازك</span>
-                    <span className="text-[10px] text-gray-600 block mt-1">تنسيق JPG, PNG, WEBP فقط</span>
+                    <span className="text-[10px] text-gray-500 block">سيتم حفظ هذا النص مباشرة في حقل الصورة، وعرضه في المنظومة بدلاً من الصورة.</span>
                   </div>
                 )}
               </div>
