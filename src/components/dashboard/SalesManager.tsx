@@ -303,7 +303,8 @@ export default function SalesManager({
         setSavedOrderData({
           ...payload,
           id: editingOrder.id,
-          order_number: editingOrder.order_number,
+          order_number: editingOrder.tracking_number || editingOrder.order_number,
+          tracking_number: editingOrder.tracking_number || editingOrder.order_number,
           items: savedProducts.map(it => ({
             ...it,
             products: products.find(p => p.id === it.id) || { name: it.name || "منتج مخصص" }
@@ -325,7 +326,8 @@ export default function SalesManager({
         setSavedOrderData({
           ...payload,
           id: res.data.id,
-          order_number: res.data.order_number,
+          order_number: res.data.tracking_number || res.data.order_number,
+          tracking_number: res.data.tracking_number || res.data.order_number,
           items: savedProducts.map(it => ({
             ...it,
             products: products.find(p => p.id === it.id) || { name: it.name || "منتج مخصص" }
@@ -397,7 +399,7 @@ export default function SalesManager({
         '  ' +
         '  <table class="info-table">' +
         '    <tr>' +
-        '      <td><strong>رقم الفاتورة:</strong> ' + (order.order_number || '') + '</td>' +
+        '      <td><strong>رقم الفاتورة:</strong> ' + (order.tracking_number || order.order_number || '') + '</td>' +
         '      <td><strong>التاريخ:</strong> ' + new Date(order.created_at || Date.now()).toLocaleDateString('ar-LY') + '</td>' +
         '    </tr>' +
         '    <tr>' +
@@ -451,7 +453,7 @@ export default function SalesManager({
     const csvContent = "data:text/csv;charset=utf-8," 
       + ["رقم الفاتورة", "العميل", "الهاتف", "التاريخ", "الإجمالي المدفوع", "المتبقي", "الملاحظات"].join(",") + "\n"
       + orders.map(o => [
-          `"${o.order_number}"`, 
+          `"${o.tracking_number || o.order_number || ''}"`, 
           `"${o.customers?.name || ''}"`, 
           `"${o.customers?.phone || ''}"`, 
           `"${new Date(o.created_at).toLocaleDateString('ar-LY')}"`, 
@@ -472,8 +474,9 @@ export default function SalesManager({
   const filteredOrders = orders.filter(o => {
     const custName = o.customers?.name || '';
     const custPhone = o.customers?.phone || '';
+    const orderNum = o.tracking_number || o.order_number || '';
     return (
-      o.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      orderNum.toLowerCase().includes(searchTerm.toLowerCase()) ||
       custName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       custPhone.includes(searchTerm)
     );
@@ -552,11 +555,12 @@ export default function SalesManager({
                   const isPreorder = !!(order.event_date || order.pickup_date || order.is_preliminary);
                   const remAmt = Number(order.remaining || 0);
                   const depAmt = Number(order.deposit || 0);
+                  const orderNum = order.tracking_number || order.order_number;
                   
                   return (
                     <tr key={order.id} className="hover:bg-zinc-900/40 transition-colors">
                       <td className="py-4 px-4 font-bold text-white text-right">
-                        {order.order_number}
+                        {orderNum}
                       </td>
                       <td className="py-4 px-4 text-right">
                         <div className="font-bold text-zinc-200">{custName}</div>
@@ -627,7 +631,7 @@ export default function SalesManager({
             {/* Header */}
             <div className="flex justify-between items-center p-4 border-b border-zinc-800">
               <h3 className="font-bold text-white text-base">
-                {savedOrderData ? "تم تسجيل العملية" : (editingOrder ? "تعديل فاتورة البيع / الحجز" : "تسجيل عملية بيع / حجز مسبق")}
+                {savedOrderData ? "تم تسجيل العملية" : (editingOrder ? "تعديل فاتورة البيع / الحجز" : "تسجيل عملية بيع / hجز مسبق")}
               </h3>
               <button onClick={closeModal} className="text-gray-400 hover:text-white cursor-pointer">
                 <X size={20} />
@@ -647,7 +651,7 @@ export default function SalesManager({
                 <div className="space-y-2">
                   <h4 className="text-lg font-black text-white">{successMsg}</h4>
                   <p className="text-xs text-amber-500 font-bold tracking-widest">
-                    رقم الفاتورة: {savedOrderData.order_number}
+                    رقم الفاتورة: {savedOrderData.tracking_number || savedOrderData.order_number}
                   </p>
                 </div>
 
@@ -929,7 +933,7 @@ export default function SalesManager({
                                 max={p.is_custom ? undefined : p.quantity + (editingOrder?.items?.find((oIt: any) => oIt.product_id === p.id)?.quantity || 0)}
                                 value={p.quantity}
                                 onChange={(e) => handleProductQtyChange(p.id, Number(e.target.value))}
-                                className="w-12 bg-zinc-950 border border-zinc-850 rounded p-1 text-xs text-center text-white"
+                                className="w-12 bg-zinc-955 border border-zinc-800 rounded p-1 text-xs text-center text-white"
                               />
                             </div>
                             <div className="flex items-center gap-1">

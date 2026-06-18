@@ -2516,7 +2516,7 @@ export async function addOrder(order: any, items: any[]): Promise<{ success: boo
     // 1. Insert order record
     const orderPayload = {
       id: orderId,
-      order_number: orderNumber,
+      tracking_number: orderNumber,
       customer_id: order.customer_id,
       total_amount: Number(order.total_amount || 0),
       payment_status: order.payment_status || 'paid',
@@ -2571,7 +2571,7 @@ export async function addOrder(order: any, items: any[]): Promise<{ success: boo
     }
 
     await logActivity('add', 'orders', orderId, { order_number: orderNumber });
-    return { success: true, data: { id: orderId, order_number: orderNumber } };
+    return { success: true, data: { id: orderId, order_number: orderNumber, tracking_number: orderNumber } };
   } catch (err: any) {
     console.error("Failed to add order (sale):", err);
     return { success: false, error: err.message || String(err) };
