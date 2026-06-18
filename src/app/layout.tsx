@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Cairo, Tajawal } from "next/font/google";
 import "./globals.css";
+import { CartProvider } from "@/context/CartContext";
 
 const cairo = Cairo({
   subsets: ["arabic"],
@@ -27,8 +28,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ar" dir="rtl" className={`${cairo.variable} ${tajawal.variable}`}>
-      <body className="antialiased min-h-screen flex flex-col bg-[#09090b]">
-        {children}
+      <body className="antialiased min-h-screen flex flex-col">
+        <CartProvider>
+          {children}
+        </CartProvider>
       </body>
     </html>
   );
