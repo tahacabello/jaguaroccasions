@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { 
-  BarChart3, ShoppingCart, Package, Users, TrendingUp, Search, Eye, Edit3, Trash2, Plus, Check, RefreshCw, Lock, ArrowRight, LayoutGrid, X, Upload, MessageCircle, Settings, Image as ImageIcon, Star, EyeOff, UserPlus, FileText
+  BarChart3, ShoppingCart, Package, Users, TrendingUp, Search, Eye, Edit3, Trash2, Plus, Check, RefreshCw, Lock, ArrowRight, LayoutGrid, X, Upload, MessageCircle, Settings, Image as ImageIcon, Star, EyeOff, UserPlus, FileText, Calendar, Clock, DollarSign, Sun, Moon
 } from "lucide-react";
 import Image from "next/image";
 import { 
@@ -58,8 +58,20 @@ import {
   adminApproveChangeRequest,
   adminRejectChangeRequest,
   approveOrderCancellation,
-  rejectOrderCancellation
+  rejectOrderCancellation,
+  getReservations,
+  getRentals,
+  getPayments,
+  getActivityLogs,
+  getCustomers,
+  getOrders
 } from "@/lib/supabase";
+
+import ReservationManager from "@/components/dashboard/ReservationManager";
+import RentalManager from "@/components/dashboard/RentalManager";
+import SalesManager from "@/components/dashboard/SalesManager";
+import PaymentTracker from "@/components/dashboard/PaymentTracker";
+import ActivityLogger from "@/components/dashboard/ActivityLogger";
 
 const cityNames: Record<string, string> = {
   tripoli: "طرابلس",
@@ -172,7 +184,20 @@ export default function AdminDashboard() {
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   
-  const [activeTab, setActiveTab] = useState<"analytics" | "orders" | "inventory" | "settings" | "categories" | "customers" | "homepage_builder" | "change_requests">("analytics");
+  const [activeTab, setActiveTab] = useState<"analytics" | "orders" | "inventory" | "settings" | "categories" | "customers" | "homepage_builder" | "change_requests" | "reservations" | "rentals" | "sales" | "payments" | "logs">("analytics");
+
+  // Instore Dashboard states
+  const [reservations, setReservations] = useState<any[]>([]);
+  const [rentals, setRentals] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [instoreCustomers, setInstoreCustomers] = useState<any[]>([]);
+  const [instoreOrders, setInstoreOrders] = useState<any[]>([]);
+
+  // Flags to open modals directly from dashboard quick actions
+  const [openNewReservation, setOpenNewReservation] = useState(false);
+  const [openNewRental, setOpenNewRental] = useState(false);
+  const [openNewSale, setOpenNewSale] = useState(false);
 
   // Customer Creation & Password Reset & Manual Order States
   const [isCreateCustOpen, setIsCreateCustOpen] = useState(false);
@@ -742,7 +767,13 @@ ${orderSum}
         dbFeaturedCards,
         dbSections,
         dbChangeRequests,
-        dbPendingCount
+        dbPendingCount,
+        dbReservations,
+        dbRentals,
+        dbPayments,
+        dbLogs,
+        dbInstoreCustomers,
+        dbInstoreOrders
       ] = await Promise.all([
         getSupabaseProducts(),
         getSupabaseSettings(),
@@ -753,7 +784,13 @@ ${orderSum}
         getSupabaseFeaturedCards(),
         getSupabaseHomepageSections(),
         getSupabaseAllChangeRequests(),
-        getSupabasePendingChangeRequestsCount()
+        getSupabasePendingChangeRequestsCount(),
+        getReservations(),
+        getRentals(),
+        getPayments(),
+        getActivityLogs(),
+        getCustomers(),
+        getOrders()
       ]);
       
       setProducts(dbProducts);
@@ -766,6 +803,12 @@ ${orderSum}
       setHomepageSectionsList(dbSections);
       setChangeRequests(dbChangeRequests || []);
       setPendingRequestsCount(dbPendingCount || 0);
+      setReservations(dbReservations || []);
+      setRentals(dbRentals || []);
+      setPayments(dbPayments || []);
+      setLogs(dbLogs || []);
+      setInstoreCustomers(dbInstoreCustomers || []);
+      setInstoreOrders(dbInstoreOrders || []);
     } catch (err) {
       console.error("Error refreshing database tables in admin:", err);
     } finally {
@@ -1797,6 +1840,61 @@ ${orderSum}
                   {pendingRequestsCount + orders.filter(o => o.cancellation_status === 'pending').length}
                 </span>
               )}
+            </button>
+
+            <button
+              onClick={() => setActiveTab("reservations")}
+              type="button"
+              className={`px-5 py-3 rounded-xl font-bold text-xs shrink-0 transition-all ${
+                activeTab === "reservations" ? "bg-primary text-black" : "bg-surface hover:bg-surface-hover text-foreground/75"
+              }`}
+            >
+              <Calendar className="w-4 h-4 inline-block ml-2" />
+              الحجوزات
+            </button>
+
+            <button
+              onClick={() => setActiveTab("rentals")}
+              type="button"
+              className={`px-5 py-3 rounded-xl font-bold text-xs shrink-0 transition-all ${
+                activeTab === "rentals" ? "bg-primary text-black" : "bg-surface hover:bg-surface-hover text-foreground/75"
+              }`}
+            >
+              <Clock className="w-4 h-4 inline-block ml-2" />
+              الإيجارات
+            </button>
+
+            <button
+              onClick={() => setActiveTab("sales")}
+              type="button"
+              className={`px-5 py-3 rounded-xl font-bold text-xs shrink-0 transition-all ${
+                activeTab === "sales" ? "bg-primary text-black" : "bg-surface hover:bg-surface-hover text-foreground/75"
+              }`}
+            >
+              <ShoppingCart className="w-4 h-4 inline-block ml-2" />
+              المبيعات المباشرة
+            </button>
+
+            <button
+              onClick={() => setActiveTab("payments")}
+              type="button"
+              className={`px-5 py-3 rounded-xl font-bold text-xs shrink-0 transition-all ${
+                activeTab === "payments" ? "bg-primary text-black" : "bg-surface hover:bg-surface-hover text-foreground/75"
+              }`}
+            >
+              <DollarSign className="w-4 h-4 inline-block ml-2" />
+              حركة الخزينة
+            </button>
+
+            <button
+              onClick={() => setActiveTab("logs")}
+              type="button"
+              className={`px-5 py-3 rounded-xl font-bold text-xs shrink-0 transition-all ${
+                activeTab === "logs" ? "bg-primary text-black" : "bg-surface hover:bg-surface-hover text-foreground/75"
+              }`}
+            >
+              <FileText className="w-4 h-4 inline-block ml-2" />
+              سجل النشاطات
             </button>
           </div>
 
@@ -3415,6 +3513,52 @@ ${orderSum}
                   )}
                 </div>
               </div>
+            )}
+
+            {/* Tab: Instore Reservations */}
+            {activeTab === "reservations" && (
+              <ReservationManager 
+                reservations={reservations} 
+                products={products} 
+                customers={instoreCustomers} 
+                onRefresh={refreshAllData} 
+                openNewReservationFlag={openNewReservation}
+                setOpenNewReservationFlag={setOpenNewReservation}
+              />
+            )}
+
+            {/* Tab: Instore Rentals */}
+            {activeTab === "rentals" && (
+              <RentalManager 
+                rentals={rentals} 
+                products={products} 
+                customers={instoreCustomers} 
+                onRefresh={refreshAllData} 
+                openNewRentalFlag={openNewRental}
+                setOpenNewRentalFlag={setOpenNewRental}
+              />
+            )}
+
+            {/* Tab: Instore Sales */}
+            {activeTab === "sales" && (
+              <SalesManager 
+                orders={instoreOrders} 
+                products={products} 
+                customers={instoreCustomers} 
+                onRefresh={refreshAllData} 
+                openNewSaleFlag={openNewSale}
+                setOpenNewSaleFlag={setOpenNewSale}
+              />
+            )}
+
+            {/* Tab: Instore Payments */}
+            {activeTab === "payments" && (
+              <PaymentTracker payments={payments} onRefresh={refreshAllData} />
+            )}
+
+            {/* Tab: Instore Activity Logs */}
+            {activeTab === "logs" && (
+              <ActivityLogger logs={logs} onRefresh={refreshAllData} />
             )}
 
           </div>

@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { MapPin, Phone, Mail } from "lucide-react";
-import { getSupabaseSettings } from "@/lib/supabase";
+import { getSupabaseSettings, resolveAssetPath } from "@/lib/supabase";
 
 export function Footer() {
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDirectionsModalOpen, setIsDirectionsModalOpen] = useState(false);
+  const [activeRouteTab, setActiveRouteTab] = useState<"car" | "walk">("car");
 
   useEffect(() => {
     getSupabaseSettings().then(res => {
@@ -121,17 +123,26 @@ export function Footer() {
                     <MapPin className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                     <span className="text-sm text-foreground/70">{settings.location}</span>
                   </div>
-                  {settings.google_maps_link && (
-                    <a 
-                      href={settings.google_maps_link}
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="mr-8 inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary-light transition-colors border border-primary/20 hover:border-primary/50 bg-primary/5 px-2.5 py-1 rounded-lg w-fit"
+                  <div className="mr-8 flex flex-wrap gap-2 mt-1">
+                    {settings.google_maps_link && (
+                      <a 
+                        href={settings.google_maps_link}
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary-light transition-colors border border-primary/20 hover:border-primary/50 bg-primary/5 px-2.5 py-1 rounded-lg w-fit"
+                      >
+                        <MapPin className="w-3.5 h-3.5" />
+                        <span>عرض الموقع على الخريطة</span>
+                      </a>
+                    )}
+                    <button 
+                      onClick={() => setIsDirectionsModalOpen(true)}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary-light transition-colors border border-primary/20 hover:border-primary/50 bg-primary/5 px-2.5 py-1 rounded-lg w-fit"
                     >
                       <MapPin className="w-3.5 h-3.5" />
-                      <span>عرض الموقع على الخريطة</span>
-                    </a>
-                  )}
+                      <span>دليل الوصول للمحل (تفادي خطأ الخريطة)</span>
+                    </button>
+                  </div>
                 </li>
               )}
               {settings.contact_phone && (
@@ -188,6 +199,119 @@ export function Footer() {
               <button 
                 onClick={() => setIsModalOpen(false)}
                 className="px-6 py-2 bg-primary text-black font-black hover:bg-primary-light rounded-xl text-xs transition-colors"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Directions Guide Modal */}
+      {isDirectionsModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm overflow-y-auto">
+          <div className="glass p-6 md:p-8 rounded-3xl border border-primary/20 max-w-xl w-full relative space-y-6 text-right overflow-hidden shadow-[0_0_50px_rgba(212,175,55,0.15)] my-8">
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-primary-light via-primary to-primary-dark"></div>
+            
+            <div className="flex justify-between items-center border-b border-border pb-4">
+              <h3 className="text-xl md:text-2xl font-black bg-gradient-to-r from-primary-light to-primary-dark bg-clip-text text-transparent">
+                دليل الوصول وتفادي أخطاء الخرائط
+              </h3>
+              <button 
+                onClick={() => setIsDirectionsModalOpen(false)}
+                className="p-1.5 bg-surface-hover rounded-full text-foreground/70 hover:text-primary transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 text-xs md:text-sm text-yellow-500/90 leading-relaxed text-right">
+              ⚠️ <strong>تنبيه هام للزوار:</strong> خرائط قوقل تحتوي على خطأ يوجه السيارات عبر أدراج مشاة غير سالكة للسيارات تحت الشارع. يرجى اتباع الدليل أدناه لتفادي هذا الخطأ والوصول بسهولة.
+            </div>
+
+            {/* Tabs */}
+            <div className="grid grid-cols-2 gap-2 p-1 bg-surface-hover rounded-xl border border-border">
+              <button
+                onClick={() => setActiveRouteTab("car")}
+                className={`py-2 px-3 rounded-lg text-xs md:text-sm font-bold transition-all ${
+                  activeRouteTab === "car"
+                    ? "bg-primary text-black shadow-lg"
+                    : "text-foreground/70 hover:text-foreground hover:bg-surface"
+                }`}
+              >
+                🚗 بالسيارة (طريق الخدمات)
+              </button>
+              <button
+                onClick={() => setActiveRouteTab("walk")}
+                className={`py-2 px-3 rounded-lg text-xs md:text-sm font-bold transition-all ${
+                  activeRouteTab === "walk"
+                    ? "bg-primary text-black shadow-lg"
+                    : "text-foreground/70 hover:text-foreground hover:bg-surface"
+                }`}
+              >
+                🚶 مشياً (عبر مواقف الجوازات)
+              </button>
+            </div>
+
+            {/* Tab Contents */}
+            <div className="space-y-4 text-right">
+              {activeRouteTab === "car" ? (
+                <div className="space-y-3 text-sm md:text-base leading-relaxed text-foreground/80">
+                  <p className="font-bold text-white">مسار السيارات للوصول مباشرة أمام باب المحل:</p>
+                  <ol className="list-decimal list-inside space-y-2 pr-2 text-xs md:text-sm">
+                    <li>تحرك من <strong>دوار جوازات الصريم</strong> غرباً على شارع النصر الرئيسي.</li>
+                    <li>اصعد <strong>المنحدر الجانبي على اليمين</strong> (الذي يلتف للأعلى).</li>
+                    <li>انعطف <strong>يميناً خلف معمل لورا للحلويات</strong> وتابع السير شرقاً في الشارع العلوي.</li>
+                    <li>انعطف <strong>يميناً في الممر الفرعي</strong> لتصل مباشرة للساحة أمام باب المحل.</li>
+                  </ol>
+                  <div className="pt-2 flex flex-wrap gap-2 justify-end">
+                    <a
+                      href="https://www.google.com/maps/search/?api=1&query=Libyan+Passport+Authority+Tripoli"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-black bg-primary hover:bg-primary-light transition-colors px-3 py-2 rounded-xl"
+                    >
+                      📍 فتح موقع دوار الجوازات على الخريطة
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3 text-sm md:text-base leading-relaxed text-foreground/80">
+                  <p className="font-bold text-white">خيار ركن السيارة والوصول مشياً عبر أدراج المحل مباشرة:</p>
+                  <ul className="list-decimal list-inside space-y-2 pr-2 text-xs md:text-sm">
+                    <li>اسلك شارع النصر الرئيسي (Al Nasr St) المار أسفل المحل مباشرة.</li>
+                    <li>اركن سيارتك على جانب الطريق أسفل المحل مباشرة.</li>
+                    <li>اصعد عبر <strong>أدراج المشاة (الدرج)</strong> الواقعة تحت المحل مباشرة لتصل إلى الباب في ثوانٍ.</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Map Image */}
+            <div className="relative border border-border rounded-2xl overflow-hidden bg-black/40">
+              <img 
+                src={resolveAssetPath("/route_guide.png")}
+                alt="دليل اتجاهات جاغوار Occasions" 
+                className="w-full h-auto object-cover max-h-[300px]"
+              />
+            </div>
+            
+            <div className="flex justify-end pt-4 border-t border-border gap-2">
+              {settings.google_maps_link && (
+                <a
+                  href={settings.google_maps_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-5 py-2 bg-surface hover:bg-surface-hover text-foreground border border-border font-bold rounded-xl text-xs transition-colors"
+                >
+                  فتح موقع المحل (المباشر)
+                </a>
+              )}
+              <button 
+                onClick={() => setIsDirectionsModalOpen(false)}
+                className="px-5 py-2 bg-primary text-black font-black hover:bg-primary-light rounded-xl text-xs transition-colors"
               >
                 إغلاق
               </button>

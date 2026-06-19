@@ -1,20 +1,6 @@
 import type { Metadata } from "next";
-import { Cairo, Tajawal } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
-
-const cairo = Cairo({
-  subsets: ["arabic"],
-  variable: "--font-cairo",
-  display: "swap",
-});
-
-const tajawal = Tajawal({
-  weight: ["400", "500", "700", "800", "900"],
-  subsets: ["arabic"],
-  variable: "--font-tajawal",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "جاغوار Occasions | مستلزمات التخرج في ليبيا",
@@ -27,8 +13,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ar" dir="rtl" className={`${cairo.variable} ${tajawal.variable}`}>
+    <html lang="ar" dir="rtl">
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@200..1000&family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
