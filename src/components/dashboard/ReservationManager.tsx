@@ -410,13 +410,45 @@ export default function ReservationManager({
     if (printWindow) {
       const custName = res.customers?.name || 'عميل';
       const custPhone = res.customers?.phone || '';
-      const itemsHtml = res.items?.map((item: any) => `
-        <tr>
-          <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.products?.name || 'منتج'}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">${item.quantity}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: left;">${item.price} د.ل</td>
-        </tr>
-      `).join('');
+      const itemsHtml = res.items?.map((item: any) => {
+        let customizationDetails = '';
+        if (item.custom_text || item.customization_type || item.pickup_date || item.is_preliminary) {
+          customizationDetails = '<div style="font-size: 10px; color: #555; margin-top: 4px; border-top: 1px dashed #eee; padding-top: 3px;">';
+          if (item.customization_type && item.customization_type !== 'none') {
+            customizationDetails += 'التخصيص: ' + (item.customization_type === 'embroidery' ? 'تطريز' : 'طباعة');
+          }
+          if (item.layer_type && item.layer_type !== 'none') {
+            customizationDetails += ' | الطبقة: ' + (item.layer_type === 'double' ? 'ثنائي' : 'ثلاثي');
+          }
+          if (item.color_sash) {
+            customizationDetails += ' | لون القماش: ' + item.color_sash;
+          }
+          if (item.color_text) {
+            customizationDetails += ' | خيط/طباعة: ' + item.color_text;
+          }
+          if (item.custom_text) {
+            customizationDetails += ' | الاسم: <strong>' + item.custom_text + '</strong>';
+          }
+          if (item.pickup_date || item.is_preliminary) {
+            customizationDetails += ' | استلام: <strong>' + (item.is_preliminary ? 'أول ما يجهز' : item.pickup_date) + '</strong>';
+          }
+          if (item.return_date) {
+            customizationDetails += ' | إرجاع: <strong>' + item.return_date + '</strong>';
+          }
+          customizationDetails += '</div>';
+        }
+
+        return `
+          <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #ddd;">
+              <div>${item.products?.name || item.name || 'منتج مخصص'}</div>
+              ${customizationDetails}
+            </td>
+            <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">${item.quantity}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: left;">${item.price} د.ل</td>
+          </tr>
+        `;
+      }).join('');
 
       printWindow.document.write(`
         <html>

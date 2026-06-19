@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Key, ShieldAlert, LogOut, Settings, Bell, Calendar, Tags, Users, 
   Clock, DollarSign, ClipboardList, ShoppingBag, LayoutDashboard, Check, 
-  Menu, X, Sparkles, RefreshCw, AlertCircle
+  Menu, X, Sparkles, RefreshCw, AlertCircle, Sun, Moon
 } from 'lucide-react';
 import { 
   supabase, getSettings, getProducts, getCustomers, 
@@ -23,6 +23,24 @@ import ActivityLogger from '@/components/dashboard/ActivityLogger';
 import SettingsPanel from '@/components/dashboard/SettingsPanel';
 
 export default function Page() {
+  const [theme, setTheme] = useState("dark");
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") || "dark";
+    setTheme(savedTheme);
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === "dark" ? "light" : "dark";
+    setTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+    if (newTheme === "light") {
+      document.documentElement.classList.add("light");
+    } else {
+      document.documentElement.classList.remove("light");
+    }
+  };
+
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [pinInput, setPinInput] = useState('');
   const [activeTab, setActiveTab] = useState('home');
@@ -420,6 +438,21 @@ export default function Page() {
           </div>
 
           <div className="flex items-center gap-4">
+            <button 
+              onClick={toggleTheme}
+              type="button"
+              className={`w-12 h-6 rounded-full border transition-all duration-300 cursor-pointer relative flex items-center px-1 ${
+                theme === "dark" ? "bg-zinc-950 border-zinc-800" : "bg-zinc-200 border-zinc-300"
+              }`}
+              title={theme === "dark" ? "الوضع النهاري" : "الوضع الليلي"}
+            >
+              <div 
+                className="w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center transition-transform duration-300"
+                style={{ transform: theme === 'dark' ? 'translateX(0)' : 'translateX(-22px)' }}
+              >
+                {theme === "dark" ? <Moon size={10} className="text-zinc-950" /> : <Sun size={10} className="text-zinc-950" />}
+              </div>
+            </button>
             <button 
               onClick={loadAllData}
               disabled={isLoading}

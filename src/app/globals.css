@@ -7,9 +7,9 @@
   --color-primary-dark: #b08d33;
   --color-primary-light: #f5d07a;
   
-  --color-surface: #121214;
-  --color-surface-hover: #1c1c1f;
-  --color-border: #27272a;
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
   
   --font-sans: "Cairo", "Tajawal", sans-serif;
 }
@@ -17,6 +17,42 @@
 :root {
   --background: #09090b;
   --foreground: #ededed;
+  --surface: #121214;
+  --surface-hover: #1c1c1f;
+  --border: #27272a;
+  --glass-bg: rgba(18, 18, 20, 0.75);
+  --glass-premium-bg: linear-gradient(135deg, rgba(20, 20, 22, 0.85) 0%, rgba(10, 10, 12, 0.95) 100%);
+  --shadow-premium: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+  --border-glass: rgba(255, 255, 255, 0.04);
+}
+
+.light {
+  --background: #fcfcfd;
+  --foreground: #09090b;
+  --surface: #f4f4f5;
+  --surface-hover: #e4e4e7;
+  --border: #e4e4e7;
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-premium-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(245, 245, 247, 0.95) 100%);
+  --shadow-premium: 0 8px 32px 0 rgba(0, 0, 0, 0.06);
+  --border-glass: rgba(0, 0, 0, 0.06);
+
+  /* Override Tailwind v4 zinc variables for light mode! */
+  --color-zinc-950: #fcfcfd;
+  --color-zinc-900: #f4f4f5;
+  --color-zinc-800: #e4e4e7;
+  --color-zinc-700: #d4d4d8;
+  --color-zinc-650: #a1a1aa;
+  --color-zinc-600: #71717a;
+  --color-zinc-500: #52525b;
+  --color-zinc-400: #3f3f46;
+  --color-zinc-300: #27272a;
+  --color-zinc-200: #18181b;
+  --color-zinc-100: #09090b;
+  --color-zinc-50: #000000;
+
+  --color-white: #09090b; /* Map white text to dark text on light backgrounds */
+  --color-black: #ffffff; /* Map black background to white backgrounds */
 }
 
 body {
@@ -26,6 +62,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Custom Scrollbars */
@@ -34,10 +71,10 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #09090b;
+  background: var(--background);
 }
 ::-webkit-scrollbar-thumb {
-  background: #27272a;
+  background: var(--border);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
@@ -46,18 +83,20 @@ body {
 
 /* Glassmorphism utility */
 .glass {
-  background: rgba(18, 18, 20, 0.75);
+  background: var(--glass-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-glass);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .glass-premium {
-  background: linear-gradient(135deg, rgba(20, 20, 22, 0.85) 0%, rgba(10, 10, 12, 0.95) 100%);
+  background: var(--glass-premium-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(201, 168, 76, 0.15);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  box-shadow: var(--shadow-premium);
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* Gold Shimmer Text Effect */

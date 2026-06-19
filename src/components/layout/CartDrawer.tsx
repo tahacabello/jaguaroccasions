@@ -74,7 +74,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
             <div className="space-y-4">
               {cartItems.map((item) => (
                 <div
-                  key={`${item.id}-${item.mode}`}
+                  key={item.cartKey}
                   className="flex gap-4 p-4 rounded-2xl glass border border-border hover:border-primary/20 transition-colors"
                 >
                   {/* Item Image */}
@@ -95,28 +95,55 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           {item.name}
                         </h4>
                         <button
-                          onClick={() => removeFromCart(item.id, item.mode)}
+                          onClick={() => removeFromCart(item.cartKey)}
                           className="text-foreground/40 hover:text-red-400 p-1 rounded transition-colors shrink-0"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
-                      <span className="inline-block text-xs px-2 py-0.5 mt-1 rounded bg-primary/10 text-primary-light font-medium">
-                        {item.mode === "rent" ? "إيجار" : "شراء"}
-                      </span>
+                      
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary-light font-bold">
+                          {item.mode === "rent" ? "إيجار" : "شراء"}
+                        </span>
+                        {item.layer_type && item.layer_type !== "none" && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-hover border border-border text-foreground/75 font-semibold">
+                            {item.layer_type === "double" ? "ثنائي" : "ثلاثي"}
+                          </span>
+                        )}
+                        {item.customization_type && item.customization_type !== "none" && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-hover border border-border text-foreground/75 font-semibold">
+                            {item.customization_type === "embroidery" ? "تطريز" : "طباعة"}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Customized Name & Dates */}
+                      {item.custom_text && item.custom_text !== "none" && (
+                        <p className="text-xs text-foreground/70 mt-1.5 font-bold">
+                          الاسم: <span className="text-primary">{item.custom_text}</span>
+                        </p>
+                      )}
+
+                      {/* Item dates */}
+                      {(item.pickup_date || item.is_preliminary) && (
+                        <p className="text-[10px] text-foreground/60 mt-1">
+                          🗓️ استلام: {item.is_preliminary ? "أول ما يجهز" : item.pickup_date}
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex justify-between items-center mt-2">
                       <div className="flex items-center border border-border rounded-lg bg-surface overflow-hidden">
                         <button
-                          onClick={() => updateQuantity(item.id, item.mode, item.quantity - 1)}
+                          onClick={() => updateQuantity(item.cartKey, item.quantity - 1)}
                           className="p-1.5 hover:bg-surface-hover text-foreground/60 hover:text-foreground transition-colors"
                         >
                           <Minus className="w-3.5 h-3.5" />
                         </button>
                         <span className="px-3 text-sm font-bold">{item.quantity}</span>
                         <button
-                          onClick={() => updateQuantity(item.id, item.mode, item.quantity + 1)}
+                          onClick={() => updateQuantity(item.cartKey, item.quantity + 1)}
                           className="p-1.5 hover:bg-surface-hover text-foreground/60 hover:text-foreground transition-colors"
                         >
                           <Plus className="w-3.5 h-3.5" />

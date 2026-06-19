@@ -4,18 +4,29 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 
 export interface CartItem {
   id: string;
+  cartKey: string;
   name: string;
   price: number;
   image: string;
   quantity: number;
   mode: "rent" | "sale"; // 'rent' for rental, 'sale' for purchasing
+  
+  // Customization fields
+  customization_type?: "embroidery" | "print" | "none";
+  layer_type?: "double" | "triple" | "none";
+  color_sash?: string;
+  color_text?: string;
+  custom_text?: string; // name or custom text
+  pickup_date?: string; // item-level pickup
+  return_date?: string; // item-level return
+  is_preliminary?: boolean; // first ready / preliminary
 }
 
 interface CartContextType {
   cartItems: CartItem[];
-  addToCart: (item: Omit<CartItem, "quantity">, quantity?: number) => void;
-  removeFromCart: (id: string, mode: "rent" | "sale") => void;
-  updateQuantity: (id: string, mode: "rent" | "sale", quantity: number) => void;
+  addToCart: (item: Omit<CartItem, "quantity" | "cartKey">, quantity?: number) => void;
+  removeFromCart: (cartKey: string) => void;
+  updateQuantity: (cartKey: string, quantity: number) => void;
   clearCart: () => void;
   cartTotal: number;
   cartCount: number;
@@ -52,10 +63,24 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [cartItems, isLoaded]);
 
-  const addToCart = (item: Omit<CartItem, "quantity">, quantity = 1) => {
+  const addToCart = (item: Omit<CartItem, "quantity" | "cartKey">, quantity = 1) => {
+    const keyParts = [
+      item.id,
+      item.mode,
+      item.customization_type || 'none',
+      item.layer_type || 'none',
+      item.color_sash || 'none',
+      item.color_text || 'none',
+      item.custom_text || 'none',
+      item.pickup_date || 'none',
+      item.return_date || 'none',
+      item.is_preliminary ? 'prelim' : 'fixed'
+    ];
+    const generatedKey = keyParts.join('_');
+
     setCartItems((prevItems) => {
       const existingItemIndex = prevItems.findIndex(
-        (i) => i.id === item.id && i.mode === item.mode
+        (i) => i.cartKey === generatedKey
       );
 
       if (existingItemIndex > -1) {
@@ -64,25 +89,25 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         return newItems;
       }
 
-      return [...prevItems, { ...item, quantity }];
+      return [...prevItems, { ...item, cartKey: generatedKey, quantity } as CartItem];
     });
   };
 
-  const removeFromCart = (id: string, mode: "rent" | "sale") => {
+  const removeFromCart = (cartKey: string) => {
     setCartItems((prevItems) =>
-      prevItems.filter((item) => !(item.id === id && item.mode === mode))
+      prevItems.filter((item) => item.cartKey !== cartKey)
     );
   };
 
-  const updateQuantity = (id: string, mode: "rent" | "sale", quantity: number) => {
+  const updateQuantity = (cartKey: string, quantity: number) => {
     if (quantity <= 0) {
-      removeFromCart(id, mode);
+      removeFromCart(cartKey);
       return;
     }
 
     setCartItems((prevItems) =>
       prevItems.map((item) =>
-        item.id === id && item.mode === mode ? { ...item, quantity } : item
+        item.cartKey === cartKey ? { ...item, quantity } : item
       )
     );
   };

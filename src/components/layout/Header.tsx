@@ -2,13 +2,31 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, ShoppingBag, User, Menu, X } from "lucide-react";
+import { Search, ShoppingBag, User, Menu, X, Sun, Moon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "@/context/CartContext";
 import { CartDrawer } from "@/components/layout/CartDrawer";
 import { getSupabaseSettings, supabase } from "@/lib/supabase";
 
 export function Header() {
+  const [theme, setTheme] = useState("dark");
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") || "dark";
+    setTheme(savedTheme);
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === "dark" ? "light" : "dark";
+    setTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+    if (newTheme === "light") {
+      document.documentElement.classList.add("light");
+    } else {
+      document.documentElement.classList.remove("light");
+    }
+  };
+
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -94,6 +112,21 @@ export function Header() {
             <Link href={userLoggedIn ? "/account" : "/auth/login"} className="p-2 text-foreground/80 hover:text-primary transition-colors rounded-full hover:bg-surface-hover">
               <User className="w-5 h-5" />
             </Link>
+            <button 
+              onClick={toggleTheme}
+              type="button"
+              className={`w-12 h-6 rounded-full border transition-all duration-300 cursor-pointer relative flex items-center px-1 ${
+                theme === "dark" ? "bg-zinc-950 border-zinc-800" : "bg-zinc-200 border-zinc-300"
+              }`}
+              title={theme === "dark" ? "الوضع النهاري" : "الوضع الليلي"}
+            >
+              <div 
+                className="w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center transition-transform duration-300"
+                style={{ transform: theme === 'dark' ? 'translateX(0)' : 'translateX(-22px)' }}
+              >
+                {theme === "dark" ? <Moon className="w-2.5 h-2.5 text-zinc-950" /> : <Sun className="w-2.5 h-2.5 text-zinc-950" />}
+              </div>
+            </button>
             <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-foreground/80 hover:text-primary transition-colors rounded-full hover:bg-surface-hover">
               <ShoppingBag className="w-5 h-5" />
               {cartCount > 0 && (

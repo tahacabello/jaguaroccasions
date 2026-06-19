@@ -105,12 +105,19 @@ export default function SalesManager({
     
     // Load products
     const mapped = (order.items || []).map((item: any) => ({
-      id: item.product_id,
+      id: item.product_id || `item-${item.id}`,
       name: item.products?.name || item.product_name || "منتج مخصص",
       price_sale: item.price || item.price_at_purchase || 0,
       custom_price: item.price || item.price_at_purchase || 0,
       quantity: item.quantity || 1,
-      category: item.products?.category || "أخرى"
+      category: item.products?.category || "أخرى",
+      customization_type: item.customization_type || 'none',
+      layer_type: item.layer_type || 'none',
+      color_sash: item.color_sash || '',
+      color_text: item.color_text || '',
+      custom_text: item.custom_text || '',
+      pickup_date: item.pickup_date || '',
+      is_preliminary: !!item.is_preliminary,
     }));
     setSelectedProducts(mapped);
     setIsGuestCustomer(false); 
@@ -126,7 +133,19 @@ export default function SalesManager({
       setSelectedProducts(filtered);
       recalcTotal(filtered);
     } else {
-      const updated = [...selectedProducts, { ...prod, quantity: 1, custom_price: prod.price_sale || 0 }];
+      const isSash = prod.categoryId === 'sashes' || (prod.category && prod.category.includes('شال')) || (prod.name && prod.name.includes('شال'));
+      const updated = [...selectedProducts, { 
+        ...prod, 
+        quantity: 1, 
+        custom_price: prod.price_sale || 0,
+        customization_type: isSash ? 'embroidery' : 'none',
+        layer_type: isSash ? 'double' : 'none',
+        color_sash: isSash ? 'أسود' : '',
+        color_text: isSash ? 'ذهبي' : '',
+        custom_text: '',
+        pickup_date: '',
+        is_preliminary: true,
+      }];
       setSelectedProducts(updated);
       recalcTotal(updated);
     }
@@ -169,12 +188,19 @@ export default function SalesManager({
     const newCustomItem = {
       id: customId,
       name: 'شال تخرج مطرز ثنائي مخصص',
-      category: 'أخرى',
+      category: 'شالات التخرج',
       price_rent: 0,
-      price_sale: 0,
+      price_sale: 45,
       quantity: 1,
-      custom_price: 0,
-      is_custom: true
+      custom_price: 45,
+      is_custom: true,
+      customization_type: 'embroidery',
+      layer_type: 'double',
+      color_sash: 'أسود',
+      color_text: 'ذهبي',
+      custom_text: '',
+      pickup_date: '',
+      is_preliminary: true,
     };
     const updated = [...selectedProducts, newCustomItem];
     setSelectedProducts(updated);
@@ -282,9 +308,16 @@ export default function SalesManager({
         const itemsPayload = savedProducts.map(p => ({
           order_id: editingOrder.id,
           product_id: p.id,
+          product_name: p.name || "منتج مخصص",
           quantity: p.quantity,
-          price: p.custom_price,
-          product_name: p.name || "منتج مخصص"
+          price_at_purchase: p.custom_price,
+          pickup_date: p.pickup_date || null,
+          is_preliminary: p.is_preliminary || false,
+          customization_type: p.customization_type || null,
+          layer_type: p.layer_type || null,
+          color_sash: p.color_sash || null,
+          color_text: p.color_text || null,
+          custom_text: p.custom_text || null
         }));
         const { error: itemsErr } = await supabase.from('order_items').insert(itemsPayload);
         if (itemsErr) throw itemsErr;
@@ -316,9 +349,16 @@ export default function SalesManager({
       } else {
         const itemsPayload = savedProducts.map(p => ({
           product_id: p.id,
+          product_name: p.name || "منتج مخصص",
           quantity: p.quantity,
           price: p.custom_price,
-          product_name: p.name || "منتج مخصص"
+          pickup_date: p.pickup_date || null,
+          is_preliminary: p.is_preliminary || false,
+          customization_type: p.customization_type || null,
+          layer_type: p.layer_type || null,
+          color_sash: p.color_sash || null,
+          color_text: p.color_text || null,
+          custom_text: p.custom_text || null
         }));
         const res = await addOrder(payload, itemsPayload);
         if (!res.success) throw new Error(res.error || "فشل تسجيل الفاتورة");
@@ -362,13 +402,40 @@ export default function SalesManager({
     if (printWindow) {
       const custName = order.customers?.name || 'عميل';
       const custPhone = order.customers?.phone || '';
-      const itemsHtml = (order.items || []).map((item: any) => 
-        '<tr>' +
-        '  <td style="padding: 8px; border-bottom: 1px solid #ddd;">' + (item.products?.name || item.product_name || 'منتج مخصص') + '</td>' +
-        '  <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">' + item.quantity + '</td>' +
-        '  <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: left;">' + (item.price || item.price_at_purchase || 0) + ' د.ل</td>' +
-        '</tr>'
-      ).join('');
+      const itemsHtml = (order.items || []).map((item: any) => {
+        let customizationDetails = '';
+        if (item.custom_text || item.customization_type || item.pickup_date || item.is_preliminary) {
+          customizationDetails = '<div style="font-size: 10px; color: #555; margin-top: 4px; border-top: 1px dashed #eee; padding-top: 3px;">';
+          if (item.customization_type && item.customization_type !== 'none') {
+            customizationDetails += 'التخصيص: ' + (item.customization_type === 'embroidery' ? 'تطريز' : 'طباعة');
+          }
+          if (item.layer_type && item.layer_type !== 'none') {
+            customizationDetails += ' | الطبقة: ' + (item.layer_type === 'double' ? 'ثنائي' : 'ثلاثي');
+          }
+          if (item.color_sash) {
+            customizationDetails += ' | لون القماش: ' + item.color_sash;
+          }
+          if (item.color_text) {
+            customizationDetails += ' | خيط/طباعة: ' + item.color_text;
+          }
+          if (item.custom_text) {
+            customizationDetails += ' | الاسم: <strong>' + item.custom_text + '</strong>';
+          }
+          if (item.pickup_date || item.is_preliminary) {
+            customizationDetails += ' | استلام: <strong>' + (item.is_preliminary ? 'أول ما يجهز' : item.pickup_date) + '</strong>';
+          }
+          customizationDetails += '</div>';
+        }
+
+        return '<tr>' +
+          '  <td style="padding: 8px; border-bottom: 1px solid #ddd;">' + 
+          '    <div>' + (item.products?.name || item.product_name || 'منتج مخصص') + '</div>' + 
+          customizationDetails +
+          '  </td>' +
+          '  <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">' + item.quantity + '</td>' +
+          '  <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: left;">' + (item.price || item.price_at_purchase || 0) + ' د.ل</td>' +
+          '</tr>';
+      }).join('');
 
       let dateHtml = '';
       if (order.event_date || order.pickup_date) {
@@ -901,52 +968,52 @@ export default function SalesManager({
 
                 {/* Selected items edit */}
                 {selectedProducts.length > 0 && (
-                  <div className="space-y-3 p-4 bg-zinc-900/40 rounded-lg border border-zinc-800">
+                  <div className="space-y-3 p-4 bg-zinc-900/40 rounded-lg border border-zinc-800 font-sans">
                     <h4 className="text-xs font-bold text-white">المنتجات المختارة والكميات</h4>
                     <div className="space-y-3">
                       {selectedProducts.map(p => (
-                        <div key={p.id} className="flex justify-between items-center gap-4 border-b border-zinc-900 pb-2 last:border-0 last:pb-0">
-                          <div className="flex-1 space-y-1">
-                            {p.is_custom ? (
-                              <input 
-                                type="text"
-                                value={p.name}
-                                onChange={(e) => {
-                                  const updated = selectedProducts.map(item => item.id === p.id ? { ...item, name: e.target.value } : item);
-                                  setSelectedProducts(updated);
-                                }}
-                                className="bg-zinc-950 border border-zinc-800 focus:border-amber-500 focus:outline-none rounded px-2 py-1 text-xs text-white w-full max-w-[200px]"
-                                placeholder="اسم المنتج المخصص..."
-                              />
-                            ) : (
-                              <span className="text-xs font-semibold text-gray-200">{p.name}</span>
-                            )}
-                            <div className="text-[10px] text-gray-500">السعر الافتراضي: {p.price_sale} د.ل</div>
-                          </div>
-                          
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1">
-                              <span className="text-[10px] text-gray-400">الكمية:</span>
-                              <input
-                                type="number"
-                                min="1"
-                                max={p.is_custom ? undefined : p.quantity + (editingOrder?.items?.find((oIt: any) => oIt.product_id === p.id)?.quantity || 0)}
-                                value={p.quantity}
-                                onChange={(e) => handleProductQtyChange(p.id, Number(e.target.value))}
-                                className="w-12 bg-zinc-955 border border-zinc-800 rounded p-1 text-xs text-center text-white"
-                              />
+                        <div key={p.id} className="border-b border-zinc-855 pb-3 mb-3 last:border-0 last:pb-0 last:mb-0 space-y-2">
+                          <div className="flex justify-between items-center gap-4">
+                            <div className="flex-1 space-y-1">
+                              {p.is_custom ? (
+                                <input 
+                                  type="text"
+                                  value={p.name}
+                                  onChange={(e) => {
+                                    const updated = selectedProducts.map(item => item.id === p.id ? { ...item, name: e.target.value } : item);
+                                    setSelectedProducts(updated);
+                                  }}
+                                  className="bg-zinc-950 border border-zinc-800 focus:border-amber-500 focus:outline-none rounded px-2 py-1 text-xs text-white w-full max-w-[200px]"
+                                  placeholder="اسم المنتج المخصص..."
+                                />
+                              ) : (
+                                <span className="text-xs font-semibold text-gray-200">{p.name}</span>
+                              )}
+                              <div className="text-[10px] text-gray-500">السعر الافتراضي: {p.price_sale} د.ل</div>
                             </div>
-                            <div className="flex items-center gap-1">
-                              <span className="text-[10px] text-gray-400">سعر البيع:</span>
-                              <input
-                                type="number"
-                                min="0"
-                                value={p.custom_price}
-                                onChange={(e) => handleProductPriceChange(p.id, Number(e.target.value))}
-                                className="w-16 bg-zinc-955 border border-zinc-800 rounded p-1 text-xs text-center text-white font-bold"
-                              />
-                            </div>
-                            {(p.is_custom || editingOrder) && (
+                            
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] text-gray-400">الكمية:</span>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max={p.is_custom ? undefined : p.quantity + (editingOrder?.items?.find((oIt: any) => oIt.product_id === p.id)?.quantity || 0)}
+                                  value={p.quantity}
+                                  onChange={(e) => handleProductQtyChange(p.id, Number(e.target.value))}
+                                  className="w-12 bg-zinc-950 border border-zinc-800 rounded p-1 text-xs text-center text-white"
+                                />
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="text-[10px] text-gray-400">سعر البيع:</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={p.custom_price}
+                                  onChange={(e) => handleProductPriceChange(p.id, Number(e.target.value))}
+                                  className="w-16 bg-zinc-955 border border-zinc-800 rounded p-1 text-xs text-center text-white font-bold"
+                                />
+                              </div>
                               <button
                                 type="button"
                                 onClick={() => {
@@ -959,7 +1026,157 @@ export default function SalesManager({
                               >
                                 <X size={12} />
                               </button>
-                            )}
+                            </div>
+                          </div>
+
+                          {/* Customization Details Sub-panel */}
+                          <div className="w-full mt-2 p-3 bg-zinc-950/80 rounded border border-zinc-900 space-y-3 text-right">
+                            <div className="text-[10px] font-bold text-amber-500 border-b border-zinc-900 pb-1.5 flex justify-between items-center">
+                              <span>⚙️ خيارات التخصيص وجدولة القطعة:</span>
+                              <label className="flex items-center gap-1 cursor-pointer select-none text-gray-400">
+                                <input
+                                  type="checkbox"
+                                  checked={p.is_preliminary}
+                                  onChange={(e) => {
+                                    const updated = selectedProducts.map(item => 
+                                      item.id === p.id ? { ...item, is_preliminary: e.target.checked, pickup_date: e.target.checked ? '' : item.pickup_date } : item
+                                    );
+                                    setSelectedProducts(updated);
+                                  }}
+                                  className="w-3 h-3 rounded bg-zinc-900 border-zinc-850 text-amber-500 focus:ring-0"
+                                />
+                                أول ما يجهز
+                              </label>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                              {/* Customization Type */}
+                              <div>
+                                <label className="text-[9px] text-gray-500 block font-bold">التخصيص</label>
+                                <select
+                                  value={p.customization_type || 'none'}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    const updated = selectedProducts.map(item => 
+                                      item.id === p.id ? { ...item, customization_type: val } : item
+                                    );
+                                    setSelectedProducts(updated);
+                                  }}
+                                  className="w-full bg-zinc-900 border border-zinc-800 rounded p-1 text-[10px] text-white"
+                                >
+                                  <option value="none">بدون</option>
+                                  <option value="embroidery">تطريز</option>
+                                  <option value="print">طباعة</option>
+                                </select>
+                              </div>
+
+                              {/* Layer Type */}
+                              <div>
+                                <label className="text-[9px] text-gray-500 block font-bold">الطبقة</label>
+                                <select
+                                  value={p.layer_type || 'none'}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    // Update price automatically if changed
+                                    let newPrice = p.custom_price;
+                                    if (val === 'triple' && p.layer_type !== 'triple') {
+                                      newPrice = Number(p.custom_price) + 15;
+                                    } else if (val !== 'triple' && p.layer_type === 'triple') {
+                                      newPrice = Math.max(0, Number(p.custom_price) - 15);
+                                    }
+                                    const updated = selectedProducts.map(item => 
+                                      item.id === p.id ? { ...item, layer_type: val, custom_price: newPrice } : item
+                                    );
+                                    setSelectedProducts(updated);
+                                    recalcTotal(updated);
+                                  }}
+                                  className="w-full bg-zinc-900 border border-zinc-800 rounded p-1 text-[10px] text-white"
+                                >
+                                  <option value="none">بدون</option>
+                                  <option value="double">ثنائي</option>
+                                  <option value="triple">ثلاثي (+15)</option>
+                                </select>
+                              </div>
+
+                              {/* Sash Color */}
+                              <div>
+                                <label className="text-[9px] text-gray-500 block font-bold">لون الشال</label>
+                                <input 
+                                  type="text"
+                                  value={p.color_sash || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    let newPrice = p.custom_price;
+                                    if (val !== 'أسود' && p.color_sash === 'أسود') {
+                                      newPrice = Number(p.custom_price) + 10;
+                                    } else if (val === 'أسود' && p.color_sash !== 'أسود') {
+                                      newPrice = Math.max(0, Number(p.custom_price) - 10);
+                                    }
+                                    const updated = selectedProducts.map(item => 
+                                      item.id === p.id ? { ...item, color_sash: val, custom_price: newPrice } : item
+                                    );
+                                    setSelectedProducts(updated);
+                                    recalcTotal(updated);
+                                  }}
+                                  placeholder="أسود، أبيض..."
+                                  className="w-full bg-zinc-900 border border-zinc-800 rounded p-1 text-[10px] text-white"
+                                />
+                              </div>
+
+                              {/* Text/Thread Color */}
+                              <div>
+                                <label className="text-[9px] text-gray-500 block font-bold">لون الكتابة</label>
+                                <input 
+                                  type="text"
+                                  value={p.color_text || ''}
+                                  onChange={(e) => {
+                                    const updated = selectedProducts.map(item => 
+                                      item.id === p.id ? { ...item, color_text: e.target.value } : item
+                                    );
+                                    setSelectedProducts(updated);
+                                  }}
+                                  placeholder="ذهبي، فضي..."
+                                  className="w-full bg-zinc-900 border border-zinc-800 rounded p-1 text-[10px] text-white"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {/* Custom Text / Name */}
+                              <div>
+                                <label className="text-[9px] text-gray-500 block font-bold">الاسم المطلوب كتابته</label>
+                                <input 
+                                  type="text"
+                                  value={p.custom_text || ''}
+                                  onChange={(e) => {
+                                    const updated = selectedProducts.map(item => 
+                                      item.id === p.id ? { ...item, custom_text: e.target.value } : item
+                                    );
+                                    setSelectedProducts(updated);
+                                  }}
+                                  placeholder="الاسم المراد تطريزه/طباعته..."
+                                  className="w-full bg-zinc-900 border border-zinc-800 rounded p-1 text-[10px] text-white"
+                                />
+                              </div>
+
+                              {/* Pickup date */}
+                              {!p.is_preliminary && (
+                                <div>
+                                  <label className="text-[9px] text-gray-500 block font-bold">تاريخ التسليم الفردي</label>
+                                  <input 
+                                    type="date"
+                                    value={p.pickup_date || ''}
+                                    onChange={(e) => {
+                                      const updated = selectedProducts.map(item => 
+                                        item.id === p.id ? { ...item, pickup_date: e.target.value } : item
+                                      );
+                                      setSelectedProducts(updated);
+                                    }}
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded p-1 text-[10px] text-white font-bold"
+                                  />
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       ))}

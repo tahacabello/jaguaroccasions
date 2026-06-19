@@ -712,7 +712,7 @@ export async function getSupabaseOrders(): Promise<any[]> {
     const { data, error } = await supabase
       .from('orders')
       .select(`
-        *,
+        id, customer_id, guest_name, guest_phone, guest_backup_phone, guest_city, guest_street, guest_address_detail, customer_notes, status, payment_method, total_amount, tracking_number, deposit, remaining, event_date, pickup_date, return_date, is_preliminary, google_maps_link, created_at,
         order_items(*)
       `)
       .order('created_at', { ascending: false });
@@ -733,7 +733,15 @@ export async function addSupabaseOrder(order: any, items: any[]): Promise<{ succ
       product_image: item.product_image || item.image || "",
       quantity: Number(item.quantity || 1),
       price_at_purchase: Number(item.price_at_purchase || item.price || 0),
-      item_mode: item.item_mode || item.mode || 'sale'
+      item_mode: item.item_mode || item.mode || 'sale',
+      pickup_date: item.pickup_date || null,
+      return_date: item.return_date || null,
+      is_preliminary: item.is_preliminary || false,
+      customization_type: item.customization_type || null,
+      layer_type: item.layer_type || null,
+      color_sash: item.color_sash || null,
+      color_text: item.color_text || null,
+      custom_text: item.custom_text || null
     }));
 
     const { data, error } = await supabase
@@ -1769,7 +1777,7 @@ export async function getSupabaseAllChangeRequests(): Promise<OrderChangeRequest
     // We can also fetch the order details for these requests
     const { data: orders } = await supabase
       .from('orders')
-      .select('*');
+      .select('id, customer_id, guest_name, guest_phone, guest_backup_phone, guest_city, guest_street, guest_address_detail, customer_notes, status, payment_method, total_amount, tracking_number, deposit, remaining, event_date, pickup_date, return_date, is_preliminary, google_maps_link, created_at');
 
     const ordersMap = (orders || []).reduce((acc: any, ord: any) => {
       acc[ord.id] = ord;
@@ -1787,7 +1795,7 @@ export async function getSupabaseAllChangeRequests(): Promise<OrderChangeRequest
     // Try to get mock orders or real orders to attach
     let orders: any[] = [];
     try {
-      const { data } = await supabase.from('orders').select('*');
+      const { data } = await supabase.from('orders').select('id, customer_id, guest_name, guest_phone, guest_backup_phone, guest_city, guest_street, guest_address_detail, customer_notes, status, payment_method, total_amount, tracking_number, deposit, remaining, event_date, pickup_date, return_date, is_preliminary, google_maps_link, created_at');
       orders = data || [];
     } catch {}
 
@@ -2314,9 +2322,17 @@ export async function addReservation(reservation: any, items: any[]): Promise<{ 
     // 2. Insert items
     const itemsPayload = items.map(item => ({
       reservation_id: resId,
-      product_id: item.product_id,
+      product_id: item.product_id || null,
       quantity: Number(item.quantity || 1),
-      price: Number(item.price || 0)
+      price: Number(item.price || item.custom_price || 0),
+      pickup_date: item.pickup_date || null,
+      return_date: item.return_date || null,
+      is_preliminary: item.is_preliminary || false,
+      customization_type: item.customization_type || null,
+      layer_type: item.layer_type || null,
+      color_sash: item.color_sash || null,
+      color_text: item.color_text || null,
+      custom_text: item.custom_text || null
     }));
 
     const { error: itemsErr } = await supabase.from('reservation_items').insert(itemsPayload);
@@ -2426,9 +2442,17 @@ export async function addRental(rental: any, items: any[]): Promise<{ success: b
     // 2. Insert items
     const itemsPayload = items.map(item => ({
       rental_id: rentId,
-      product_id: item.product_id,
+      product_id: item.product_id || null,
       quantity: Number(item.quantity || 1),
-      price: Number(item.price || 0)
+      price: Number(item.price || item.custom_price || 0),
+      pickup_date: item.pickup_date || null,
+      return_date: item.return_date || null,
+      is_preliminary: item.is_preliminary || false,
+      customization_type: item.customization_type || null,
+      layer_type: item.layer_type || null,
+      color_sash: item.color_sash || null,
+      color_text: item.color_text || null,
+      custom_text: item.custom_text || null
     }));
 
     const { error: itemsErr } = await supabase.from('rental_items').insert(itemsPayload);
@@ -2489,19 +2513,63 @@ export async function deleteRental(id: string): Promise<boolean> {
 // =====================================================================
 export async function getOrders(): Promise<any[]> {
   try {
-    const { data, error } = await supabase
+    // 1. Fetch raw orders
+    const { data: orders, error: ordersErr } = await supabase
       .from('orders')
-      .select(`
-        *,
-        customers:customer_id(*),
-        items:order_items(
-          *,
-          products:product_id(*)
-        )
-      `)
+      .select('id, customer_id, guest_name, guest_phone, guest_backup_phone, guest_city, guest_street, guest_address_detail, customer_notes, status, payment_method, total_amount, tracking_number, deposit, remaining, event_date, pickup_date, return_date, is_preliminary, google_maps_link, created_at')
       .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
+    if (ordersErr) throw ordersErr;
+
+    // 2. Fetch raw order_items
+    const { data: orderItems, error: itemsErr } = await supabase
+      .from('order_items')
+      .select('*');
+    if (itemsErr) throw itemsErr;
+
+    // 3. Fetch raw products
+    const { data: products, error: prodsErr } = await supabase
+      .from('products')
+      .select('*');
+    if (prodsErr) throw prodsErr;
+
+    // 4. Fetch raw customers
+    const { data: customers, error: custsErr } = await supabase
+      .from('customers')
+      .select('*');
+    if (custsErr) throw custsErr;
+
+    // Maps for fast lookup
+    const productsMap = (products || []).reduce((acc: any, p: any) => {
+      acc[p.id] = p;
+      return acc;
+    }, {});
+
+    const customersMap = (customers || []).reduce((acc: any, c: any) => {
+      acc[c.id] = c;
+      return acc;
+    }, {});
+
+    // Group order items by order_id
+    const itemsByOrderId: any = {};
+    for (const item of (orderItems || [])) {
+      const orderId = item.order_id;
+      if (!itemsByOrderId[orderId]) {
+        itemsByOrderId[orderId] = [];
+      }
+      itemsByOrderId[orderId].push({
+        ...item,
+        products: item.product_id ? productsMap[item.product_id] : null
+      });
+    }
+
+    // Stitch together orders with their customer and items
+    const enrichedOrders = (orders || []).map((o: any) => ({
+      ...o,
+      customers: o.customer_id ? customersMap[o.customer_id] : null,
+      items: itemsByOrderId[o.id] || []
+    }));
+
+    return enrichedOrders;
   } catch (err) {
     console.error("Failed to fetch orders (sales):", err);
     return [];
@@ -2536,9 +2604,18 @@ export async function addOrder(order: any, items: any[]): Promise<{ success: boo
     // 2. Insert items
     const itemsPayload = items.map(item => ({
       order_id: orderId,
-      product_id: item.product_id,
+      product_id: item.product_id || null,
+      product_name: item.product_name || item.name || "منتج مخصص",
       quantity: Number(item.quantity || 1),
-      price: Number(item.price || 0)
+      price_at_purchase: Number(item.price || item.price_at_purchase || 0),
+      pickup_date: item.pickup_date || null,
+      return_date: item.return_date || null,
+      is_preliminary: item.is_preliminary || false,
+      customization_type: item.customization_type || null,
+      layer_type: item.layer_type || null,
+      color_sash: item.color_sash || null,
+      color_text: item.color_text || null,
+      custom_text: item.custom_text || null
     }));
 
     const { error: itemsErr } = await supabase.from('order_items').insert(itemsPayload);

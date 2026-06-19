@@ -236,10 +236,6 @@ export default function CheckoutPage() {
     }
 
     const hasRentItems = cartItems.some(item => item.mode === "rent");
-    if (hasRentItems && !isPreliminary && (!eventDate || !pickupDate || !returnDate)) {
-      alert("يرجى تحديد تاريخ المناسبة، وتاريخ الاستلام والإرجاع، أو اختيار حجز مبدئي.");
-      return;
-    }
     if (hasRentItems && !agreeToPolicy) {
       alert("يرجى الموافقة على سياسة الإيجار قبل إتمام الطلب");
       return;
@@ -250,6 +246,9 @@ export default function CheckoutPage() {
     try {
       const trackingNumber = `JG-${Math.floor(100000 + Math.random() * 900000)}`;
       
+      const rentalItem = cartItems.find(item => item.mode === "rent");
+      const firstItem = cartItems[0];
+
       // 1. Prepare Order Payload
       const orderPayload = {
         customer_id: customerId,
@@ -264,10 +263,10 @@ export default function CheckoutPage() {
         payment_method: "cash_on_delivery", // Enforced CoD only
         total_amount: finalTotal,
         tracking_number: trackingNumber,
-        event_date: isPreliminary ? null : eventDate,
-        pickup_date: isPreliminary ? null : pickupDate,
-        return_date: isPreliminary ? null : returnDate,
-        is_preliminary: isPreliminary,
+        event_date: rentalItem?.pickup_date || null,
+        pickup_date: rentalItem?.pickup_date || firstItem?.pickup_date || null,
+        return_date: rentalItem?.return_date || null,
+        is_preliminary: rentalItem ? (rentalItem.is_preliminary || false) : (firstItem?.is_preliminary || false),
         google_maps_link: googleMapsLink.trim(),
       };
 
@@ -290,7 +289,15 @@ export default function CheckoutPage() {
           price: item.price,
           image: item.image,
           quantity: item.quantity,
-          mode: item.mode
+          mode: item.mode,
+          customization_type: item.customization_type || null,
+          layer_type: item.layer_type || null,
+          color_sash: item.color_sash || null,
+          color_text: item.color_text || null,
+          custom_text: item.custom_text || null,
+          pickup_date: item.pickup_date || null,
+          return_date: item.return_date || null,
+          is_preliminary: item.is_preliminary || false
         })),
         created_at: new Date().toISOString(),
       };
@@ -318,10 +325,63 @@ export default function CheckoutPage() {
           </h1>
 
           {/* WhatsApp confirmation prompt */}
-          <div className="mb-8 p-4 rounded-2xl bg-primary/10 border border-primary/20 flex items-center gap-3 text-primary-light">
+          <div className="mb-8 p-4 rounded-2xl bg-primary/10 border border-primary/20 flex items-center gap-3 text-primary-light animate-fadeIn">
             <Info className="w-5 h-5 shrink-0" />
             <p className="text-sm font-bold leading-relaxed">
               💡 **ملاحظة هامة:** لتأكيد وإتمام طلبك 100%، يرجى التواصل معنا عبر الواتساب فور الانتهاء من ملء البيانات وتقديم الطلب.
+            </p>
+          </div>
+
+          {/* Visual Pickup Timeline */}
+          <div className="mb-8 p-6 rounded-3xl glass-premium border border-primary/20 space-y-6 animate-fadeIn">
+            <h3 className="text-lg font-black text-primary-light flex items-center gap-2">
+              <span>📅 المخطط الزمني المقدر لاستلام الطلب</span>
+            </h3>
+            
+            <div className="relative border-r-2 border-primary/20 mr-4 pr-6 space-y-8 text-right">
+              {cartItems.map((item) => {
+                return (
+                  <div key={item.cartKey} className="relative">
+                    {/* Circle marker */}
+                    <div className="absolute top-1.5 -right-[31px] w-4 h-4 rounded-full border-2 border-primary bg-background flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary-light animate-ping"></div>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-bold text-foreground">{item.name}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-black ${
+                          item.mode === 'rent' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/25' : 'bg-green-500/10 text-green-400 border border-green-500/25'
+                        }`}>
+                          {item.mode === 'rent' ? 'إيجار' : 'شراء'}
+                        </span>
+                      </div>
+                      
+                      <p className="text-xs text-foreground/75 font-semibold">
+                        📍 موعد الاستلام: {" "}
+                        {item.is_preliminary ? (
+                          <span className="text-primary-light font-bold">أول ما يجهز (خلال 3 - 5 أيام من الطلب)</span>
+                        ) : item.pickup_date ? (
+                          <span className="text-foreground font-black">{formatArabicDate(item.pickup_date)}</span>
+                        ) : (
+                          <span className="text-foreground/50">غير محدد</span>
+                        )}
+                        {item.mode === 'rent' && item.return_date && (
+                          <>
+                            {" | "}
+                            <span>🔄 موعد الإرجاع: </span>
+                            <span className="text-foreground font-black">{formatArabicDate(item.return_date)}</span>
+                          </>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            <p className="text-xs text-foreground/50 pt-2 border-t border-border/40">
+              * يتم إبلاغك تلقائياً عند تجهيز الشيلات المخصصة للاستلام فوراً، بينما يتم حجز الكابات والقبعات لتاريخ استلامها المحدد.
             </p>
           </div>
 
@@ -484,112 +544,6 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
-                {cartItems.some(item => item.mode === "rent") && (
-                  <div className="space-y-6 p-6 rounded-2xl bg-primary/5 border border-primary/20 text-right" dir="rtl">
-                    <h3 className="text-lg font-bold text-primary-light border-b border-primary/10 pb-2 flex items-center gap-2">
-                      <span>🗓️</span>
-                      <span>تفاصيل وجدولة الإيجار</span>
-                    </h3>
-                    
-                    <label className="flex items-center gap-3 p-4 rounded-xl border border-border bg-surface hover:bg-surface-hover cursor-pointer transition-all select-none">
-                      <input
-                        type="checkbox"
-                        checked={isPreliminary}
-                        onChange={(e) => {
-                          setIsPreliminary(e.target.checked);
-                          if (e.target.checked) {
-                            setEventDate("");
-                            setPickupDate("");
-                            setReturnDate("");
-                          }
-                        }}
-                        className="w-5 h-5 rounded border-border text-primary focus:ring-primary accent-primary shrink-0"
-                      />
-                      <span className="text-sm font-bold text-foreground/90">
-                        حجز مبدئي — لم يتم تحديد موعد المناسبة بعد
-                      </span>
-                    </label>
-
-                    {isPreliminary ? (
-                      <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 leading-relaxed font-bold">
-                        ⚠️ **ملاحظة:** سيتم تسجيل هذا الطلب كـ "حجز مبدئي". يجب عليك تأكيد الموعد النهائي للمناسبة لاحقاً عبر الواتساب مع إدارة المعرض.
-                      </div>
-                    ) : (
-                      <div className="space-y-6">
-                        {/* 1. Select Event Date */}
-                        <div className="space-y-2">
-                          <label className="block text-sm font-bold text-foreground/80">تاريخ المناسبة / التخرج *</label>
-                          <input
-                            type="date"
-                            required={!isPreliminary}
-                            value={eventDate}
-                            onChange={(e) => setEventDate(e.target.value)}
-                            className="w-full px-4 py-3 rounded-xl border border-border bg-surface hover:border-primary-light/35 focus:border-primary focus:outline-none transition-colors font-semibold"
-                          />
-                        </div>
-
-                        {/* 2. Choose Return Option */}
-                        {eventDate && (
-                          <div className="space-y-3">
-                            <label className="block text-sm font-bold text-foreground/80">خيار وتاريخ الإرجاع المفضل *</label>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <button
-                                type="button"
-                                onClick={() => setReturnOption("same_day")}
-                                className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all text-center gap-1 ${
-                                  returnOption === "same_day"
-                                    ? "border-primary bg-primary/10 text-primary-light font-black"
-                                    : "border-border bg-surface hover:bg-surface-hover text-foreground/80 font-bold"
-                                }`}
-                              >
-                                <span className="text-sm">الإرجاع في نفس يوم المناسبة</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => setReturnOption("next_day")}
-                                className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all text-center gap-1 ${
-                                  returnOption === "next_day"
-                                    ? "border-primary bg-primary/10 text-primary-light font-black"
-                                    : "border-border bg-surface hover:bg-surface-hover text-foreground/80 font-bold"
-                                }`}
-                              >
-                                <span className="text-sm">الإرجاع في اليوم التالي للمناسبة</span>
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 3. Automatic Dates Summary (No Confusing Inputs!) */}
-                        {eventDate && pickupDate && returnDate && (
-                          <div className="space-y-3 p-5 rounded-2xl bg-surface border border-border/80 text-right mt-4" dir="rtl">
-                            <div className="flex justify-between items-center border-b border-border/40 pb-2 mb-2">
-                              <span className="text-xs font-black text-primary-light">جدول مواعيد الحجز المعتمدة:</span>
-                            </div>
-                            <div className="space-y-3 text-xs md:text-sm font-semibold">
-                              <div className="flex justify-between items-center gap-4">
-                                <span className="text-foreground/60">🎓 تاريخ المناسبة / التخرج:</span>
-                                <span className="text-primary font-black">{formatArabicDate(eventDate)}</span>
-                              </div>
-                              <div className="flex justify-between items-center gap-4">
-                                <span className="text-foreground/60">🚚 تاريخ الاستلام:</span>
-                                <span className="text-foreground/90 font-bold">{formatArabicDate(pickupDate)}</span>
-                              </div>
-                              <div className="flex justify-between items-center gap-4">
-                                <span className="text-foreground/60">🔄 تاريخ الإرجاع:</span>
-                                <span className="text-foreground/90 font-bold">{formatArabicDate(returnDate)}</span>
-                              </div>
-                            </div>
-                            <p className="text-[10px] text-foreground/50 border-t border-border/20 pt-2 mt-2 leading-relaxed">
-                              * قمنا بحساب تاريخ الاستلام (قبل المناسبة بيوم، باستثناء أيام الجمعة حيث تم تعديلها للخميس تلقائياً لتجنب العطلة الرسمية). الإرجاع محسوب طبقاً لخيارك المفضل.
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 {cartItems.some(item => item.mode === "rent") && settings.rental_policy && (
                   <div className="space-y-4">
                     <div className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-right space-y-3 shadow-lg">
@@ -664,7 +618,7 @@ export default function CheckoutPage() {
                 {/* Items list */}
                 <div className="max-h-[300px] overflow-y-auto space-y-4 pr-1">
                   {cartItems.map((item) => (
-                    <div key={`${item.id}-${item.mode}`} className="flex gap-4 items-center">
+                    <div key={item.cartKey} className="flex gap-4 items-start border-b border-border/10 pb-3 last:border-0 last:pb-0">
                       <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-surface border border-border shrink-0">
                         <Image
                           src={item.image}
@@ -675,12 +629,34 @@ export default function CheckoutPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="font-bold text-sm text-foreground truncate">{item.name}</h4>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary-light font-medium">
+                        
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary-light font-bold">
                             {item.mode === "rent" ? "إيجار" : "شراء"}
                           </span>
-                          <span className="text-xs text-foreground/60">العدد: {item.quantity}</span>
+                          {item.layer_type && item.layer_type !== "none" && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-hover border border-border text-foreground/75 font-semibold">
+                              {item.layer_type === "double" ? "ثنائي" : "ثلاثي"}
+                            </span>
+                          )}
+                          {item.customization_type && item.customization_type !== "none" && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-hover border border-border text-foreground/75 font-semibold">
+                              {item.customization_type === "embroidery" ? "تطريز" : "طباعة"}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-foreground/60 mr-auto">العدد: {item.quantity}</span>
                         </div>
+
+                        {item.custom_text && item.custom_text !== "none" && (
+                          <p className="text-xs text-foreground/70 mt-1 font-bold">
+                            الاسم: <span className="text-primary">{item.custom_text}</span>
+                          </p>
+                        )}
+                        {(item.pickup_date || item.is_preliminary) && (
+                          <p className="text-[10px] text-foreground/60 mt-0.5">
+                            🗓️ استلام: {item.is_preliminary ? "أول ما يجهز" : item.pickup_date}
+                          </p>
+                        )}
                       </div>
                       <span className="font-black text-sm text-primary-light shrink-0">
                         {item.price * item.quantity} د.ل

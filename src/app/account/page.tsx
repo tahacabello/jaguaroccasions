@@ -282,7 +282,7 @@ export default function AccountPage() {
         if (user) {
           const { data: dbOrders, error } = await supabase
             .from("orders")
-            .select("*, order_items(*)")
+            .select("id, customer_id, guest_name, guest_phone, guest_backup_phone, guest_city, guest_street, guest_address_detail, customer_notes, status, payment_method, total_amount, tracking_number, deposit, remaining, event_date, pickup_date, return_date, is_preliminary, google_maps_link, created_at, order_items(*)")
             .eq("customer_id", user.id)
             .order("created_at", { ascending: false });
 
@@ -327,7 +327,7 @@ export default function AccountPage() {
       // Fetch Customer Orders
       const { data: dbOrders, error } = await supabase
         .from("orders")
-        .select("*, order_items(*)")
+        .select("id, customer_id, guest_name, guest_phone, guest_backup_phone, guest_city, guest_street, guest_address_detail, customer_notes, status, payment_method, total_amount, tracking_number, deposit, remaining, event_date, pickup_date, return_date, is_preliminary, google_maps_link, created_at, order_items(*)")
         .eq("customer_id", user.id)
         .order("created_at", { ascending: false });
 

@@ -127,6 +127,21 @@ export default function ProductDetailClient() {
   const [subcategories, setSubcategories] = useState<any[]>([]);
   const { addToCart } = useCart();
 
+  // Sash Customization states
+  const [layerType, setLayerType] = useState<"double" | "triple">("double");
+  const [customizationType, setCustomizationType] = useState<"embroidery" | "print">("embroidery");
+  const [sashColor, setSashColor] = useState<string>("أسود");
+  const [customSashColor, setCustomSashColor] = useState<string>("");
+  const [textColor, setTextColor] = useState<string>("ذهبي");
+  const [customText, setCustomText] = useState<string>("");
+
+  // Scheduling states
+  const [pickupDate, setPickupDate] = useState<string>("");
+  const [returnDate, setReturnDate] = useState<string>("");
+  const [isPreliminary, setIsPreliminary] = useState<boolean>(true); // default to true (first ready) for sale
+
+  const [validationError, setValidationError] = useState<string>("");
+
   useEffect(() => {
     getSupabaseSettings().then(setSettings).catch(err => console.error("Error fetching settings in PD:", err));
     getSupabaseCategories().then(setCategories).catch(err => console.error("Error fetching categories in PD:", err));
@@ -230,17 +245,63 @@ export default function ProductDetailClient() {
     };
   }, [productId]);
 
-  const currentPrice = product ? (mode === "sale" ? product.priceSale : product.priceRent) : 0;
+  const isSash = product ? (
+    product.categoryId === "sashes" || 
+    (product.category && product.category.includes("شال")) || 
+    (product.name && product.name.includes("شال"))
+  ) : false;
+
+  const currentBasePrice = product ? (mode === "sale" ? product.priceSale : product.priceRent) : 0;
+  
+  let extraPrice = 0;
+  if (isSash) {
+    if (layerType === "triple") {
+      extraPrice += 15;
+    }
+    if (sashColor !== "أسود") {
+      extraPrice += 10;
+    }
+  }
+  const finalPrice = currentBasePrice + extraPrice;
 
   const handleAddToCart = () => {
     if (!product) return;
+    
+    setValidationError("");
+
+    // Validate custom text if customization is active
+    if (isSash && !customText.trim()) {
+      setValidationError("الرجاء إدخال الاسم المطلوب كتابته على الشال.");
+      return;
+    }
+    
+    // Validate pickup date if not preliminary
+    if (!isPreliminary && mode === "sale" && !pickupDate) {
+      setValidationError("الرجاء تحديد تاريخ الاستلام المفضل.");
+      return;
+    }
+    if (mode === "rent" && (!pickupDate || !returnDate)) {
+      setValidationError("الرجاء تحديد تواريخ الاستلام والإرجاع للإيجار.");
+      return;
+    }
+
     addToCart(
       {
         id: productId,
-        name: product.name,
-        price: currentPrice,
+        name: isSash 
+          ? `${product.name} (${layerType === "double" ? "ثنائي" : "ثلاثي"} - ${customizationType === "embroidery" ? "تطريز" : "طباعة"})`
+          : product.name,
+        price: finalPrice,
         image: product.image,
         mode: mode,
+        customization_type: isSash ? customizationType : undefined,
+        layer_type: isSash ? layerType : undefined,
+        color_sash: isSash ? (sashColor === "أخرى" ? customSashColor : sashColor) : undefined,
+        color_text: isSash ? textColor : undefined,
+        custom_text: isSash ? customText : undefined,
+        pickup_date: mode === "rent" ? pickupDate : (isPreliminary ? undefined : pickupDate),
+        return_date: mode === "rent" ? returnDate : undefined,
+        is_preliminary: mode === "sale" ? isPreliminary : false,
       },
       quantity
     );
@@ -427,7 +488,7 @@ export default function ProductDetailClient() {
                     if (mode === "sale") {
                       return isSaleAvailable ? (
                         <div className="text-4xl font-black text-primary-light">
-                          {product.priceSale} <span className="text-xl font-normal">د.ل</span>
+                          {finalPrice} <span className="text-xl font-normal">د.ل</span>
                         </div>
                       ) : (
                         <div className="text-4xl font-black text-red-500">غير متوفر للبيع</div>
@@ -435,7 +496,7 @@ export default function ProductDetailClient() {
                     } else {
                       return isRentAvailable ? (
                         <div className="text-4xl font-black text-primary-light">
-                          {product.priceRent} <span className="text-xl font-normal">د.ل</span>
+                          {finalPrice} <span className="text-xl font-normal">د.ل</span>
                         </div>
                       ) : (
                         <div className="text-4xl font-black text-red-500">غير متوفر للإيجار</div>
@@ -559,6 +620,194 @@ export default function ProductDetailClient() {
                 )}
               </div>
 
+              {/* Sash Customizations (if applicable) */}
+              {isSash && (
+                <div className="mb-8 p-6 rounded-2xl glass-premium border border-primary/20 space-y-6 animate-fadeIn">
+                  <div className="flex items-center gap-2 text-primary font-bold text-lg border-b border-border pb-3">
+                    <span>🎨 خيارات تخصيص الشال</span>
+                  </div>
+                  
+                  {/* Layer Type */}
+                  <div>
+                    <label className="text-sm font-bold text-foreground/80 mb-2 block">نوع الشال (عدد الطبقات):</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => setLayerType("double")}
+                        className={`p-3 rounded-xl border text-sm font-bold transition-all ${
+                          layerType === "double"
+                            ? "border-primary bg-primary/10 text-primary-light"
+                            : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
+                        }`}
+                      >
+                        ثنائي الطبقات
+                        <span className="text-xs opacity-75 block mt-0.5">(السعر الأساسي)</span>
+                      </button>
+                      <button
+                        onClick={() => setLayerType("triple")}
+                        className={`p-3 rounded-xl border text-sm font-bold transition-all ${
+                          layerType === "triple"
+                            ? "border-primary bg-primary/10 text-primary-light"
+                            : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
+                        }`}
+                      >
+                        ثلاثي الطبقات
+                        <span className="text-xs text-primary-light/90 block mt-0.5">(+15 د.ل)</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Customization Type */}
+                  <div>
+                    <label className="text-sm font-bold text-foreground/80 mb-2 block">طريقة الكتابة:</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => setCustomizationType("embroidery")}
+                        className={`p-3 rounded-xl border text-sm font-bold transition-all ${
+                          customizationType === "embroidery"
+                            ? "border-primary bg-primary/10 text-primary-light"
+                            : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
+                        }`}
+                      >
+                        🪡 تطريز بخيوط حريرية
+                      </button>
+                      <button
+                        onClick={() => setCustomizationType("print")}
+                        className={`p-3 rounded-xl border text-sm font-bold transition-all ${
+                          customizationType === "print"
+                            ? "border-primary bg-primary/10 text-primary-light"
+                            : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
+                        }`}
+                      >
+                        🖨️ طباعة حرارية
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Sash Color */}
+                  <div>
+                    <label className="text-sm font-bold text-foreground/80 mb-2 block">لون قماش الشال:</label>
+                    <div className="grid grid-cols-3 gap-3 mb-3">
+                      {["أسود", "أبيض", "أخرى"].map((col) => (
+                        <button
+                          key={col}
+                          onClick={() => setSashColor(col)}
+                          className={`p-2.5 rounded-xl border text-sm font-bold transition-all ${
+                            sashColor === col
+                              ? "border-primary bg-primary/10 text-primary-light"
+                              : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
+                          }`}
+                        >
+                          {col === "أخرى" ? "لون آخر مخصص" : col}
+                          {col !== "أسود" && col !== "أخرى" && <span className="text-[10px] text-primary-light block mt-0.5">(+10 د.ل)</span>}
+                          {col === "أخرى" && <span className="text-[10px] text-primary-light block mt-0.5">(+10 د.ل)</span>}
+                        </button>
+                      ))}
+                    </div>
+                    {sashColor === "أخرى" && (
+                      <input
+                        type="text"
+                        value={customSashColor}
+                        onChange={(e) => setCustomSashColor(e.target.value)}
+                        placeholder="أدخل اللون المفضل (مثال: كحلي، عنابي، زيتي)..."
+                        className="w-full p-3 rounded-xl border border-border bg-surface/50 text-foreground font-bold focus:border-primary focus:outline-none"
+                      />
+                    )}
+                  </div>
+
+                  {/* Text/Thread Color */}
+                  <div>
+                    <label className="text-sm font-bold text-foreground/80 mb-2 block">لون الكتابة/التطريز:</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {["ذهبي", "فضي", "أبيض", "أسود"].map((col) => (
+                        <button
+                          key={col}
+                          onClick={() => setTextColor(col)}
+                          className={`p-2 rounded-xl border text-xs font-bold transition-all ${
+                            textColor === col
+                              ? "border-primary bg-primary/10 text-primary-light"
+                              : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
+                          }`}
+                        >
+                          {col}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Custom Name / Text */}
+                  <div>
+                    <label className="text-sm font-bold text-foreground/80 mb-2 block">الاسم المراد تطريزه/طباعته:</label>
+                    <input
+                      type="text"
+                      value={customText}
+                      onChange={(e) => setCustomText(e.target.value)}
+                      placeholder="أدخل الاسم بالتفصيل (مثال: محمد السنوسي)..."
+                      className="w-full p-3.5 rounded-xl border border-border bg-surface/50 text-foreground font-bold focus:border-primary focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Scheduling Panel */}
+              <div className="mb-8 p-6 rounded-2xl glass border border-border space-y-6 animate-fadeIn">
+                <div className="flex items-center gap-2 text-primary font-bold text-lg border-b border-border pb-3">
+                  <span>🗓️ جدولة وتاريخ الاستلام</span>
+                </div>
+
+                {mode === "sale" ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-surface/50 border border-border">
+                      <div>
+                        <span className="text-sm font-bold text-foreground block">الاستلام أول ما يجهز</span>
+                        <span className="text-xs text-foreground/60">يتيح لك استلام القطعة فور انتهاء حياكتها وتجهيزها</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={isPreliminary}
+                        onChange={(e) => {
+                          setIsPreliminary(e.target.checked);
+                          if (e.target.checked) setPickupDate("");
+                        }}
+                        className="w-5 h-5 accent-primary cursor-pointer"
+                      />
+                    </div>
+
+                    {!isPreliminary && (
+                      <div className="animate-fadeIn">
+                        <label className="text-sm font-bold text-foreground/80 mb-2 block">تحديد تاريخ الاستلام:</label>
+                        <input
+                          type="date"
+                          value={pickupDate}
+                          onChange={(e) => setPickupDate(e.target.value)}
+                          className="w-full p-3.5 rounded-xl border border-border bg-surface/50 text-foreground font-bold focus:border-primary focus:outline-none"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-bold text-foreground/80 mb-2 block">تاريخ الاستلام:</label>
+                      <input
+                        type="date"
+                        value={pickupDate}
+                        onChange={(e) => setPickupDate(e.target.value)}
+                        className="w-full p-3.5 rounded-xl border border-border bg-surface/50 text-foreground font-bold focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-bold text-foreground/80 mb-2 block">تاريخ الإرجاع:</label>
+                      <input
+                        type="date"
+                        value={returnDate}
+                        onChange={(e) => setReturnDate(e.target.value)}
+                        className="w-full p-3.5 rounded-xl border border-border bg-surface/50 text-foreground font-bold focus:border-primary focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Quantity Selector */}
               <div className="mb-8">
                 <h3 className="text-sm font-bold text-foreground/60 mb-3">الكمية:</h3>
@@ -578,6 +827,14 @@ export default function ProductDetailClient() {
                   </button>
                 </div>
               </div>
+
+              {/* Validation Error */}
+              {validationError && (
+                <div className="mb-4 p-3.5 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl text-sm font-bold text-right flex items-center gap-2 animate-shake animate-fadeIn">
+                  <span className="w-2 h-2 rounded-full bg-red-400 shrink-0"></span>
+                  <span>{validationError}</span>
+                </div>
+              )}
 
               {/* Actions */}
               <div className="flex flex-col sm:flex-row gap-4 mb-12">
