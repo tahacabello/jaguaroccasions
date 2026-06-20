@@ -353,7 +353,7 @@ export default function AdminDashboard() {
   const [prodCategoryId, setProdCategoryId] = useState("");
   const [prodSubcategoryId, setProdSubcategoryId] = useState("");
   const [prodCode, setProdCode] = useState("");
-  const [prodStock, setProdStock] = useState(10);
+  const [prodStock, setProdStock] = useState<number | "">(10);
   const [prodStatus, setProdStatus] = useState("available");
   const [prodIsFeatured, setProdIsFeatured] = useState(false);
   const [prodIsHidden, setProdIsHidden] = useState(false);
@@ -1474,7 +1474,7 @@ ${orderSum}
       alert("القسم الرئيسي مطلوب");
       return;
     }
-    if (prodStock < 0) {
+    if (prodStock !== "" && prodStock < 0 && prodStock !== -1) {
       alert("كمية المخزن غير صالحة");
       return;
     }
@@ -1515,7 +1515,7 @@ ${orderSum}
       categoryId: prodCategoryId,
       subcategoryId: prodSubcategoryId || null,
       code: prodCode.trim(),
-      stockQuantity: prodStock,
+      stockQuantity: prodStock === "" ? 0 : prodStock,
       status: prodStatus,
       isFeatured: prodIsFeatured,
       isHidden: prodIsHidden,
@@ -1561,7 +1561,7 @@ ${orderSum}
       alert("القسم الرئيسي مطلوب");
       return;
     }
-    if (editingProduct.stockQuantity < 0) {
+    if (editingProduct.stockQuantity < 0 && editingProduct.stockQuantity !== -1) {
       alert("كمية المخزن غير صالحة");
       return;
     }
@@ -1600,7 +1600,7 @@ ${orderSum}
       categoryId: editingProduct.categoryId,
       subcategoryId: editingProduct.subcategoryId || null,
       code: editingProduct.code.trim(),
-      stockQuantity: editingProduct.stockQuantity,
+      stockQuantity: editingProduct.stockQuantity === "" ? 0 : editingProduct.stockQuantity,
       status: editingProduct.status,
       isFeatured: editingProduct.isFeatured,
       isHidden: editingProduct.isHidden,
@@ -2443,11 +2443,23 @@ ${orderSum}
                             </div>
 
                             <div className="flex justify-between items-center border-t border-border/40 pt-4">
-                              <div className="text-right">
-                                <span className="text-[10px] text-foreground/40 block font-bold">سعر البيع / الإيجار</span>
-                                <span className="text-primary-light font-black text-sm">{prod.priceSale} د.ل</span>
-                                <span className="text-foreground/40 mx-1">/</span>
-                                <span className="text-foreground/60 font-semibold text-xs">{prod.priceRent} د.ل</span>
+                              <div className="flex gap-4">
+                                <div className="text-right">
+                                  <span className="text-[10px] text-foreground/40 block font-bold">سعر البيع / الإيجار</span>
+                                  <span className="text-primary-light font-black text-sm">{prod.priceSale} د.ل</span>
+                                  <span className="text-foreground/40 mx-1">/</span>
+                                  <span className="text-foreground/60 font-semibold text-xs">{prod.priceRent} د.ل</span>
+                                </div>
+                                <div className="text-right border-r border-border/40 pr-4">
+                                  <span className="text-[10px] text-foreground/40 block font-bold">الكمية المتوفرة</span>
+                                  <span className="text-xs font-bold text-foreground/90 block mt-0.5">
+                                    {prod.stockQuantity === -1 ? (
+                                      <span className="text-amber-500 font-bold">غير محدودة</span>
+                                    ) : (
+                                      `${prod.stockQuantity} قطعة`
+                                    )}
+                                  </span>
+                                </div>
                               </div>
 
                               <div className="flex gap-1.5 items-center">
@@ -4457,8 +4469,8 @@ ${orderSum}
 
           {/* 6. ADD PRODUCT MODAL */}
           {showAddProdModal && (
-            <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
-              <div className="bg-background border border-border w-full max-w-3xl rounded-3xl p-8 relative space-y-6 text-right">
+            <div className="fixed inset-0 bg-black/80 flex items-start justify-center p-4 md:p-8 z-50 overflow-y-auto">
+              <div className="bg-background border border-border w-full max-w-3xl rounded-3xl p-8 my-8 relative space-y-6 text-right">
                 <button
                   onClick={() => setShowAddProdModal(false)}
                   className="absolute top-6 left-6 p-2 hover:bg-surface rounded-lg border border-border"
@@ -4498,11 +4510,31 @@ ${orderSum}
                       <label className="block text-xs font-bold text-foreground/60">الكمية في المخزن (Stock) *</label>
                       <input
                         type="number"
-                        required
-                        value={prodStock}
-                        onChange={(e) => setProdStock(Number(e.target.value))}
-                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm font-bold"
+                        required={prodStock !== -1}
+                        disabled={prodStock === -1}
+                        value={prodStock === -1 ? "" : prodStock}
+                        onChange={(e) => setProdStock(e.target.value === "" ? "" : Number(e.target.value))}
+                        placeholder={prodStock === -1 ? "غير معروفة / غير محدودة" : "مثال: 10"}
+                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm font-bold disabled:opacity-50 disabled:bg-surface/50"
                       />
+                      <div className="flex items-center gap-2 mt-1 justify-start">
+                        <input
+                          type="checkbox"
+                          id="prodStockUnknown"
+                          checked={prodStock === -1}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setProdStock(-1);
+                            } else {
+                              setProdStock(10);
+                            }
+                          }}
+                          className="rounded border-border text-primary focus:ring-primary cursor-pointer w-4 h-4"
+                        />
+                        <label htmlFor="prodStockUnknown" className="text-[11px] font-bold text-foreground/75 cursor-pointer select-none">
+                          الكمية غير معروفة (غير محدودة)
+                        </label>
+                      </div>
                     </div>
                   </div>
 
@@ -4752,8 +4784,8 @@ ${orderSum}
 
           {/* 7. EDIT PRODUCT MODAL */}
           {editingProduct && (
-            <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
-              <div className="bg-background border border-border w-full max-w-3xl rounded-3xl p-8 relative space-y-6 text-right">
+            <div className="fixed inset-0 bg-black/80 flex items-start justify-center p-4 md:p-8 z-50 overflow-y-auto">
+              <div className="bg-background border border-border w-full max-w-3xl rounded-3xl p-8 my-8 relative space-y-6 text-right">
                 <button
                   onClick={() => setEditingProduct(null)}
                   className="absolute top-6 left-6 p-2 hover:bg-surface rounded-lg border border-border"
@@ -4791,11 +4823,30 @@ ${orderSum}
                       <label className="block text-xs font-bold text-foreground/60">الكمية (Stock) *</label>
                       <input
                         type="number"
-                        required
-                        value={editingProduct.stockQuantity}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, stockQuantity: Number(e.target.value) })}
-                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm font-bold"
+                        required={editingProduct.stockQuantity !== -1}
+                        disabled={editingProduct.stockQuantity === -1}
+                        value={editingProduct.stockQuantity === -1 ? "" : editingProduct.stockQuantity}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, stockQuantity: e.target.value === "" ? "" : Number(e.target.value) })}
+                        placeholder={editingProduct.stockQuantity === -1 ? "غير معروفة / غير محدودة" : "مثال: 10"}
+                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-sm font-bold disabled:opacity-50 disabled:bg-surface/50"
                       />
+                      <div className="flex items-center gap-2 mt-1 justify-start">
+                        <input
+                          type="checkbox"
+                          id="editProdStockUnknown"
+                          checked={editingProduct.stockQuantity === -1}
+                          onChange={(e) => {
+                            setEditingProduct({
+                              ...editingProduct,
+                              stockQuantity: e.target.checked ? -1 : 10
+                            });
+                          }}
+                          className="rounded border-border text-primary focus:ring-primary cursor-pointer w-4 h-4"
+                        />
+                        <label htmlFor="editProdStockUnknown" className="text-[11px] font-bold text-foreground/75 cursor-pointer select-none">
+                          الكمية غير معروفة (غير محدودة)
+                        </label>
+                      </div>
                     </div>
                   </div>
 
