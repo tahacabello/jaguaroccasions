@@ -250,7 +250,20 @@ export default function ProductDetailClient() {
     (product.name && product.name.includes("شال"))
   ) : false;
 
-  const finalPrice = product ? (mode === "sale" ? product.priceSale : product.priceRent) : 0;
+  const currentBasePrice = product ? (mode === "sale" ? product.priceSale : product.priceRent) : 0;
+  
+  const bordersAvailable = settings.sash_borders_available !== "false";
+
+  let extraPrice = 0;
+  if (isSash) {
+    if (sashColor !== "أسود") {
+      extraPrice += 10;
+    }
+    if (isEdged && bordersAvailable) {
+      extraPrice += 20;
+    }
+  }
+  const finalPrice = currentBasePrice + extraPrice;
 
   const getWhatsAppCustomizationLink = () => {
     const rawNumber = settings.whatsapp_number || "218921544663";
@@ -260,6 +273,8 @@ export default function ProductDetailClient() {
     const sashLayers = (nameLower.includes("ثلاثي") || nameLower.includes("ثلاثية")) ? "ثلاثي الطبقات" : "ثنائي الطبقات";
     const writeMethod = nameLower.includes("تطريز") ? "تطريز" : (nameLower.includes("طباعة") ? "طباعة" : "تطريز/طباعة");
     
+    const pColor = sashColor === "أخرى" ? (customSashColor || "_________") : sashColor;
+    
     let message = `مرحباً، أود تفصيل شال تخرج:\n`;
     message += `- الموديل: ${product?.name || ""}\n`;
     message += `- عدد الطبقات: ${sashLayers}\n`;
@@ -267,9 +282,9 @@ export default function ProductDetailClient() {
     message += `📋 تفاصيل الطلب:\n`;
     message += `* الاسم (الجهة الأولى): _________\n`;
     message += `* الجهة الأخرى: _________\n`;
-    message += `* لون قماش الشال: _________\n`;
+    message += `* لون قماش الشال: ${pColor}\n`;
     message += `* لون ال${writeMethod}: _________\n`;
-    message += `* الحواف (الكنار): _________ (مثال: مع حواف أو بدون حواف)\n`;
+    message += `* الحواف (الكنار): ${bordersAvailable ? (isEdged ? "مع حواف" : "بدون حواف") : "غير متوفرة حالياً"}\n`;
     message += `* تفاصيل أو ملاحظات أخرى: _________\n`;
     
     return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`;
@@ -290,19 +305,21 @@ export default function ProductDetailClient() {
       return;
     }
 
+    const cartItemName = isSash && isEdged && bordersAvailable ? `${product.name} (مع حواف)` : product.name;
+
     addToCart(
       {
         id: productId,
-        name: product.name,
+        name: cartItemName,
         price: finalPrice,
         image: product.image,
         mode: mode,
         customization_type: undefined,
         layer_type: undefined,
-        color_sash: undefined,
+        color_sash: isSash ? (sashColor === "أخرى" ? customSashColor : sashColor) : undefined,
         color_text: undefined,
         custom_text: undefined,
-        is_edged: undefined,
+        is_edged: isSash ? (isEdged && bordersAvailable) : undefined,
         pickup_date: mode === "rent" ? pickupDate : (isPreliminary ? undefined : pickupDate),
         return_date: mode === "rent" ? returnDate : undefined,
         is_preliminary: mode === "sale" ? isPreliminary : false,
@@ -626,14 +643,75 @@ export default function ProductDetailClient() {
 
               {/* Sash Customizations (if applicable) */}
               {isSash && (
-                <div className="mb-8 p-6 rounded-2xl glass-premium border border-primary/20 space-y-4 animate-fadeIn">
+                <div className="mb-8 p-6 rounded-2xl glass-premium border border-primary/20 space-y-6 animate-fadeIn">
                   <div className="flex items-center gap-2 text-primary font-bold text-lg border-b border-border pb-3">
-                    <span>🎨 تنسيق وتفصيل الشال</span>
+                    <span>🎨 خيارات وتنسيق الشال</span>
                   </div>
 
-                  <p className="text-xs text-foreground/80 leading-relaxed">
-                    لتحديد الاسم، لون القماش، لون التطريز/الطباعة، الحواف، وكافة تفاصيل الشال المفضلة لديك، يرجى الضغط على الزر أدناه للتواصل والتنسيق مباشرة معنا عبر الواتساب:
-                  </p>
+                  {/* Sash Color */}
+                  <div>
+                    <label className="text-sm font-bold text-foreground/80 mb-2 block">لون قماش الشال:</label>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      {["أسود", "أخرى"].map((col) => (
+                        <button
+                          key={col}
+                          onClick={() => setSashColor(col)}
+                          className={`p-2.5 rounded-xl border text-sm font-bold transition-all ${
+                            sashColor === col
+                              ? "border-primary bg-primary/10 text-primary-light"
+                              : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
+                          }`}
+                        >
+                          {col === "أخرى" ? "لون آخر مخصص" : "أسود (اللون الأساسي)"}
+                          {col === "أخرى" && <span className="text-[10px] text-primary-light block mt-0.5">(+10 د.ل)</span>}
+                        </button>
+                      ))}
+                    </div>
+                    {sashColor === "أخرى" && (
+                      <input
+                        type="text"
+                        value={customSashColor}
+                        onChange={(e) => setCustomSashColor(e.target.value)}
+                        placeholder="أدخل اللون المفضل (مثال: كحلي، عنابي، زيتي)..."
+                        className="w-full p-3 rounded-xl border border-border bg-surface/50 text-foreground font-bold focus:border-primary focus:outline-none"
+                      />
+                    )}
+                  </div>
+
+                  {/* Sash Edging/Borders */}
+                  <div>
+                    <label className="text-sm font-bold text-foreground/80 mb-2 block">حواف الشال (الكنار):</label>
+                    {!bordersAvailable ? (
+                      <div className="p-3 bg-red-950/20 border border-red-500/20 text-red-400 font-bold rounded-xl text-xs text-center">
+                        ⚠️ خيار حواف الشال غير متوفر حالياً
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          onClick={() => setIsEdged(false)}
+                          className={`p-3 rounded-xl border text-sm font-bold transition-all ${
+                            !isEdged
+                              ? "border-primary bg-primary/10 text-primary-light"
+                              : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
+                          }`}
+                        >
+                          بدون حواف
+                          <span className="text-xs opacity-75 block mt-0.5">(السعر الأساسي)</span>
+                        </button>
+                        <button
+                          onClick={() => setIsEdged(true)}
+                          className={`p-3 rounded-xl border text-sm font-bold transition-all ${
+                            isEdged
+                              ? "border-primary bg-primary/10 text-primary-light"
+                              : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
+                          }`}
+                        >
+                          إضافة حواف
+                          <span className="text-xs text-primary-light/90 block mt-0.5">(+20 د.ل)</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
                   {/* WhatsApp Customization Coordinator Button */}
                   <a
