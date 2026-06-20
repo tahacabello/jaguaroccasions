@@ -128,8 +128,6 @@ export default function ProductDetailClient() {
   const { addToCart } = useCart();
 
   // Sash Customization states
-  const [layerType, setLayerType] = useState<"double" | "triple">("double");
-  const [customizationType, setCustomizationType] = useState<"embroidery" | "print">("embroidery");
   const [sashColor, setSashColor] = useState<string>("أسود");
   const [customSashColor, setCustomSashColor] = useState<string>("");
   const [textColor, setTextColor] = useState<string>("ذهبي");
@@ -255,9 +253,6 @@ export default function ProductDetailClient() {
   
   let extraPrice = 0;
   if (isSash) {
-    if (layerType === "triple") {
-      extraPrice += 15;
-    }
     if (sashColor !== "أسود") {
       extraPrice += 10;
     }
@@ -285,17 +280,30 @@ export default function ProductDetailClient() {
       return;
     }
 
+    const nameLower = ((product.name || "") + " " + (product.category || "")).toLowerCase();
+    let inferredLayerType: "double" | "triple" | undefined = undefined;
+    if (nameLower.includes("ثلاثي") || nameLower.includes("ثلاثية")) {
+      inferredLayerType = "triple";
+    } else if (nameLower.includes("ثنائي") || nameLower.includes("ثنائية")) {
+      inferredLayerType = "double";
+    }
+
+    let inferredCustomizationType: "embroidery" | "print" | undefined = undefined;
+    if (nameLower.includes("تطريز")) {
+      inferredCustomizationType = "embroidery";
+    } else if (nameLower.includes("طباعة")) {
+      inferredCustomizationType = "print";
+    }
+
     addToCart(
       {
         id: productId,
-        name: isSash 
-          ? `${product.name} (${layerType === "double" ? "ثنائي" : "ثلاثي"} - ${customizationType === "embroidery" ? "تطريز" : "طباعة"})`
-          : product.name,
+        name: product.name,
         price: finalPrice,
         image: product.image,
         mode: mode,
-        customization_type: isSash ? customizationType : undefined,
-        layer_type: isSash ? layerType : undefined,
+        customization_type: isSash ? inferredCustomizationType : undefined,
+        layer_type: isSash ? inferredLayerType : undefined,
         color_sash: isSash ? (sashColor === "أخرى" ? customSashColor : sashColor) : undefined,
         color_text: isSash ? textColor : undefined,
         custom_text: isSash ? customText : undefined,
@@ -625,62 +633,6 @@ export default function ProductDetailClient() {
                 <div className="mb-8 p-6 rounded-2xl glass-premium border border-primary/20 space-y-6 animate-fadeIn">
                   <div className="flex items-center gap-2 text-primary font-bold text-lg border-b border-border pb-3">
                     <span>🎨 خيارات تخصيص الشال</span>
-                  </div>
-                  
-                  {/* Layer Type */}
-                  <div>
-                    <label className="text-sm font-bold text-foreground/80 mb-2 block">نوع الشال (عدد الطبقات):</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        onClick={() => setLayerType("double")}
-                        className={`p-3 rounded-xl border text-sm font-bold transition-all ${
-                          layerType === "double"
-                            ? "border-primary bg-primary/10 text-primary-light"
-                            : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
-                        }`}
-                      >
-                        ثنائي الطبقات
-                        <span className="text-xs opacity-75 block mt-0.5">(السعر الأساسي)</span>
-                      </button>
-                      <button
-                        onClick={() => setLayerType("triple")}
-                        className={`p-3 rounded-xl border text-sm font-bold transition-all ${
-                          layerType === "triple"
-                            ? "border-primary bg-primary/10 text-primary-light"
-                            : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
-                        }`}
-                      >
-                        ثلاثي الطبقات
-                        <span className="text-xs text-primary-light/90 block mt-0.5">(+15 د.ل)</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Customization Type */}
-                  <div>
-                    <label className="text-sm font-bold text-foreground/80 mb-2 block">طريقة الكتابة:</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        onClick={() => setCustomizationType("embroidery")}
-                        className={`p-3 rounded-xl border text-sm font-bold transition-all ${
-                          customizationType === "embroidery"
-                            ? "border-primary bg-primary/10 text-primary-light"
-                            : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
-                        }`}
-                      >
-                        🪡 تطريز بخيوط حريرية
-                      </button>
-                      <button
-                        onClick={() => setCustomizationType("print")}
-                        className={`p-3 rounded-xl border text-sm font-bold transition-all ${
-                          customizationType === "print"
-                            ? "border-primary bg-primary/10 text-primary-light"
-                            : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
-                        }`}
-                      >
-                        🖨️ طباعة حرارية
-                      </button>
-                    </div>
                   </div>
 
                   {/* Sash Color */}
