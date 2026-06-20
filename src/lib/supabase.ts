@@ -573,6 +573,8 @@ export async function addSupabaseProduct(product: any) {
       is_featured: product.isFeatured || false,
       is_hidden: product.isHidden || false,
       code: product.code || `JG-${Math.floor(100000 + Math.random() * 900000)}`,
+      barcode: product.barcode || `BAR-${Math.floor(10000000 + Math.random() * 90000000)}`,
+      category: product.category || "عام",
       sort_order: Number(product.sortOrder || 0),
       item_mode: product.itemMode || "both"
     };
@@ -629,7 +631,12 @@ export async function updateSupabaseProduct(productId: string, updates: any) {
       dbUpdates.status = dbStatus;
     }
 
-    if (updates.categoryId !== undefined) dbUpdates.category_id = updates.categoryId;
+    if (updates.categoryId !== undefined) {
+      dbUpdates.category_id = updates.categoryId;
+      if (updates.category) {
+        dbUpdates.category = updates.category;
+      }
+    }
     if (updates.subcategoryId !== undefined) dbUpdates.subcategory_id = updates.subcategoryId;
     if (updates.stockQuantity !== undefined) dbUpdates.stock_quantity = Number(updates.stockQuantity);
     if (updates.isFeatured !== undefined) dbUpdates.is_featured = updates.isFeatured;

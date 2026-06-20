@@ -1507,12 +1507,16 @@ ${orderSum}
     else if (prodSaleAvailable) resolvedItemMode = "sale";
     else if (prodRentAvailable) resolvedItemMode = "rent";
 
+    const categoryObj = categoriesList.find(c => c.id === prodCategoryId);
+    const categoryName = categoryObj ? categoryObj.name : "عام";
+
     const res = await addSupabaseProduct({
       name: prodName.trim(),
       priceSale: prodSaleAvailable ? prodPriceSale : "",
       priceRent: prodRentAvailable ? prodPriceRent : "",
       description: prodDescription.trim(),
       categoryId: prodCategoryId,
+      category: categoryName,
       subcategoryId: prodSubcategoryId || null,
       code: prodCode.trim(),
       stockQuantity: prodStock === "" ? 0 : prodStock,
@@ -1592,12 +1596,16 @@ ${orderSum}
     else if (editingProduct.saleAvailable) resolvedItemMode = "sale";
     else if (editingProduct.rentAvailable) resolvedItemMode = "rent";
 
+    const categoryObj = categoriesList.find(c => c.id === editingProduct.categoryId);
+    const categoryName = categoryObj ? categoryObj.name : "عام";
+
     const res = await updateSupabaseProduct(editingProduct.id, {
       name: editingProduct.name.trim(),
       priceSale: editingProduct.saleAvailable ? editingProduct.priceSale : "",
       priceRent: editingProduct.rentAvailable ? editingProduct.priceRent : "",
       description: editingProduct.description.trim(),
       categoryId: editingProduct.categoryId,
+      category: categoryName,
       subcategoryId: editingProduct.subcategoryId || null,
       code: editingProduct.code.trim(),
       stockQuantity: editingProduct.stockQuantity === "" ? 0 : editingProduct.stockQuantity,
