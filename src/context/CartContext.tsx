@@ -20,6 +20,7 @@ export interface CartItem {
   pickup_date?: string; // item-level pickup
   return_date?: string; // item-level return
   is_preliminary?: boolean; // first ready / preliminary
+  is_edged?: boolean;
 }
 
 interface CartContextType {
@@ -72,6 +73,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       item.color_sash || 'none',
       item.color_text || 'none',
       item.custom_text || 'none',
+      item.is_edged ? 'edged' : 'no_edged',
       item.pickup_date || 'none',
       item.return_date || 'none',
       item.is_preliminary ? 'prelim' : 'fixed'

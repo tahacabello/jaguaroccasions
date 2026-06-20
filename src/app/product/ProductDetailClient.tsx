@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import Image from "next/image";
-import { ShoppingCart, Heart, ShieldCheck, Truck, ChevronLeft, ChevronRight, Plus, Minus, Check, X } from "lucide-react";
+import { ShoppingCart, Heart, ShieldCheck, Truck, ChevronLeft, ChevronRight, Plus, Minus, Check, X, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { getSupabaseProducts, resolveAssetPath, getSupabaseSettings, getSupabaseCategories, getSupabaseSubcategories } from "@/lib/supabase";
@@ -132,6 +132,7 @@ export default function ProductDetailClient() {
   const [customSashColor, setCustomSashColor] = useState<string>("");
   const [textColor, setTextColor] = useState<string>("ذهبي");
   const [customText, setCustomText] = useState<string>("");
+  const [isEdged, setIsEdged] = useState<boolean>(false);
 
   // Scheduling states
   const [pickupDate, setPickupDate] = useState<string>("");
@@ -256,8 +257,38 @@ export default function ProductDetailClient() {
     if (sashColor !== "أسود") {
       extraPrice += 10;
     }
+    if (isEdged) {
+      extraPrice += 20;
+    }
   }
   const finalPrice = currentBasePrice + extraPrice;
+
+  const getWhatsAppCustomizationLink = () => {
+    const rawNumber = settings.whatsapp_number || "218921234567";
+    const cleanNumber = rawNumber.replace(/\+/g, "").replace(/\s/g, "");
+    
+    const nameLower = ((product?.name || "") + " " + (product?.category || "")).toLowerCase();
+    const sashLayers = (nameLower.includes("ثلاثي") || nameLower.includes("ثلاثية")) ? "ثلاثي الطبقات" : "ثنائي الطبقات";
+    const writeMethod = nameLower.includes("تطريز") ? "تطريز" : (nameLower.includes("طباعة") ? "طباعة" : "تطريز/طباعة");
+    
+    const pColor = sashColor === "أخرى" ? (customSashColor || "_________") : sashColor;
+    const wColor = textColor || "_________";
+    const cName = customText || "_________";
+    
+    let message = `مرحباً، أود تفصيل شال تخرج:\n`;
+    message += `- الموديل: ${product?.name || ""}\n`;
+    message += `- عدد الطبقات: ${sashLayers}\n`;
+    message += `- طريقة الكتابة: ${writeMethod}\n\n`;
+    message += `📋 تفاصيل الطلب:\n`;
+    message += `* الاسم (الجهة الأولى): ${cName}\n`;
+    message += `* الجهة الأخرى: _________\n`;
+    message += `* لون قماش الشال: ${pColor}\n`;
+    message += `* لون ال${writeMethod}: ${wColor}\n`;
+    message += `* الحواف: ${isEdged ? "مع حواف" : "بدون حواف"}\n`;
+    message += `* تفاصيل أو ملاحظات أخرى: _________\n`;
+    
+    return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`;
+  };
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -295,10 +326,12 @@ export default function ProductDetailClient() {
       inferredCustomizationType = "print";
     }
 
+    const cartItemName = isSash && isEdged ? `${product.name} (مع حواف)` : product.name;
+
     addToCart(
       {
         id: productId,
-        name: product.name,
+        name: cartItemName,
         price: finalPrice,
         image: product.image,
         mode: mode,
@@ -307,6 +340,7 @@ export default function ProductDetailClient() {
         color_sash: isSash ? (sashColor === "أخرى" ? customSashColor : sashColor) : undefined,
         color_text: isSash ? textColor : undefined,
         custom_text: isSash ? customText : undefined,
+        is_edged: isSash ? isEdged : undefined,
         pickup_date: mode === "rent" ? pickupDate : (isPreliminary ? undefined : pickupDate),
         return_date: mode === "rent" ? returnDate : undefined,
         is_preliminary: mode === "sale" ? isPreliminary : false,
@@ -686,6 +720,35 @@ export default function ProductDetailClient() {
                     </div>
                   </div>
 
+                  {/* Sash Edging/Borders */}
+                  <div>
+                    <label className="text-sm font-bold text-foreground/80 mb-2 block">حواف الشال (الكنار):</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => setIsEdged(false)}
+                        className={`p-3 rounded-xl border text-sm font-bold transition-all ${
+                          !isEdged
+                            ? "border-primary bg-primary/10 text-primary-light"
+                            : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
+                        }`}
+                      >
+                        بدون حواف إضافية
+                        <span className="text-xs opacity-75 block mt-0.5">(السعر الأساسي)</span>
+                      </button>
+                      <button
+                        onClick={() => setIsEdged(true)}
+                        className={`p-3 rounded-xl border text-sm font-bold transition-all ${
+                          isEdged
+                            ? "border-primary bg-primary/10 text-primary-light"
+                            : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
+                        }`}
+                      >
+                        إضافة حواف ذهبية/فضية
+                        <span className="text-xs text-primary-light/90 block mt-0.5">(+20 د.ل)</span>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Custom Name / Text */}
                   <div>
                     <label className="text-sm font-bold text-foreground/80 mb-2 block">الاسم المراد تطريزه/طباعته:</label>
@@ -697,6 +760,17 @@ export default function ProductDetailClient() {
                       className="w-full p-3.5 rounded-xl border border-border bg-surface/50 text-foreground font-bold focus:border-primary focus:outline-none"
                     />
                   </div>
+
+                  {/* WhatsApp Customization Coordinator Button */}
+                  <a
+                    href={getWhatsAppCustomizationLink()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full mt-4 bg-emerald-600/10 hover:bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 hover:text-emerald-300 font-bold py-3 px-4 rounded-xl transition-all shadow-sm hover:scale-[1.01]"
+                  >
+                    <MessageCircle className="w-5 h-5 text-emerald-400" />
+                    <span>تنسيق وتفصيل الشال مباشرة عبر الواتساب</span>
+                  </a>
                 </div>
               )}
 

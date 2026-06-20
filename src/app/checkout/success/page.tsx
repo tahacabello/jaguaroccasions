@@ -20,6 +20,12 @@ interface OrderItem {
   image: string;
   quantity: number;
   mode: string;
+  customization_type?: string | null;
+  layer_type?: string | null;
+  color_sash?: string | null;
+  color_text?: string | null;
+  custom_text?: string | null;
+  is_edged?: boolean | null;
 }
 
 interface SimulatedOrder {
@@ -233,7 +239,22 @@ function SuccessContent() {
     const cleanNumber = rawNumber.replace(/\+/g, "").replace(/\s/g, "");
     
     const itemsList = currentOrder.items
-      ? currentOrder.items.map(item => `📦 *${item.name}* (${item.mode === "rent" ? "إيجار" : "شراء"}) × ${item.quantity}`).join("\n")
+      ? currentOrder.items.map(item => {
+          let str = `📦 *${item.name}* (${item.mode === "rent" ? "إيجار" : "شراء"}) × ${item.quantity}`;
+          if (item.custom_text && item.custom_text !== "none") {
+            str += `\n   └ الاسم: ${item.custom_text}`;
+          }
+          if (item.color_sash && item.color_sash !== "none") {
+            str += `\n   └ لون القماش: ${item.color_sash}`;
+          }
+          if (item.color_text && item.color_text !== "none") {
+            str += `\n   └ لون الخط: ${item.color_text}`;
+          }
+          if (item.is_edged) {
+            str += `\n   └ الحواف: مع حواف (+20 د.ل)`;
+          }
+          return str;
+        }).join("\n")
       : "";
 
     let message = `*✨ تأكيد طلب جديد - متجر جاغوار للمناسبات ✨*\n\n`;
@@ -644,6 +665,26 @@ function SuccessContent() {
                               </span>
                               <span className="text-xs text-foreground/60">العدد: {item.quantity}</span>
                             </div>
+                            {item.custom_text && item.custom_text !== "none" && (
+                              <p className="text-[11px] font-bold text-primary mt-1">
+                                الاسم: {item.custom_text}
+                              </p>
+                            )}
+                            {item.color_sash && item.color_sash !== "none" && (
+                              <p className="text-[10px] text-foreground/60">
+                                لون القماش: {item.color_sash}
+                              </p>
+                            )}
+                            {item.color_text && item.color_text !== "none" && (
+                              <p className="text-[10px] text-foreground/60">
+                                لون التطريز/الطباعة: {item.color_text}
+                              </p>
+                            )}
+                            {item.is_edged && (
+                              <p className="text-[10px] text-primary-light font-semibold">
+                                حواف الشال: مع حواف (+20 د.ل)
+                              </p>
+                            )}
                           </div>
                           <span className="font-black text-sm text-primary-light shrink-0">
                             {item.price * item.quantity} د.ل

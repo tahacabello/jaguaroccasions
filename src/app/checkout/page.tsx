@@ -295,6 +295,7 @@ export default function CheckoutPage() {
           color_sash: item.color_sash || null,
           color_text: item.color_text || null,
           custom_text: item.custom_text || null,
+          is_edged: item.is_edged || false,
           pickup_date: item.pickup_date || null,
           return_date: item.return_date || null,
           is_preliminary: item.is_preliminary || false
@@ -650,6 +651,21 @@ export default function CheckoutPage() {
                         {item.custom_text && item.custom_text !== "none" && (
                           <p className="text-xs text-foreground/70 mt-1 font-bold">
                             الاسم: <span className="text-primary">{item.custom_text}</span>
+                          </p>
+                        )}
+                        {item.color_sash && item.color_sash !== "none" && (
+                          <p className="text-[11px] text-foreground/60 mt-0.5">
+                            لون القماش: <span className="text-foreground font-semibold">{item.color_sash}</span>
+                          </p>
+                        )}
+                        {item.color_text && item.color_text !== "none" && (
+                          <p className="text-[11px] text-foreground/60 mt-0.5">
+                            لون التطريز/الطباعة: <span className="text-foreground font-semibold">{item.color_text}</span>
+                          </p>
+                        )}
+                        {item.is_edged && (
+                          <p className="text-[11px] text-foreground/60 mt-0.5 font-bold">
+                            حواف الشال: <span className="text-primary-light">مع حواف (+20 د.ل)</span>
                           </p>
                         )}
                         {(item.pickup_date || item.is_preliminary) && (
