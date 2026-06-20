@@ -2,4 +2,4 @@
 2:I[15017,["/jaguaroccasions/_next/static/chunks/0r1-gwk-zzi73.js","/jaguaroccasions/_next/static/chunks/0x-j4e.z4.zq_.js"],"default"]
 3:I[86308,["/jaguaroccasions/_next/static/chunks/0r1-gwk-zzi73.js","/jaguaroccasions/_next/static/chunks/0x-j4e.z4.zq_.js"],"default"]
 4:[]
-0:{"rsc":["$","$1","c",{"children":[null,["$","$L2",null,{"parallelRouterKey":"children","template":["$","$L3",null,{}]}]]}],"isPartial":false,"staleTime":300,"varyParams":"$W4","buildId":"JlMx9bKhwXtiq9rt9P8Cc"}
+0:{"rsc":["$","$1","c",{"children":[null,["$","$L2",null,{"parallelRouterKey":"children","template":["$","$L3",null,{}]}]]}],"isPartial":false,"staleTime":300,"varyParams":"$W4","buildId":"D8V8WnkrQ-9LPFgtOUj4k"}

@@ -1,3 +1,3 @@
 :HL["/jaguaroccasions/_next/static/chunks/0so8wmc_yqwum.css","style"]
 :HL["https://fonts.googleapis.com/css2?family=Cairo:wght@200..1000&family=Tajawal:wght@400;500;700;800;900&display=swap","style"]
-0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}},"staleTime":300,"buildId":"JlMx9bKhwXtiq9rt9P8Cc"}
+0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}},"staleTime":300,"buildId":"D8V8WnkrQ-9LPFgtOUj4k"}

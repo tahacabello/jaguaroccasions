@@ -252,12 +252,14 @@ export default function ProductDetailClient() {
 
   const currentBasePrice = product ? (mode === "sale" ? product.priceSale : product.priceRent) : 0;
   
+  const bordersAvailable = settings.sash_borders_available !== "false";
+
   let extraPrice = 0;
   if (isSash) {
     if (sashColor !== "أسود") {
       extraPrice += 10;
     }
-    if (isEdged) {
+    if (isEdged && bordersAvailable) {
       extraPrice += 20;
     }
   }
@@ -284,7 +286,7 @@ export default function ProductDetailClient() {
     message += `* الجهة الأخرى: _________\n`;
     message += `* لون قماش الشال: ${pColor}\n`;
     message += `* لون ال${writeMethod}: ${wColor}\n`;
-    message += `* الحواف: ${isEdged ? "مع حواف" : "بدون حواف"}\n`;
+    message += `* الحواف: ${bordersAvailable ? (isEdged ? "مع حواف" : "بدون حواف") : "غير متوفرة حالياً"}\n`;
     message += `* تفاصيل أو ملاحظات أخرى: _________\n`;
     
     return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`;
@@ -326,7 +328,7 @@ export default function ProductDetailClient() {
       inferredCustomizationType = "print";
     }
 
-    const cartItemName = isSash && isEdged ? `${product.name} (مع حواف)` : product.name;
+    const cartItemName = isSash && isEdged && bordersAvailable ? `${product.name} (مع حواف)` : product.name;
 
     addToCart(
       {
@@ -340,7 +342,7 @@ export default function ProductDetailClient() {
         color_sash: isSash ? (sashColor === "أخرى" ? customSashColor : sashColor) : undefined,
         color_text: isSash ? textColor : undefined,
         custom_text: isSash ? customText : undefined,
-        is_edged: isSash ? isEdged : undefined,
+        is_edged: isSash ? (isEdged && bordersAvailable) : undefined,
         pickup_date: mode === "rent" ? pickupDate : (isPreliminary ? undefined : pickupDate),
         return_date: mode === "rent" ? returnDate : undefined,
         is_preliminary: mode === "sale" ? isPreliminary : false,
@@ -723,30 +725,36 @@ export default function ProductDetailClient() {
                   {/* Sash Edging/Borders */}
                   <div>
                     <label className="text-sm font-bold text-foreground/80 mb-2 block">حواف الشال (الكنار):</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        onClick={() => setIsEdged(false)}
-                        className={`p-3 rounded-xl border text-sm font-bold transition-all ${
-                          !isEdged
-                            ? "border-primary bg-primary/10 text-primary-light"
-                            : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
-                        }`}
-                      >
-                        بدون حواف إضافية
-                        <span className="text-xs opacity-75 block mt-0.5">(السعر الأساسي)</span>
-                      </button>
-                      <button
-                        onClick={() => setIsEdged(true)}
-                        className={`p-3 rounded-xl border text-sm font-bold transition-all ${
-                          isEdged
-                            ? "border-primary bg-primary/10 text-primary-light"
-                            : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
-                        }`}
-                      >
-                        إضافة حواف ذهبية/فضية
-                        <span className="text-xs text-primary-light/90 block mt-0.5">(+20 د.ل)</span>
-                      </button>
-                    </div>
+                    {!bordersAvailable ? (
+                      <div className="p-3 bg-red-950/20 border border-red-500/20 text-red-400 font-bold rounded-xl text-xs text-center">
+                        ⚠️ خيار حواف الشال غير متوفر حالياً
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          onClick={() => setIsEdged(false)}
+                          className={`p-3 rounded-xl border text-sm font-bold transition-all ${
+                            !isEdged
+                              ? "border-primary bg-primary/10 text-primary-light"
+                              : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
+                          }`}
+                        >
+                          بدون حواف إضافية
+                          <span className="text-xs opacity-75 block mt-0.5">(السعر الأساسي)</span>
+                        </button>
+                        <button
+                          onClick={() => setIsEdged(true)}
+                          className={`p-3 rounded-xl border text-sm font-bold transition-all ${
+                            isEdged
+                              ? "border-primary bg-primary/10 text-primary-light"
+                              : "border-border bg-surface hover:bg-surface-hover text-foreground/80"
+                          }`}
+                        >
+                          إضافة حواف
+                          <span className="text-xs text-primary-light/90 block mt-0.5">(+20 د.ل)</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Custom Name / Text */}

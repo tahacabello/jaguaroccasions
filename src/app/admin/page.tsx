@@ -3068,6 +3068,17 @@ ${orderSum}
                             className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary"
                           />
                         </div>
+                        <div className="space-y-2">
+                          <label className="block text-xs font-bold text-foreground/80">توفر حواف الشيلان (الكنار)</label>
+                          <select
+                            value={settings.sash_borders_available === "false" ? "false" : "true"}
+                            onChange={(e) => setSettings(prev => ({ ...prev, sash_borders_available: e.target.value }))}
+                            className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-sm text-foreground focus:outline-none focus:border-primary font-bold cursor-pointer"
+                          >
+                            <option value="true">متوفرة (يستطيع الزبائن اختيار الحواف بزيادة +20 د.ل)</option>
+                            <option value="false">غير متوفرة حالياً (يتم إيقاف خيار إضافة حواف للزبائن مؤقتاً)</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
                   )}
