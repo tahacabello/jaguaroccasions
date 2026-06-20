@@ -421,6 +421,9 @@ export default function SalesManager({
           if (item.custom_text) {
             customizationDetails += ' | الاسم: <strong>' + item.custom_text + '</strong>';
           }
+          if (item.is_edged) {
+            customizationDetails += ' | حواف: مع حواف (+20 د.ل)';
+          }
           if (item.pickup_date || item.is_preliminary) {
             customizationDetails += ' | استلام: <strong>' + (item.is_preliminary ? 'أول ما يجهز' : item.pickup_date) + '</strong>';
           }
