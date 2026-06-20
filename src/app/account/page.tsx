@@ -436,7 +436,7 @@ export default function AccountPage() {
 ${itemsList}
 المجموع: ${order.total_amount} د.ل`;
 
-    return `https://wa.me/218921234567?text=${encodeURIComponent(message)}`;
+    return `https://wa.me/218921544663?text=${encodeURIComponent(message)}`;
   };
 
   const renderChangeRequestStatus = (ord: any) => {

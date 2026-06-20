@@ -235,7 +235,7 @@ function SuccessContent() {
 
   // Generate WhatsApp confirmation link with pre-filled message detailing order
   const getWhatsAppLink = () => {
-    const rawNumber = settings.whatsapp_number || "+218921234567";
+    const rawNumber = settings.whatsapp_number || "218921544663";
     const cleanNumber = rawNumber.replace(/\+/g, "").replace(/\s/g, "");
     
     const itemsList = currentOrder.items
