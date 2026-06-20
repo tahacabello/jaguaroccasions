@@ -250,6 +250,18 @@ export default function ProductDetailClient() {
     (product.name && product.name.includes("شال"))
   ) : false;
 
+  const getMinSashDate = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split("T")[0];
+  };
+
+  const getMaxSashDate = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    return d.toISOString().split("T")[0];
+  };
+
   const currentBasePrice = product ? (mode === "sale" ? product.priceSale : product.priceRent) : 0;
   
   const bordersAvailable = settings.sash_borders_available !== "false";
@@ -303,6 +315,26 @@ export default function ProductDetailClient() {
     if (mode === "rent" && (!pickupDate || !returnDate)) {
       setValidationError("الرجاء تحديد تواريخ الاستلام والإرجاع للإيجار.");
       return;
+    }
+
+    // Validate 1-2 weeks pickup date range for sashes
+    if (isSash && pickupDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selected = new Date(pickupDate);
+      selected.setHours(0, 0, 0, 0);
+      
+      const diffTime = selected.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays < 7) {
+        setValidationError("عذراً، يتطلب تفصيل وتجهيز الشال أسبوعاً واحداً على الأقل (7 أيام) من اليوم.");
+        return;
+      }
+      if (diffDays > 14) {
+        setValidationError("عذراً، أقصى مدة لتفصيل وتجهيز الشال هي أسبوعين (14 يوماً) من اليوم.");
+        return;
+      }
     }
 
     const cartItemName = isSash && isEdged && bordersAvailable ? `${product.name} (مع حواف)` : product.name;
@@ -738,6 +770,11 @@ export default function ProductDetailClient() {
                       <div>
                         <span className="text-sm font-bold text-foreground block">الاستلام أول ما يجهز</span>
                         <span className="text-xs text-foreground/60">يتيح لك استلام القطعة فور انتهاء حياكتها وتجهيزها</span>
+                        {isSash && (
+                          <span className="text-[10px] text-amber-500 font-bold block mt-1">
+                            * يستغرق تفصيل وتجهيز الشال من أسبوع إلى أسبوعين كحد أقصى.
+                          </span>
+                        )}
                       </div>
                       <input
                         type="checkbox"
@@ -757,31 +794,47 @@ export default function ProductDetailClient() {
                           type="date"
                           value={pickupDate}
                           onChange={(e) => setPickupDate(e.target.value)}
+                          min={isSash ? getMinSashDate() : undefined}
+                          max={isSash ? getMaxSashDate() : undefined}
                           className="w-full p-3.5 rounded-xl border border-border bg-surface/50 text-foreground font-bold focus:border-primary focus:outline-none"
                         />
+                        {isSash && (
+                          <span className="text-[10px] text-amber-500 font-bold block mt-1.5">
+                            * يُسمح فقط باختيار التواريخ المتاحة لتفصيل الشال (من 7 إلى 14 يوماً من اليوم).
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-bold text-foreground/80 mb-2 block">تاريخ الاستلام:</label>
-                      <input
-                        type="date"
-                        value={pickupDate}
-                        onChange={(e) => setPickupDate(e.target.value)}
-                        className="w-full p-3.5 rounded-xl border border-border bg-surface/50 text-foreground font-bold focus:border-primary focus:outline-none"
-                      />
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-bold text-foreground/80 mb-2 block">تاريخ الاستلام:</label>
+                        <input
+                          type="date"
+                          value={pickupDate}
+                          onChange={(e) => setPickupDate(e.target.value)}
+                          min={isSash ? getMinSashDate() : undefined}
+                          max={isSash ? getMaxSashDate() : undefined}
+                          className="w-full p-3.5 rounded-xl border border-border bg-surface/50 text-foreground font-bold focus:border-primary focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-bold text-foreground/80 mb-2 block">تاريخ الإرجاع:</label>
+                        <input
+                          type="date"
+                          value={returnDate}
+                          onChange={(e) => setReturnDate(e.target.value)}
+                          className="w-full p-3.5 rounded-xl border border-border bg-surface/50 text-foreground font-bold focus:border-primary focus:outline-none"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-sm font-bold text-foreground/80 mb-2 block">تاريخ الإرجاع:</label>
-                      <input
-                        type="date"
-                        value={returnDate}
-                        onChange={(e) => setReturnDate(e.target.value)}
-                        className="w-full p-3.5 rounded-xl border border-border bg-surface/50 text-foreground font-bold focus:border-primary focus:outline-none"
-                      />
-                    </div>
+                    {isSash && (
+                      <span className="text-[10px] text-amber-500 font-bold block">
+                        * تفصيل وتجهيز الشال للإيجار يتطلب اختيار تاريخ استلام خلال (7 إلى 14 يوماً من اليوم).
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
