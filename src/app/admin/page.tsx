@@ -1557,74 +1557,82 @@ ${orderSum}
     e.preventDefault();
     if (!editingProduct) return;
 
-    if (!editingProduct.name.trim()) {
-      alert("اسم المنتج مطلوب");
-      return;
-    }
-    if (!editingProduct.categoryId) {
-      alert("القسم الرئيسي مطلوب");
-      return;
-    }
-    if (editingProduct.stockQuantity < 0 && editingProduct.stockQuantity !== -1) {
-      alert("كمية المخزن غير صالحة");
-      return;
-    }
+    try {
+      const nameVal = (editingProduct.name || "").trim();
+      if (!nameVal) {
+        alert("اسم المنتج مطلوب");
+        return;
+      }
+      if (!editingProduct.categoryId) {
+        alert("القسم الرئيسي مطلوب");
+        return;
+      }
+      
+      const stockVal = editingProduct.stockQuantity === "" ? 0 : Number(editingProduct.stockQuantity);
+      if (isNaN(stockVal) || (stockVal < 0 && stockVal !== -1)) {
+        alert("كمية المخزن غير صالحة");
+        return;
+      }
 
-    // Pricing validation
-    if (editingProduct.saleAvailable && (editingProduct.priceSale === "" || Number(editingProduct.priceSale) < 0)) {
-      alert("يرجى إدخال سعر بيع صالح عند تفعيل خيار البيع");
-      return;
-    }
-    if (editingProduct.rentAvailable && (editingProduct.priceRent === "" || Number(editingProduct.priceRent) < 0)) {
-      alert("يرجى إدخال سعر إيجار صالح عند تفعيل خيار الإيجار");
-      return;
-    }
+      // Pricing validation
+      if (editingProduct.saleAvailable && (editingProduct.priceSale === "" || Number(editingProduct.priceSale) < 0)) {
+        alert("يرجى إدخال سعر بيع صالح عند تفعيل خيار البيع");
+        return;
+      }
+      if (editingProduct.rentAvailable && (editingProduct.priceRent === "" || Number(editingProduct.priceRent) < 0)) {
+        alert("يرجى إدخال سعر إيجار صالح عند تفعيل خيار الإيجار");
+        return;
+      }
 
-    const isUnavailableOrHidden = 
-      editingProduct.status === "unavailable" || 
-      editingProduct.status === "hidden" || 
-      editingProduct.status === "غير متوفر" || 
-      editingProduct.status === "مخفي";
+      const isUnavailableOrHidden = 
+        editingProduct.status === "unavailable" || 
+        editingProduct.status === "hidden" || 
+        editingProduct.status === "غير متوفر" || 
+        editingProduct.status === "مخفي";
 
-    if (!editingProduct.saleAvailable && !editingProduct.rentAvailable && !isUnavailableOrHidden) {
-      alert("يجب تفعيل خيار البيع أو الإيجار أو كلاهما للمنتجات المتوفرة.");
-      return;
-    }
+      if (!editingProduct.saleAvailable && !editingProduct.rentAvailable && !isUnavailableOrHidden) {
+        alert("يجب تفعيل خيار البيع أو الإيجار أو كلاهما للمنتجات المتوفرة.");
+        return;
+      }
 
-    let resolvedItemMode = "both";
-    if (editingProduct.saleAvailable && editingProduct.rentAvailable) resolvedItemMode = "both";
-    else if (editingProduct.saleAvailable) resolvedItemMode = "sale";
-    else if (editingProduct.rentAvailable) resolvedItemMode = "rent";
+      let resolvedItemMode = "both";
+      if (editingProduct.saleAvailable && editingProduct.rentAvailable) resolvedItemMode = "both";
+      else if (editingProduct.saleAvailable) resolvedItemMode = "sale";
+      else if (editingProduct.rentAvailable) resolvedItemMode = "rent";
 
-    const categoryObj = categoriesList.find(c => c.id === editingProduct.categoryId);
-    const categoryName = categoryObj ? categoryObj.name : "عام";
+      const categoryObj = categoriesList.find(c => c.id === editingProduct.categoryId);
+      const categoryName = categoryObj ? categoryObj.name : "عام";
 
-    const res = await updateSupabaseProduct(editingProduct.id, {
-      name: editingProduct.name.trim(),
-      priceSale: editingProduct.saleAvailable ? editingProduct.priceSale : "",
-      priceRent: editingProduct.rentAvailable ? editingProduct.priceRent : "",
-      description: editingProduct.description.trim(),
-      categoryId: editingProduct.categoryId,
-      category: categoryName,
-      subcategoryId: editingProduct.subcategoryId || null,
-      code: editingProduct.code.trim(),
-      stockQuantity: editingProduct.stockQuantity === "" ? 0 : editingProduct.stockQuantity,
-      status: editingProduct.status,
-      isFeatured: editingProduct.isFeatured,
-      isHidden: editingProduct.isHidden,
-      image: prodImage || editingProduct.image,
-      images: prodImages,
-      sortOrder: editingProduct.sortOrder,
-      itemMode: resolvedItemMode
-    });
+      const res = await updateSupabaseProduct(editingProduct.id, {
+        name: nameVal,
+        priceSale: editingProduct.saleAvailable ? editingProduct.priceSale : "",
+        priceRent: editingProduct.rentAvailable ? editingProduct.priceRent : "",
+        description: (editingProduct.description || "").trim(),
+        categoryId: editingProduct.categoryId,
+        category: categoryName,
+        subcategoryId: editingProduct.subcategoryId || null,
+        code: (editingProduct.code || "").trim(),
+        stockQuantity: stockVal,
+        status: editingProduct.status,
+        isFeatured: editingProduct.isFeatured,
+        isHidden: editingProduct.isHidden,
+        image: prodImage || editingProduct.image,
+        images: prodImages,
+        sortOrder: editingProduct.sortOrder,
+        itemMode: resolvedItemMode
+      });
 
-    if (res.success) {
-      setEditingProduct(null);
-      setProdImage("");
-      setProdImages([]);
-      refreshAllData();
-    } else {
-      alert("فشل تعديل المنتج");
+      if (res.success) {
+        setEditingProduct(null);
+        setProdImage("");
+        setProdImages([]);
+        refreshAllData();
+      } else {
+        alert(`فشل تعديل المنتج: ${res.error || "خطأ غير معروف"}`);
+      }
+    } catch (err: any) {
+      console.error("Error editing product:", err);
+      alert(`حدث خطأ أثناء تعديل المنتج: ${err.message || String(err)}`);
     }
   };
 
@@ -1644,11 +1652,15 @@ ${orderSum}
     const rentAvail = prod.itemMode === "rent" || prod.itemMode === "both";
     setEditingProduct({
       ...prod,
+      name: prod.name || "",
+      description: prod.description || "",
+      code: prod.code || "",
       status: prod.statusKey || "available",
       priceSale: prod.priceSale === null || prod.priceSale === undefined || prod.priceSale === 0 ? "" : String(prod.priceSale),
       priceRent: prod.priceRent === null || prod.priceRent === undefined || prod.priceRent === 0 ? "" : String(prod.priceRent),
       saleAvailable: saleAvail,
-      rentAvailable: rentAvail
+      rentAvailable: rentAvail,
+      stockQuantity: prod.stockQuantity === null || prod.stockQuantity === undefined ? 0 : prod.stockQuantity
     });
     setProdImage(prod.image);
     setProdImages(prod.images || []);
